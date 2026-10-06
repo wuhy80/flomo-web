@@ -71,6 +71,9 @@ interface StoredConfig {
 /** Auto-save debounce, matching the web app's feel. */
 const AUTOSAVE_MS = 1500
 
+/** How many distinct state-reading clients to remember. */
+const MAX_STATE_CLIENTS = 5
+
 /** How many memos the agent-facing listings return by default. */
 export const DEFAULT_LIST_LIMIT = 20
 
@@ -118,6 +121,7 @@ export class FlomoHostService {
   private toolsRegistered = false
   private toolsError: string | null = null
   private lastMessage: string | null = null
+  private stateClients: string[] = []
 
   /**
    * @param options - the credentials service, config path and store factory.
@@ -263,6 +267,7 @@ export class FlomoHostService {
       recoveryCode: this.recoveryCode,
       toolsRegistered: this.toolsRegistered,
       toolsError: this.toolsError,
+      stateClients: this.stateClients,
     }
   }
 
@@ -278,6 +283,22 @@ export class FlomoHostService {
   setToolsStatus(registered: boolean, error: string | null = null): void {
     this.toolsRegistered = registered
     this.toolsError = error
+  }
+
+  /**
+   * Record that some client read the state.
+   *
+   * The browser half reads it on mount, so a browser user agent showing up here
+   * is the only externally visible evidence that the panel actually loaded — the
+   * shell's own index needs auth that lives in the desktop shell's memory.
+   * @param userAgent - the request's user agent, when it sent one.
+   */
+  noteStateRead(userAgent: string | null): void {
+    const client = userAgent ?? '(no user agent)'
+    this.stateClients = [client, ...this.stateClients.filter((seen) => seen !== client)].slice(
+      0,
+      MAX_STATE_CLIENTS,
+    )
   }
 
   /**

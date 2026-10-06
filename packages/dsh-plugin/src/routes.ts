@@ -118,6 +118,9 @@ export function makeFlomoRoutes(host: FlomoHostService): WebRoute[] {
       if (req.method !== 'GET') return writeJson(res, 405, { ok: false, error: 'method-not-allowed' })
       if (!guard(req, res)) return
       await host.ensureStarted()
+      // Recorded before the snapshot is built, so this read is included in it.
+      const agent = req.headers['user-agent']
+      host.noteStateRead(typeof agent === 'string' ? agent : null)
       writeJson(res, 200, { ok: true, state: await host.fullSnapshot() })
     },
   }

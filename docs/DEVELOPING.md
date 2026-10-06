@@ -107,8 +107,12 @@ Invoke-WebRequest -Uri "http://127.0.0.1:19387/flomo-sim/api/state" -UseBasicPar
   -Headers @{ "sec-fetch-site" = "same-origin" } | Select-Object -ExpandProperty Content
 ```
 
-那个 `toolsRegistered` / `toolsError` 字段就是为这件事加的 —— 它在这一轮直接
-指出了工具为什么没注册上。
+那个 `toolsRegistered` / `toolsError` 字段就是为这件事加的 —— 它直接指出了
+工具为什么没注册上。
+
+同一个路由还返回 `stateClients`：**读过状态的客户端 User-Agent**。面板在挂载时会读一次，
+所以那里出现一个浏览器 UA，就是**浏览器半真的加载并挂载了**的唯一外部可见证据 ——
+因为 GUI 自己的 index 需要只有桌面壳才持有的鉴权（见坑 8）。
 
 ### 4. `defineTool` 不是等价函数
 

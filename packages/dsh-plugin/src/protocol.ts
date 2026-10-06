@@ -44,6 +44,15 @@ export interface HostState {
   toolsRegistered: boolean
   /** Why the tools are unavailable, when they are. */
   toolsError: string | null
+  /**
+   * Distinct user agents that have read this state, newest first, capped.
+   *
+   * The panel reads it on mount, so a browser user agent appearing here is
+   * evidence that the browser half actually loaded and mounted — which is
+   * otherwise invisible from outside the GUI, since the shell's own index
+   * requires auth that only the desktop shell holds.
+   */
+  stateClients: string[]
 }
 
 /** Every mutation the panel or an agent tool may request. */

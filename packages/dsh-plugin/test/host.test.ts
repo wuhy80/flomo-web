@@ -381,4 +381,42 @@ describe('http surface', () => {
       server.close()
     }
   })
+
+  it('records which clients have read the state', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
+    temporaryDirs.push(dir)
+    const { host } = await makeHost(dir, new MemoryStore())
+    const { server, base } = await serve(host)
+    const sameOrigin = { 'sec-fetch-site': 'same-origin' }
+
+    /**
+     * Read the state as a given client.
+     * @param agent - the user agent to send.
+     * @returns the reported client list.
+     */
+    const readAs = async (agent: string): Promise<string[]> => {
+      const response = await fetch(`${base}${API_PREFIX}/state`, {
+        headers: { ...sameOrigin, 'user-agent': agent },
+      })
+      const body = (await response.json()) as { state: { stateClients: string[] } }
+      return body.state.stateClients
+    }
+
+    try {
+      // The browser half reads the state on mount, so a browser user agent here
+      // is the only externally visible evidence that the panel loaded at all.
+      assert.deepEqual(await readAs('Mozilla/5.0 Chrome/120'), ['Mozilla/5.0 Chrome/120'])
+      assert.deepEqual(await readAs('WindowsPowerShell/5.1'), [
+        'WindowsPowerShell/5.1',
+        'Mozilla/5.0 Chrome/120',
+      ])
+      assert.deepEqual(
+        await readAs('Mozilla/5.0 Chrome/120'),
+        ['Mozilla/5.0 Chrome/120', 'WindowsPowerShell/5.1'],
+        'newest first, and a repeat does not duplicate',
+      )
+    } finally {
+      server.close()
+    }
+  })
 })
