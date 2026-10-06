@@ -298,7 +298,8 @@ dsh credentials set FLOMO_PASSWORD
 ```
 packages/
 ├─ core/        零依赖内核：加密、Memo 模型、#标签解析、按月分片、GitHub 存储
-│  └─ testing.ts   内存版仓库，两个测试套件共用
+│  └─ src/testing.ts   内存版仓库，以 `@flomo/core/testing` 子路径导出，
+│                      四个包的测试都用它，不跨包去够别人的测试目录
 ├─ ui/          flomo 风格 React 组件与样式，网页版和面板共用
 ├─ web/         Vite 应用 + Pages 部署
 └─ dsh-plugin/  dsh-flomo 双面插件

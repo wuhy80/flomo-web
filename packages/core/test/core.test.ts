@@ -46,7 +46,7 @@ import {
   corpusStats,
 } from '../src/index.ts'
 import type { Memo } from '../src/index.ts'
-import { MemoryStore } from './memory-store.ts'
+import { MemoryStore } from '@flomo/core/testing'
 
 /** Tiny work factor so the suite stays fast. */
 const FAST = 1_000

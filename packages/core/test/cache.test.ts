@@ -9,9 +9,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
+import { MemoryStore } from '@flomo/core/testing'
 import { CachingTextStore, MemoryCacheArea } from '../src/cache.ts'
 import type { CacheArea } from '../src/cache.ts'
-import { MemoryStore } from '../src/testing.ts'
 import type { GitHubDirEntry } from '../src/github.ts'
 import type { TextStore } from '../src/vault.ts'
 
