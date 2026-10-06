@@ -13,6 +13,8 @@ export type { FeedProps } from './Feed.tsx'
 export { FlomoApp } from './FlomoApp.tsx'
 export type { FlomoAppProps } from './FlomoApp.tsx'
 
+export { downloadText } from './download.ts'
+
 export { GitHubVaultSession, DEFAULT_AUTOSAVE_MS } from './github-session.ts'
 export type { GitHubSessionOptions } from './github-session.ts'
 

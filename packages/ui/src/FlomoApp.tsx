@@ -11,9 +11,10 @@
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { corpusStats, dailyReview, randomWalk, searchMemos } from '@flomo/core'
+import { corpusStats, dailyReview, exportFilename, memosToJson, memosToMarkdown, randomWalk, searchMemos } from '@flomo/core'
 
 import { Composer } from './Composer.tsx'
+import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
 import { Heatmap } from './Heatmap.tsx'
 import { Sidebar } from './Sidebar.tsx'
@@ -315,14 +316,48 @@ export function FlomoApp({
                   笔记以 AES-256-GCM 加密后存放，密码不会离开本机。请务必另存好恢复码 ——
                   忘记密码时它是唯一的入口。
                 </p>
-                <button
-                  type="button"
-                  className="fl-button fl-button-primary"
-                  onClick={() => void session.save()}
-                  disabled={snapshot.saving}
-                >
-                  {snapshot.saving ? '保存中…' : '立即保存'}
-                </button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="fl-button fl-button-primary"
+                    onClick={() => void session.save()}
+                    disabled={snapshot.saving}
+                  >
+                    {snapshot.saving ? '保存中…' : '立即保存'}
+                  </button>
+                  <button
+                    type="button"
+                    className="fl-button"
+                    disabled={snapshot.memos.length === 0}
+                    onClick={() =>
+                      downloadText(
+                        exportFilename('md'),
+                        memosToMarkdown(snapshot.memos),
+                        'text/markdown',
+                      )
+                    }
+                  >
+                    导出 Markdown
+                  </button>
+                  <button
+                    type="button"
+                    className="fl-button"
+                    disabled={snapshot.memos.length === 0}
+                    onClick={() =>
+                      downloadText(
+                        exportFilename('json'),
+                        memosToJson(snapshot.memos),
+                        'application/json',
+                      )
+                    }
+                  >
+                    导出 JSON
+                  </button>
+                </div>
+                <p className="fl-recovery-hint">
+                  导出的是明文。请把它放在你信任的地方 —— 这也是万一忘记密码和恢复码时，
+                  唯一能把文字带走的办法。
+                </p>
               </div>
               {renderSettingsExtra?.()}
             </>

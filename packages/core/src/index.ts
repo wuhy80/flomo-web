@@ -36,6 +36,14 @@ export {
 } from './github.ts'
 export type { GitHubContentsOptions, GitHubDirEntry, GitHubFile } from './github.ts'
 
+export {
+  EXPORT_FORMAT,
+  exportFilename,
+  memosToJson,
+  memosToMarkdown,
+} from './export.ts'
+export type { ExportPayload } from './export.ts'
+
 export { dailyReview, pickRandom, randomWalk, searchMemos } from './search.ts'
 export type { SearchQuery } from './search.ts'
 
@@ -45,7 +53,15 @@ export type { CorpusStats } from './stats.ts'
 export { hasTag, parseTags, tagKey, tagSegments, tagStats, tokenizeTags } from './tags.ts'
 export type { TagStat, TagToken } from './tags.ts'
 
-export { clockOf, dayLabel, dayOf, monthOf, recentMonths } from './time.ts'
+export {
+  absoluteDayLabel,
+  clockOf,
+  dayLabel,
+  dayOf,
+  fileStamp,
+  monthOf,
+  recentMonths,
+} from './time.ts'
 
 export {
   DATA_DIR,

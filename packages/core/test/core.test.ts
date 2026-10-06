@@ -12,11 +12,15 @@ import { describe, it } from 'node:test'
 
 import {
   DEFAULT_ITERATIONS,
+  EXPORT_FORMAT,
   FlomoVault,
   GitHubConflictError,
   WrongPasswordError,
   dailyReview,
   dayOf,
+  exportFilename,
+  memosToJson,
+  memosToMarkdown,
   monthOf,
   parseTags,
   pickRandom,
@@ -333,5 +337,82 @@ describe('queries', () => {
     assert.equal(stats.memos, 3)
     assert.equal(stats.tags, 2)
     assert.equal(stats.activeDays, 3)
+  })
+})
+
+describe('export', () => {
+  const now = new Date(2026, 9, 6, 14, 30)
+
+  /**
+   * Build a timestamp from local wall-clock parts.
+   *
+   * Local rather than UTC on purpose: the export groups by the user's local day,
+   * so a UTC literal would make these assertions depend on the runner's zone.
+   */
+  const at = (year: number, month: number, day: number, hour = 9, minute = 0): string =>
+    new Date(year, month - 1, day, hour, minute).toISOString()
+
+  it('groups markdown by absolute day, oldest first', () => {
+    const md = memosToMarkdown(
+      [
+        memo({ id: 'b', content: '第二条 #x', createdAt: at(2025, 6, 2, 10, 5) }),
+        memo({ id: 'a', content: '第一条 #y', createdAt: at(2025, 6, 1, 9, 0) }),
+      ],
+      now,
+    )
+
+    assert.ok(md.indexOf('第一条') < md.indexOf('第二条'), 'oldest memo reads first')
+    assert.match(md, /## 2025年6月1日/)
+    assert.match(md, /## 2025年6月2日/)
+    assert.match(md, /### 09:00/)
+    assert.match(md, /### 10:05/)
+    assert.match(md, /第一条 #y/, 'tags stay inline in the body')
+    assert.match(md, /共 2 条/)
+  })
+
+  it('marks pinned and edited memos without touching the body', () => {
+    const md = memosToMarkdown(
+      [
+        memo({
+          content: '被改过 #x',
+          createdAt: at(2025, 6, 1, 9, 0),
+          updatedAt: at(2025, 6, 1, 11, 0),
+          pinned: true,
+        }),
+      ],
+      now,
+    )
+    assert.match(md, /### 09:00 · 置顶 · 已编辑/)
+    assert.match(md, /被改过 #x/)
+  })
+
+  it('never writes a relative day label', () => {
+    const md = memosToMarkdown([memo({ content: '今天写的', createdAt: at(2026, 10, 6, 8, 0) })], now)
+    assert.ok(!md.includes('## 今天'), 'an export is read later; a relative label would lie')
+    assert.match(md, /## 2026年10月6日/)
+  })
+
+  it('round-trips every field through json', () => {
+    const source = memo({ id: 'keep-me', content: '一条 #x', createdAt: at(2025, 6, 1), pinned: true })
+    const parsed = JSON.parse(memosToJson([source], now)) as {
+      format: string
+      exportedAt: string
+      count: number
+      memos: Memo[]
+    }
+    assert.equal(parsed.format, EXPORT_FORMAT)
+    assert.equal(parsed.count, 1)
+    assert.equal(parsed.exportedAt, now.toISOString())
+    assert.deepEqual(parsed.memos[0], source)
+  })
+
+  it('handles an empty corpus', () => {
+    assert.match(memosToMarkdown([], now), /还没有任何记录/)
+    assert.equal((JSON.parse(memosToJson([], now)) as { count: number }).count, 0)
+  })
+
+  it('names the file after the export instant', () => {
+    assert.equal(exportFilename('md', now), 'flomo-20261006-1430.md')
+    assert.equal(exportFilename('json', now), 'flomo-20261006-1430.json')
   })
 })

@@ -48,6 +48,9 @@ export function recentMonths(count: number, from: Date = new Date()): string[] {
   return out
 }
 
+/** Weekday names, indexed by `Date#getDay`. */
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const
+
 /**
  * Human-readable Chinese label for a day, used as a feed group header.
  * @param dayKey - a `YYYY-MM-DD` key.
@@ -64,9 +67,37 @@ export function dayLabel(dayKey: string, today: Date = new Date()): string {
   const [y, m, d] = dayKey.split('-').map(Number)
   if (y === undefined || m === undefined || d === undefined) return dayKey
   const date = new Date(y, m - 1, d)
-  const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()] ?? ''
+  const weekday = WEEKDAYS[date.getDay()] ?? ''
   if (y === today.getFullYear()) return `${m}月${d}日 ${weekday}`
   return `${y}年${m}月${d}日`
+}
+
+/**
+ * Fully-qualified label for a day, with no reference to today.
+ *
+ * Used by exports, where "今天" would be meaningless the moment the file is
+ * read back.
+ * @param dayKey - a `YYYY-MM-DD` key.
+ * @returns a label such as `2026年10月6日 周二`.
+ */
+export function absoluteDayLabel(dayKey: string): string {
+  const [y, m, d] = dayKey.split('-').map(Number)
+  if (y === undefined || m === undefined || d === undefined) return dayKey
+  const weekday = WEEKDAYS[new Date(y, m - 1, d).getDay()] ?? ''
+  return `${y}年${m}月${d}日 ${weekday}`
+}
+
+/**
+ * Local-time stamp suitable for a filename: `YYYY-MM-DD-HHmm`.
+ * @param at - the instant to stamp.
+ * @returns the stamp.
+ */
+export function fileStamp(at: Date = new Date()): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return (
+    `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
+    `-${pad(at.getHours())}${pad(at.getMinutes())}`
+  )
 }
 
 /**
