@@ -285,11 +285,14 @@ dsh credentials set FLOMO_PASSWORD
 |---|---|
 | `pnpm dev` | 启动网页版开发服务器 |
 | `pnpm build` | 构建网页版（`packages/web/dist`） |
+| `pnpm preview` | 预览已构建的产物 |
 | `pnpm smoke` | **部署冒烟测试**：像 GitHub Pages 那样静态服务 `dist/`，逐项检查 |
 | `pnpm build:plugin` | 构建 DSH 插件两半 |
 | `pnpm watch:plugin` | 监听模式重建插件 |
 | `pnpm test` | 跑 core / ui / 插件 / web 的测试 |
 | `pnpm typecheck` | 全仓类型检查 |
+| `pnpm --filter @flomo/web shots` | 截图（需要 dev server，见上） |
+| `pnpm --filter @flomo/web interact` | 真实浏览器交互检查（需要 dev server，见上） |
 
 ---
 
@@ -376,6 +379,24 @@ node packages/web/scripts/screenshot.mjs http://127.0.0.1:5273/ gate.png --locke
 - 我在正文里写 `**加粗**`，而应用把它**原样显示成星号**（顺带发现行内代码的 CSS 一直存在，
   但分词器从来不产生这种 token）
 - 「在我的账号下创建这个私有仓库」用的是 ghost 样式，渲染出来**像一行灰字，不像按钮**
+
+### 用真实浏览器**操作**它
+
+看还不够 —— 截图只到"渲染出来了"为止。`packages/web/scripts/interact.mjs` 会
+**在真实的输入框里打字、点发送、点编辑、点置顶**，然后检查应用**到底想持久化什么**。
+
+```bash
+pnpm --filter @flomo/web interact      # 两种视口各跑一遍，23 项检查
+```
+
+它验证的是那些**只有交互才能暴露**的东西：新记录出现在信息流、输入框自清空、
+`#标签` 从正文解析出来、编辑是**替换**而不是追加、置顶**真的改变顺序** ——
+以及**每一次写入里都没有明文**。
+
+最后一条是**整个项目的核心主张**，而它是在**浏览器里**被验证的，不是靠服务层。
+（顺带：它抓到过"手机上没有导航"—— 侧栏在窄屏被整个隐藏，而**看截图看不出能不能用**。）
+
+两者共用 `packages/web/scripts/harness.mjs`；抽取时验证过重构前后截图的**哈希完全一致**。
 
 ### 单元与集成测试
 
