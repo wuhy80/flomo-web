@@ -473,6 +473,41 @@ describe('built client bundle', () => {
     assert.match(html, /离线也能读到这一条/, 'and the cached content still renders')
   })
 
+  it('renders fenced code verbatim and quotes as quotes', async () => {
+    const { registrations } = await loadClientBundle()
+    const page = registrations.find((r) => r.name === 'main')
+    assert.ok(page)
+    const Panel = page.component as React.ComponentType<{ session: unknown }>
+
+    const { session } = fakeSession({
+      status: 'unlocked',
+      memos: [
+        memo({
+          content: '看这段 #真标签\n```c\n#include <stdio.h>\n```\n> 一句引用',
+          tags: ['真标签'],
+        }),
+      ],
+    })
+
+    const html = renderToString(React.createElement(Panel, { session }))
+
+    assert.match(html, /<pre class="fl-code"/, 'a fence becomes a code block')
+    assert.match(html, /#include/, 'the snippet is shown')
+    assert.match(html, /stdio\.h/, 'and escaped rather than interpreted')
+    assert.match(html, /<blockquote class="fl-quote"/, 'a > run becomes a quote')
+    assert.match(html, /一句引用/)
+
+    // The decisive assertion: `#include` must never appear as a tag mark.
+    const marks = [...html.matchAll(/class="fl-memo-tag"[^>]*>([^<]*)</g)].map(
+      (match) => match[1],
+    )
+    assert.deepEqual(
+      [...new Set(marks)],
+      ['#真标签'],
+      'only the prose tag is a tag; the C directive is not',
+    )
+  })
+
   it('renders the password gate when the vault is locked', async () => {
     const { registrations } = await loadClientBundle()
     const page = registrations.find((r) => r.name === 'main')

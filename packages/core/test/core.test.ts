@@ -25,10 +25,12 @@ import {
   memosToMarkdown,
   monthOf,
   outgoingLinks,
+  parseBlocks,
   parseLinks,
   parseMemosJson,
   parseTags,
   pickRandom,
+  proseText,
   randomBytes,
   rawKeyFromRecoveryCode,
   recentMonths,
@@ -545,6 +547,106 @@ describe('tokenizeInline', () => {
 
   it('leaves a malformed marker in the text rather than eating it', () => {
     assert.deepEqual(tokenizeInline('[[   ]]'), [{ type: 'text', value: '[[   ]]' }])
+  })
+})
+
+describe('blocks', () => {
+  it('separates prose, quotes and fenced code', () => {
+    const blocks = parseBlocks(
+      [
+        '第一段',
+        '',
+        '> 引用一行',
+        '> 引用两行',
+        '',
+        '```js',
+        'const x = 1',
+        '```',
+        '',
+        '最后一段',
+      ].join('\n'),
+    )
+
+    assert.deepEqual(blocks, [
+      { type: 'paragraph', text: '第一段' },
+      { type: 'quote', text: '引用一行\n引用两行' },
+      { type: 'code', language: 'js', code: 'const x = 1' },
+      { type: 'paragraph', text: '最后一段' },
+    ])
+  })
+
+  it('keeps an unterminated fence to the end rather than eating the text', () => {
+    // A user mid-keystroke has an open fence; dropping their text would be a far
+    // worse failure than showing an unclosed block.
+    assert.deepEqual(parseBlocks('前文\n```\n还没写完'), [
+      { type: 'paragraph', text: '前文' },
+      { type: 'code', language: '', code: '还没写完' },
+    ])
+  })
+
+  it('carries the info string, empty when absent', () => {
+    assert.deepEqual(parseBlocks('```ts\nx\n```')[0], {
+      type: 'code',
+      language: 'ts',
+      code: 'x',
+    })
+    assert.deepEqual(parseBlocks('```\ny\n```')[0], { type: 'code', language: '', code: 'y' })
+  })
+
+  it('joins consecutive prose lines into one paragraph', () => {
+    assert.deepEqual(parseBlocks('一行\n二行'), [{ type: 'paragraph', text: '一行\n二行' }])
+  })
+
+  it('treats a blank body as no blocks', () => {
+    assert.deepEqual(parseBlocks(''), [])
+    assert.deepEqual(parseBlocks('\n\n'), [])
+  })
+
+  it('returns prose with the fenced blocks removed', () => {
+    assert.equal(proseText('说一句\n```\n代码\n```\n再说一句'), '说一句\n再说一句')
+  })
+})
+
+describe('code fences are not prose', () => {
+  const snippet = [
+    '看这段 #真标签',
+    '```c',
+    '#include <stdio.h>',
+    'char *s = "#不是标签";',
+    '```',
+    '还有 [[真链接]]',
+    '```',
+    '[[假链接]]',
+    '```',
+  ].join('\n')
+
+  it('does not index a # inside a fence as a tag', () => {
+    // Otherwise every C file anyone pastes in adds `include` and `define` to the
+    // tag list, and the tag list stops being a description of what you write about.
+    assert.deepEqual(parseTags(snippet), ['真标签'])
+  })
+
+  it('does not treat [[...]] inside a fence as a link', () => {
+    assert.deepEqual(parseLinks(snippet), ['真链接'])
+  })
+
+  it('keeps tag completion out of fenced blocks', () => {
+    const source = '```c\n#inc'
+    assert.equal(tagFragmentAtCaret(source, source.length), null)
+    // A prose line still completes as before.
+    assert.deepEqual(tagFragmentAtCaret('前言 #读', 5), { start: 3, query: '读' })
+  })
+
+  it('does not let a link resolve against text that only exists in code', () => {
+    const corpus = [
+      memo({ id: 'a', content: '源码如下\n```\n深度工作算法\n```', tags: [] }),
+      memo({ id: 'b', content: '谈谈 [[深度工作]]', tags: [] }),
+    ]
+    assert.deepEqual(
+      resolveLinkTarget('深度工作', corpus, 'b'),
+      [],
+      'a snippet is not a discussion',
+    )
   })
 })
 

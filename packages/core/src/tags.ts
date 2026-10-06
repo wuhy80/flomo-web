@@ -8,16 +8,20 @@
  * @module @flomo/core/tags
  */
 
+import { isInsideFence, proseText } from './blocks.ts'
 import { tokenizeInline } from './inline.ts'
 
 /**
  * Extract the distinct tags from a memo body, in first-appearance order.
+ *
+ * Runs over the body's prose only: a `#` inside a fenced block is code, and
+ * indexing `#include` as a tag is how a tag list becomes useless.
  * @param content - the raw memo text.
  * @returns tag names without the leading `#`.
  */
 export function parseTags(content: string): string[] {
   const seen = new Set<string>()
-  for (const token of tokenizeInline(content)) {
+  for (const token of tokenizeInline(proseText(content))) {
     if (token.type === 'tag') seen.add(token.value)
   }
   return [...seen]
@@ -101,6 +105,9 @@ export interface TagFragment {
  */
 export function tagFragmentAtCaret(text: string, caret: number): TagFragment | null {
   const from = Math.max(0, Math.min(caret, text.length))
+  // A `#` inside a fenced block is code, so completion stays out of it — the
+  // field must never offer a tag the parser would refuse to record.
+  if (isInsideFence(text, from)) return null
   for (let index = from - 1; index >= 0; index -= 1) {
     const char = text[index]
     if (char === undefined) break

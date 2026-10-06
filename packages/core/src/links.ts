@@ -23,30 +23,37 @@
  * @module @flomo/core/links
  */
 
+import { proseText } from './blocks.ts'
 import { tokenizeInline } from './inline.ts'
 import { hasTag } from './tags.ts'
 import type { Memo } from './types.ts'
 
 /**
  * The distinct link targets in a memo body, in first-appearance order.
+ *
+ * Runs over the body's prose only: `[[x]]` inside a fenced block is bracket
+ * syntax in someone's snippet, not a link to a note.
  * @param content - the raw body.
  * @returns the targets, trimmed and without brackets.
  */
 export function parseLinks(content: string): string[] {
   const seen = new Set<string>()
-  for (const token of tokenizeInline(content)) {
+  for (const token of tokenizeInline(proseText(content))) {
     if (token.type === 'link') seen.add(token.value)
   }
   return [...seen]
 }
 
 /**
- * Rebuild a body with every link blanked, so prose matching cannot see link text.
+ * Rebuild a body's prose with every link blanked.
+ *
+ * Two jobs at once: it keeps link text out of the "does this memo discuss X"
+ * test, and it drops fenced blocks so a snippet cannot match either.
  * @param content - the raw body.
- * @returns the body with link targets replaced by a space.
+ * @returns the prose with link targets replaced by a space.
  */
-function proseOnly(content: string): string {
-  return tokenizeInline(content)
+function withoutLinks(content: string): string {
+  return tokenizeInline(proseText(content))
     .map((token) => {
       if (token.type === 'link') return ' '
       return token.type === 'tag' ? `#${token.value}` : token.value
@@ -64,7 +71,7 @@ export function matchesLinkTarget(memo: Memo, target: string): boolean {
   const trimmed = target.trim()
   if (trimmed === '') return false
   if (hasTag(memo, trimmed)) return true
-  return proseOnly(memo.content).toLocaleLowerCase().includes(trimmed.toLocaleLowerCase())
+  return withoutLinks(memo.content).toLocaleLowerCase().includes(trimmed.toLocaleLowerCase())
 }
 
 /**

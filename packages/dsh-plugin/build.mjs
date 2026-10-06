@@ -71,19 +71,17 @@ const clientOptions = {
 }
 
 /**
- * Indent a block by one tab stop inside the factory body.
- * @param text - the text to indent.
- * @returns the indented text.
- */
-function indent(text) {
-  return text
-    .split('\n')
-    .map((line) => (line.length > 0 ? `\t\t${line}` : line))
-    .join('\n')
-}
-
-/**
  * Wrap the built CJS body in the module-loader envelope the web shell expects.
+ *
+ * The body is inserted **verbatim and unindented**. An earlier version re-indented
+ * every line for readability, which silently corrupted the code: esbuild's
+ * minifier prints a `"\n"` string as a template literal spanning two source lines,
+ * and prefixing each line with the wrapper's indentation injected that
+ * indentation *into the string*, turning every `split("\n")` into `split("\n\t\t")`.
+ *
+ * The indentation was cosmetic; the corruption was not. Anything that rewrites a
+ * bundle line by line has to know which lines are inside string literals, and the
+ * only safe amount of that is none.
  */
 async function wrapClientBundle() {
   const body = await readFile(clientBodyPath, 'utf8')
@@ -95,7 +93,7 @@ async function wrapClientBundle() {
       '\t\tvar module = { exports: {} };',
       '\t\tvar exports = module.exports;',
       '\t\tObject.defineProperty(exports, Symbol.toStringTag, { value: "Module" });',
-      indent(body),
+      body,
       '\t\treturn module.exports;',
       '\t}',
       '});',

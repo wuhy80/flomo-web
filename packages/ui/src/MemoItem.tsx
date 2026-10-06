@@ -11,7 +11,7 @@ import type * as React from 'react'
 import { useCallback, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
-import { clockOf, tokenizeInline } from '@flomo/core'
+import { clockOf, parseBlocks, tokenizeInline } from '@flomo/core'
 import type { Memo } from '@flomo/core'
 
 export interface MemoItemProps {
@@ -75,18 +75,18 @@ function InlineMark({
 }
 
 /**
- * Render a memo body with its tags and links interactive.
- * @param memo - the memo to render.
+ * Render a run of prose with its tags and links interactive.
+ * @param text - the prose.
  * @param onTagClick - tag navigation.
  * @param onLinkClick - link navigation.
- * @returns the body nodes.
+ * @returns the nodes.
  */
-function renderBody(
-  memo: Memo,
+function renderInline(
+  text: string,
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
 ): React.ReactNode[] {
-  return tokenizeInline(memo.content).map((token, index) => {
+  return tokenizeInline(text).map((token, index) => {
     if (token.type === 'tag') {
       return (
         <InlineMark
@@ -108,6 +108,49 @@ function renderBody(
       )
     }
     return <span key={`${index}-text`}>{token.value}</span>
+  })
+}
+
+/**
+ * Render a memo body from its block structure.
+ *
+ * Only paragraphs and quotes go through the inline renderer. A fenced block is
+ * emitted verbatim, which is both what the user means and what keeps the display
+ * consistent with the tag index — neither treats `#include` as a tag.
+ * @param memo - the memo to render.
+ * @param onTagClick - tag navigation.
+ * @param onLinkClick - link navigation.
+ * @returns the body nodes.
+ */
+function renderBody(
+  memo: Memo,
+  onTagClick: (tag: string) => void,
+  onLinkClick: (target: string) => void,
+): React.ReactNode[] {
+  return parseBlocks(memo.content).map((block, index) => {
+    if (block.type === 'code') {
+      return (
+        <pre
+          key={`${index}-code`}
+          className="fl-code"
+          {...(block.language ? { 'data-language': block.language } : {})}
+        >
+          <code>{block.code}</code>
+        </pre>
+      )
+    }
+    if (block.type === 'quote') {
+      return (
+        <blockquote key={`${index}-quote`} className="fl-quote">
+          {renderInline(block.text, onTagClick, onLinkClick)}
+        </blockquote>
+      )
+    }
+    return (
+      <p key={`${index}-para`} className="fl-para">
+        {renderInline(block.text, onTagClick, onLinkClick)}
+      </p>
+    )
   })
 }
 

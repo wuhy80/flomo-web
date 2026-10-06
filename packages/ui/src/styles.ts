@@ -356,6 +356,38 @@ export const FLOMO_CSS = `
   border-radius: 4px;
 }
 
+.fl-memo-body .fl-para { margin: 0; }
+.fl-memo-body .fl-para + .fl-para { margin-top: 0.75em; }
+
+.fl-quote {
+  margin: 0.6em 0;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--flomo-border-strong);
+  color: var(--flomo-text-soft);
+}
+
+/* white-space: pre overrides the body's pre-wrap, so a long line of code
+   scrolls sideways rather than wrapping into something the user did not write. */
+.fl-code {
+  margin: 0.6em 0;
+  padding: 10px 12px;
+  border-radius: var(--flomo-radius-sm);
+  background: var(--flomo-bg-sunken);
+  overflow-x: auto;
+  font-family: var(--flomo-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.fl-code code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+
 .fl-memo-foot {
   display: flex;
   align-items: center;
