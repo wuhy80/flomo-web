@@ -320,7 +320,7 @@ export function FlomoApp({
                   ref={searchInput}
                   type="search"
                   value={query}
-                  placeholder="搜索…（按 / 聚焦）"
+                  placeholder="搜索…"
                   aria-label="搜索 MEMO"
                   onChange={(event) => setQuery(event.target.value)}
                 />

@@ -14,6 +14,10 @@
 
 ![解锁门禁](docs/screenshot-locked.png)
 
+窄屏（≤720px）下侧栏变成**可横向滚动的导航条**，而不是消失：
+
+![窄屏布局](docs/screenshot-mobile.png)
+
 ---
 
 ## 已实现的功能

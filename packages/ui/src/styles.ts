@@ -706,11 +706,60 @@ export const FLOMO_CSS = `
 }
 
 @media (max-width: 720px) {
-  .fl-sidebar { display: none; }
-  .fl-column { padding: 20px 16px 120px; }
-  .fl-memo-actions { display: flex; position: static; margin-top: 6px; padding: 0; }
-  .fl-memo-foot { flex-direction: column; align-items: flex-start; gap: 6px; }
+  /* The sidebar becomes a horizontal strip rather than disappearing. Hiding it
+     outright — which is what this used to do — leaves a phone with no way to
+     reach the review, the random walk, the settings or any tag: the app quietly
+     loses most of its navigation on the device it is most likely to be used on. */
+  .fl-root { flex-direction: column; }
+
+  .fl-sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--flomo-border);
+  }
+
+  .fl-brand { padding: 0 8px 0 2px; font-size: 14px; }
+  .fl-sidebar-section { display: none; }
+  .fl-tag-list { flex-direction: row; gap: 2px; }
+
+  .fl-nav-item,
+  .fl-tag-row {
+    width: auto;
+    white-space: nowrap;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .fl-sidebar-foot { margin: 0; padding: 0; display: flex; gap: 2px; }
+  /* No keyboard to hint at, and no room for the stats. */
+  .fl-sidebar-foot .fl-stats-strip,
+  .fl-shortcut-hint { display: none; }
+
+  .fl-main { flex: 1; min-height: 0; }
+  .fl-column { padding: 16px 14px 80px; }
+  .fl-column-head { margin-bottom: 14px; }
+  .fl-column-title { font-size: 17px; }
+  .fl-search { min-width: 0; flex: 1; }
+
+  /* Actions go below the memo they act on. They were rendering above it, which
+     reads as acting on the note that follows. */
+  .fl-memo { display: flex; flex-direction: column; }
+  .fl-memo-body { order: 1; }
+  .fl-memo-foot { order: 2; flex-direction: column; align-items: flex-start; gap: 6px; }
   .fl-memo-tags { justify-content: flex-start; }
+  .fl-memo-actions {
+    order: 3;
+    position: static;
+    display: flex;
+    margin-top: 8px;
+    padding: 0;
+  }
 }
 `
 

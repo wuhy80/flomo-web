@@ -11,7 +11,12 @@
  * what gets photographed is the application, not a demo build of it.
  *
  * Usage:
- *   node scripts/screenshot.mjs <app-url> <out.png> [--locked]
+ *   node scripts/screenshot.mjs <app-url> <out.png> [options]
+ *
+ * Options:
+ *   --locked         stop at the password gate instead of unlocking
+ *   --click <label>  click the first button whose text is exactly <label>
+ *   --size <WxH>     viewport to emulate (default 1280x1000)
  *
  * Requires the dev server (`pnpm dev`) or a static host to already be running,
  * and Chrome or Edge installed.
@@ -207,13 +212,35 @@ async function connect() {
   }
 }
 
-const [url, outArg, ...flags] = process.argv.slice(2)
+const argv = process.argv.slice(2)
+const url = argv[0]
+const outArg = argv[1]
 if (url === undefined || outArg === undefined) {
-  console.error('usage: node scripts/screenshot.mjs <app-url> <out.png> [--locked]')
+  console.error('usage: node scripts/screenshot.mjs <app-url> <out.png> [--locked] [--click TEXT] [--size WxH]')
   process.exit(2)
 }
+
+/** Parse the flags. */
+function parseOptions(args) {
+  const options = { stopAtGate: false, click: null, width: 1280, height: 1000 }
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]
+    if (arg === '--locked') options.stopAtGate = true
+    else if (arg === '--click') options.click = args[index += 1] ?? null
+    else if (arg === '--size') {
+      const [width, height] = (args[index += 1] ?? '').split('x').map(Number)
+      if (!width || !height) throw new Error('--size wants WxH, e.g. 420x900')
+      options.width = width
+      options.height = height
+    } else if (arg !== undefined) {
+      throw new Error(`unknown option: ${arg}`)
+    }
+  }
+  return options
+}
+
+const options = parseOptions(argv.slice(2))
 const out = resolve(outArg)
-const stopAtGate = flags.includes('--locked')
 
 const data = await fixture()
 // A bare name (no path separator) is left to PATH; a path must actually exist.
@@ -237,7 +264,7 @@ const child = spawn(
     '--hide-scrollbars',
     `--remote-debugging-port=${DEBUG_PORT}`,
     `--user-data-dir=${profile}`,
-    '--window-size=1280,1000',
+    `--window-size=${options.width},${options.height}`,
     'about:blank',
   ],
   { stdio: 'ignore' },
@@ -283,6 +310,15 @@ try {
   await cdp.send('Page.enable')
   await cdp.send('Runtime.enable')
 
+  // Emulated rather than merely requested, so `--size` also exercises the
+  // stylesheet's media queries instead of only shrinking the window.
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width: options.width,
+    height: options.height,
+    deviceScaleFactor: 1,
+    mobile: options.width < 720,
+  })
+
   // Injected before any document script, on every navigation. Setting the stub
   // from a normal evaluate and then reloading would wipe it — which is exactly
   // what happened the first time this was written, and the app quietly went to
@@ -292,7 +328,7 @@ try {
   await cdp.send('Page.navigate', { url })
   await waitFor('document.querySelector(".fl-root") !== null', 'the app to mount')
 
-  if (stopAtGate) {
+  if (options.stopAtGate) {
     await waitFor('document.querySelector(".fl-gate") !== null', 'the password gate')
   } else {
     // Type into the field the way a person does. A synthetic `input` event built
@@ -303,7 +339,20 @@ try {
     await evaluate('document.querySelector(".fl-gate input[type=password]").focus()')
     await cdp.send('Input.insertText', { text: 'demo' })
     await evaluate('document.querySelector(".fl-gate form").requestSubmit()')
-    await waitFor('document.querySelector(".fl-composer") !== null', 'the feed to unlock')
+    await waitFor('document.querySelector(".fl-composer, .fl-card-lg") !== null', 'the feed to unlock')
+  }
+
+  if (options.click !== null) {
+    const clicked = await evaluate(`(() => {
+      const wanted = ${JSON.stringify(options.click)};
+      const button = [...document.querySelectorAll('button')]
+        .find((candidate) => candidate.textContent.trim() === wanted);
+      if (button === undefined) return false;
+      button.click();
+      return true;
+    })()`)
+    if (clicked !== true) throw new Error(`no button labelled ${JSON.stringify(options.click)}`)
+    await new Promise((ready) => setTimeout(ready, 500))
   }
 
   await new Promise((ready) => setTimeout(ready, 600))

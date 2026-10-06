@@ -453,7 +453,8 @@ describe('built client bundle', () => {
     assert.match(html, /class="fl-memo-link"[^>]*role="button"/, 'links are clickable')
     assert.match(html, /\[\[心流\]\]/, 'the link keeps its markup in the body')
     assert.match(html, /fl-shortcut-hint/, 'the shortcuts are discoverable')
-    assert.match(html, /搜索…（按 \/ 聚焦）/, 'the search box says how to reach it')
+    assert.match(html, /<kbd>\/<\/kbd>/, 'and the hint names the search key')
+    assert.match(html, /placeholder="搜索…"/, 'the search box stays terse')
     // Bold and inline code are marks too, not literal asterisks and backticks.
     assert.match(html, /<strong>专注不是意志力问题<\/strong>/)
     assert.match(html, /<code>split\(/)
