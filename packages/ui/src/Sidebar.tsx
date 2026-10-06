@@ -9,8 +9,18 @@ import type * as React from 'react'
 import { corpusStats } from '@flomo/core'
 import type { Memo, TagStat } from '@flomo/core'
 
+import { Heatmap } from './Heatmap.tsx'
 import { sameView } from './views.ts'
 import type { FlomoView } from './views.ts'
+
+/**
+ * Weeks of heatmap shown in the column.
+ *
+ * Fewer than the 26 the component defaults to, because the sidebar is about 210px
+ * wide and flomo puts its calendar there rather than above the feed. Twelve weeks
+ * fits without a scrollbar and still reads as a calendar.
+ */
+const SIDEBAR_WEEKS = 12
 
 export interface SidebarProps {
   view: FlomoView
@@ -56,6 +66,22 @@ export function Sidebar({
         <span className="fl-brand-dot" aria-hidden="true" />
         {brand}
       </div>
+
+      {/* The headline numbers and the calendar sit at the top of the column, the way
+          flomo arranges them. They describe the whole corpus rather than the list
+          below them, so putting them above the feed only pushed the notes down. */}
+      <div className="fl-corpus-stats">
+        <span>
+          <strong>{stats.memos}</strong> 笔记
+        </span>
+        <span>
+          <strong>{stats.tags}</strong> 标签
+        </span>
+        <span>
+          <strong>{stats.span}</strong> 天
+        </span>
+      </div>
+      <Heatmap memos={memos} weeks={SIDEBAR_WEEKS} />
 
       <button {...rowProps({ kind: 'all' })}>
         <span>全部</span>

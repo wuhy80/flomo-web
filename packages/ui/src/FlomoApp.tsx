@@ -27,7 +27,6 @@ import {
 import { Composer } from './Composer.tsx'
 import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
-import { Heatmap } from './Heatmap.tsx'
 import { Sidebar } from './Sidebar.tsx'
 import { UnlockGate } from './UnlockGate.tsx'
 import { injectFlomoStyles } from './styles.ts'
@@ -353,22 +352,17 @@ export function FlomoApp({
             />
           ) : null}
 
+          {/* The calendar and the headline numbers live in the sidebar, the way flomo
+              arranges them — they describe the whole corpus, so above the feed they
+              only pushed the notes down the page. What is left here is the one
+              number that belongs to this list rather than to the corpus. */}
           {view.kind === 'all' ? (
-            <>
-              <Heatmap memos={snapshot.memos} />
-              <div className="fl-stats-strip">
-                <span>
-                  共 <strong>{stats.memos}</strong> 条
-                </span>
-                <span>
-                  连续 <strong>{stats.streak}</strong> 天
-                </span>
-                <span>
-                  标签 <strong>{stats.tags}</strong> 个
-                </span>
-                <span>{snapshot.saving ? '保存中…' : savedLabel(snapshot.lastSavedAt)}</span>
-              </div>
-            </>
+            <div className="fl-stats-strip fl-list-stats">
+              <span>
+                共 <strong>{stats.memos}</strong> 条
+              </span>
+              <span>{snapshot.saving ? '保存中…' : savedLabel(snapshot.lastSavedAt)}</span>
+            </div>
           ) : null}
 
           {view.kind === 'all' || view.kind === 'tag' ? (

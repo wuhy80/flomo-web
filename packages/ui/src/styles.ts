@@ -693,6 +693,37 @@ export const FLOMO_CSS = `
 
 .fl-stats-strip strong { color: var(--flomo-text); font-weight: 600; }
 
+/* The one count that belongs to the list rather than to the corpus. Quiet, and
+   tight against the feed, so it reads as a caption rather than a dashboard. */
+.fl-list-stats {
+  gap: 16px;
+  margin: 14px 0 4px;
+  font-size: 12px;
+  color: var(--flomo-text-faint);
+}
+
+/* The corpus numbers above the calendar, stacked the way flomo stacks them: the
+   figure large and the label small beneath it. */
+.fl-corpus-stats {
+  display: flex;
+  gap: 18px;
+  padding: 0 8px 14px;
+  font-size: 11.5px;
+  color: var(--flomo-text-faint);
+}
+
+.fl-corpus-stats strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--flomo-text);
+}
+
+/* The calendar lives in the column, so it is inset to line up with the rows
+   above and below it rather than running to the edges. */
+.fl-sidebar .fl-heatmap-wrap { padding: 0 8px 14px; }
+
 /* ── misc ────────────────────────────────────────────────────────────── */
 
 .fl-loading { padding: 80px 0; text-align: center; color: var(--flomo-text-faint); font-size: 14px; }
