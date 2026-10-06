@@ -387,6 +387,10 @@ describe('built host bundle', () => {
       const configured = (await configure.json()) as {
         state: { status: string; owner: string; repo: string }
       }
+      // `locked`, not `empty`, and for a reason worth stating: this host has no
+      // injected store, so the vault probe cannot reach a repository and the answer
+      // stays unknown. Unknown deliberately reads as "there is one" — offering to
+      // unlock is recoverable, offering to create over an existing vault is not.
       assert.equal(configured.state.status, 'locked')
       assert.equal(configured.state.owner, 'me')
       assert.equal(credentials.store.get('FLOMO_GITHUB_TOKEN'), 'ghp_x')

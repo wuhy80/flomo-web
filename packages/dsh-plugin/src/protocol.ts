@@ -18,7 +18,15 @@ export const API_PREFIX = '/flomo-sim/api'
 export type HostStatus =
   /** No repository configured yet. */
   | 'unconfigured'
-  /** Configured, but no password has been supplied. */
+  /**
+   * Configured, but the repository holds no vault yet — first run, offer to create.
+   *
+   * Distinct from `locked`, which means there *is* one waiting for a password. The
+   * host used to conflate the two, so a fresh repository rendered an unlock form and
+   * the only way to find out was to try, and be told there was no vault.json.
+   */
+  | 'empty'
+  /** Configured, and a vault exists, but no password has been supplied. */
   | 'locked'
   /** Open; memos are available. */
   | 'unlocked'

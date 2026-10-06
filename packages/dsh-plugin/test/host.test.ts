@@ -25,7 +25,7 @@ import { cleanupTempDirs, fakeCredentials, makeHost, makeTempDir, serve } from '
 after(cleanupTempDirs)
 
 describe('host lifecycle', () => {
-  it('walks unconfigured → locked → unlocked, and persists the token', async () => {
+  it('walks unconfigured → empty → unlocked, and persists the token', async () => {
     const dir = await makeTempDir()
     const { host, credentials } = await makeHost(dir, new MemoryStore())
 
@@ -37,7 +37,10 @@ describe('host lifecycle', () => {
       repo: 'flomo-data',
       token: 'ghp_test',
     })
-    assert.equal(configured.status, 'locked', 'a token without a password is locked, not unconfigured')
+    // `empty`, not `locked`: the repository holds no vault yet, so the panel must
+    // offer to create one. Reporting `locked` here is what made a fresh repository
+    // render an unlock form whose only outcome was "仓库里没有 vault.json。"
+    assert.equal(configured.status, 'empty', 'a configured repository with no vault yet')
     assert.equal(configured.owner, 'me')
     assert.equal(configured.repo, 'flomo-data')
     assert.equal(credentials.store.get(TOKEN_REF), 'ghp_test', 'the token must be stored, not echoed')
@@ -345,7 +348,8 @@ describe('http surface', () => {
       assert.equal(action.status, 200)
       const actionBody = (await action.json()) as { ok: boolean; state: { status: string } }
       assert.equal(actionBody.ok, true)
-      assert.equal(actionBody.state.status, 'locked')
+      // Configured against a repository with no vault in it yet.
+      assert.equal(actionBody.state.status, 'empty')
 
       const invalid = await fetch(`${base}${API_PREFIX}/action`, {
         method: 'POST',

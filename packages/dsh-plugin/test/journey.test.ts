@@ -75,7 +75,9 @@ describe('the whole journey over the wire', () => {
         repo: 'flomo-data',
         token: TOKEN,
       })
-      assert.equal(configured.state.status, 'locked', 'an existing vault starts locked')
+      // `empty`, not `locked`: the repository exists but holds no vault yet, so the
+      // panel must offer to create one rather than to unlock nothing.
+      assert.equal(configured.state.status, 'empty', 'a fresh repository has no vault yet')
 
       // 2. Create the vault, which is the one time the recovery code is shown.
       const created = await act({ kind: 'create', password: PASSWORD })

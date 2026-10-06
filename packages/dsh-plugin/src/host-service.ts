@@ -113,6 +113,15 @@ export class FlomoHostService {
   private config: StoredConfig | null = null
   private token: string | null = null
   private vault: FlomoVault | null = null
+  /**
+   * Whether the repository holds a vault, as of the last probe.
+   *
+   * `null` means "not asked yet". The host has to know this and not only whether it
+   * is unlocked: without it the status is `locked` whenever it is configured, so a
+   * repository with no vault yet renders an unlock form — and unlocking a vault that
+   * does not exist fails with "仓库里没有 vault.json。" and no way forward.
+   */
+  private hasVault: boolean | null = null
   private error: string | null = null
   private recoveryCode: string | null = null
   private lastSavedAt: string | null = null
@@ -155,7 +164,10 @@ export class FlomoHostService {
   async start(): Promise<void> {
     await this.loadConfig()
     await this.loadToken()
-    if (this.isConfigured && this.token) await this.tryAutoUnlock()
+    if (this.isConfigured && this.token) {
+      await this.probeVault()
+      await this.tryAutoUnlock()
+    }
   }
 
   /** Read `~/.dsh/flomo.json`. */
@@ -244,10 +256,34 @@ export class FlomoHostService {
     }
   }
 
+  /**
+   * Ask the repository whether a vault exists.
+   *
+   * Called at the two moments the answer can change: after loading the settings, and
+   * after the panel connects to a repository. A failed probe leaves the answer
+   * unknown rather than false, so a network blip can never offer to create a vault
+   * over one that already exists.
+   */
+  private async probeVault(): Promise<void> {
+    const store = this.store()
+    if (!store) {
+      this.hasVault = null
+      return
+    }
+    try {
+      this.hasVault = await FlomoVault.exists(store)
+    } catch {
+      this.hasVault = null
+    }
+  }
+
   /** @returns the current status. */
   private status(): HostStatus {
     if (!this.config || !this.token) return 'unconfigured'
-    return this.vault ? 'unlocked' : 'locked'
+    if (this.vault) return 'unlocked'
+    // Unknown reads as "there is one": offering to unlock is recoverable, offering
+    // to create over an existing vault is not.
+    return this.hasVault === false ? 'empty' : 'locked'
   }
 
   /**
@@ -375,6 +411,9 @@ export class FlomoHostService {
         // A different repository means a different vault; drop the old one.
         this.vault = null
         this.error = null
+        // Ask before auto-unlocking, so a repository with no vault reports `empty`
+        // and the panel offers to create one rather than to unlock nothing.
+        await this.probeVault()
         await this.tryAutoUnlock()
         return
       }
@@ -394,6 +433,7 @@ export class FlomoHostService {
         if (!store) throw new Error('请先配置数据仓库和 token。')
         const { vault, recoveryCode } = await FlomoVault.create(store, action.password)
         this.vault = vault
+        this.hasVault = true
         this.recoveryCode = recoveryCode
         this.error = null
         return
