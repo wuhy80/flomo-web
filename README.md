@@ -240,9 +240,10 @@ dsh credentials set FLOMO_PASSWORD
 |---|---|
 | `pnpm dev` | 启动网页版开发服务器 |
 | `pnpm build` | 构建网页版（`packages/web/dist`） |
+| `pnpm smoke` | **部署冒烟测试**：像 GitHub Pages 那样静态服务 `dist/`，逐项检查 |
 | `pnpm build:plugin` | 构建 DSH 插件两半 |
 | `pnpm watch:plugin` | 监听模式重建插件 |
-| `pnpm test` | 跑 core 与插件 host 的测试 |
+| `pnpm test` | 跑 core / ui / 插件 / web 的测试 |
 | `pnpm typecheck` | 全仓类型检查 |
 
 ---
@@ -288,8 +289,28 @@ packages/
 ## 测试
 
 ```bash
-pnpm test
+pnpm test          # 单元与集成测试
+pnpm build && pnpm smoke   # 部署冒烟测试（针对构建产物）
 ```
+
+### 部署冒烟测试
+
+构建**成功**的 `dist/` 依然可能是浏览器用不了的：某个资源 URL 指向不存在的东西、
+Service Worker 根本没被拷进去、一个绝对路径 `/assets/...` 在域名根下正常、
+一部署到项目子路径就 404。**这些都不会让构建失败，但都会让用户失败。**
+
+所以 `pnpm smoke` **像 GitHub Pages 那样**（纯静态文件、无 SPA fallback、无重写）
+把 `dist/` 服务起来，然后检查真实返回了什么 —— 包括 `index.html` 引用的每个 URL 是否
+解析得到、文件名是否真的带内容哈希（Service Worker 依赖这一点）、
+以及 `sw.js` 承诺预缓存的那几个 URL 是否都可达。
+
+CI 里它在 `pnpm build` 之后、发布之前运行，所以坏的部署在这里失败，而不是在别人浏览器里。
+
+> 我验证过它**确实会失败**：把 `dist/sw.js` 藏起来，它报出 5 项失败并退出 1。
+> （第一次做这个反向验证时它其实是**崩掉**的 —— 抛出 `ENOENT` 堆栈而不是列出失败的检查项。
+> 对一个 CI 日志来说，堆栈会把其它发现全部盖住，所以已改成逐项报告。）
+
+### 单元与集成测试
 
 **`packages/core/test/core.test.ts`** —— 加密往返、分片持久化、**密文里不含明文**、
 写冲突检测、标签解析、搜索与每日回顾的确定性。

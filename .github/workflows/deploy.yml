@@ -51,6 +51,13 @@ jobs:
 
       - run: pnpm build
 
+      # A build can succeed and still produce a dist/ a browser cannot use: an
+      # asset URL that resolves to nothing, a service worker that was never
+      # copied, an absolute path that breaks under a project subpath. This serves
+      # the output the way Pages does and checks what comes back, so a broken
+      # deploy fails here instead of in someone's browser.
+      - run: pnpm smoke
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
