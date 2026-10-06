@@ -430,7 +430,8 @@ describe('built client bundle', () => {
       status: 'unlocked',
       memos: [
         memo({
-          content: '读完《深度工作》很有收获 #读书，顺便想到 [[心流]]',
+          content:
+            '读完《深度工作》很有收获 #读书，顺便想到 [[心流]]。**专注不是意志力问题**，比如 `split("\\n")`。',
           tags: ['读书'],
         }),
       ],
@@ -453,6 +454,13 @@ describe('built client bundle', () => {
     assert.match(html, /\[\[心流\]\]/, 'the link keeps its markup in the body')
     assert.match(html, /fl-shortcut-hint/, 'the shortcuts are discoverable')
     assert.match(html, /搜索…（按 \/ 聚焦）/, 'the search box says how to reach it')
+    // Bold and inline code are marks too, not literal asterisks and backticks.
+    assert.match(html, /<strong>专注不是意志力问题<\/strong>/)
+    assert.match(html, /<code>split\(/)
+    assert.ok(
+      !html.includes('**') && !html.includes('`'),
+      'no markup may leak into the rendered body',
+    )
   })
 
   it('says so when the vault is being read from the local cache', async () => {

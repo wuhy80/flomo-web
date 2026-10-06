@@ -107,6 +107,12 @@ function renderInline(
         />
       )
     }
+    if (token.type === 'strong') {
+      return <strong key={`${index}-strong`}>{token.value}</strong>
+    }
+    if (token.type === 'code') {
+      return <code key={`${index}-code`}>{token.value}</code>
+    }
     return <span key={`${index}-text`}>{token.value}</span>
   })
 }

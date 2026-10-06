@@ -24,6 +24,7 @@ import {
   exportFilename,
   memosToJson,
   memosToMarkdown,
+  markupOf,
   monthOf,
   outgoingLinks,
   parseBlocks,
@@ -523,19 +524,31 @@ describe('tokenizeInline', () => {
       '[[]] 空的和 [[   ]] 也是',
       '结尾是 #尾巴。',
       '连续##两个#号',
+      '**加粗** 和 `行内代码`',
+      '混在一起：**粗** #标签 [[链接]] `码`',
+      '未闭合的 **加粗',
+      '单个 * 星号不是粗体',
+      '**加粗里的 #标签** 不该被单独识别',
     ]
     for (const sample of samples) {
       const rebuilt = tokenizeInline(sample)
-        .map((token) =>
-          token.type === 'link'
-            ? `[[${token.value}]]`
-            : token.type === 'tag'
-              ? `#${token.value}`
-              : token.value,
-        )
+        .map((token) => markupOf(token) ?? token.value)
         .join('')
       assert.equal(rebuilt, sample, `rebuild mismatch for ${JSON.stringify(sample)}`)
     }
+  })
+
+  it('recognises bold and inline code as their own marks', () => {
+    assert.deepEqual(tokenizeInline('**粗**'), [{ type: 'strong', value: '粗' }])
+    assert.deepEqual(tokenizeInline('`码`'), [{ type: 'code', value: '码' }])
+  })
+
+  it('does not let markup inside a mark leak out of it', () => {
+    // A position earlier in the string wins over an alternative earlier in the
+    // pattern, so a code span swallows the link brackets inside it.
+    assert.deepEqual(parseLinks('`[[不是链接]]`'), [])
+    assert.deepEqual(parseTags('**#不是标签**'), [])
+    assert.deepEqual(parseLinks('**[[也不是]]**'), [])
   })
 
   it('treats a # inside a link as part of the link, not as a tag', () => {

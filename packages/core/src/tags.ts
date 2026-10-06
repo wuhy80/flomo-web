@@ -9,7 +9,7 @@
  */
 
 import { isInsideFence, proseText } from './blocks.ts'
-import { tokenizeInline } from './inline.ts'
+import { markupOf, tokenizeInline } from './inline.ts'
 
 /**
  * Extract the distinct tags from a memo body, in first-appearance order.
@@ -157,15 +157,14 @@ export interface TagToken {
 /**
  * Split a memo body into literal text and tag runs.
  *
- * Links are returned as text: this is the tag-only view, and it still covers the
- * whole input so a caller can render it verbatim.
+ * Every other mark is returned as its source text: this is the tag-only view, and
+ * it still covers the whole input so a caller can render it verbatim.
  * @param content - the raw memo body.
  * @returns the alternating tokens.
  */
 export function tokenizeTags(content: string): TagToken[] {
-  return tokenizeInline(content).map((token) =>
-    token.type === 'link'
-      ? { type: 'text' as const, value: `[[${token.value}]]` }
-      : { type: token.type, value: token.value },
-  )
+  return tokenizeInline(content).map((token) => {
+    if (token.type === 'tag') return { type: 'tag' as const, value: token.value }
+    return { type: 'text' as const, value: markupOf(token) ?? token.value }
+  })
 }

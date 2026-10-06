@@ -24,7 +24,7 @@
  */
 
 import { proseText } from './blocks.ts'
-import { tokenizeInline } from './inline.ts'
+import { markupOf, tokenizeInline } from './inline.ts'
 import { hasTag } from './tags.ts'
 import type { Memo } from './types.ts'
 
@@ -56,7 +56,9 @@ function withoutLinks(content: string): string {
   return tokenizeInline(proseText(content))
     .map((token) => {
       if (token.type === 'link') return ' '
-      return token.type === 'tag' ? `#${token.value}` : token.value
+      // Every other mark is restored to its source form, so no markup leaks into
+      // the prose comparison.
+      return markupOf(token) ?? token.value
     })
     .join('')
 }

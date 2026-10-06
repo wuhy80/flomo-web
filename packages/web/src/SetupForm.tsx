@@ -114,7 +114,7 @@ export function SetupForm({ initial, onSubmit, onCancel }: SetupFormProps): Reac
           <div style={{ marginBottom: 10 }}>
             <button
               type="button"
-              className="fl-button fl-button-ghost"
+              className="fl-button"
               disabled={!canCreate}
               onClick={() => void createRepository()}
             >
