@@ -7,6 +7,25 @@
 import type { CacheArea } from '@flomo/core'
 
 /**
+ * Resolve the storage to wrap, tolerating a browser that refuses to hand it over.
+ *
+ * The guard has to cover the property access, not only the operations. Private
+ * modes and locked-down iframes throw from `window.localStorage` itself, and this
+ * runs during render — so an unguarded throw here is a blank page, not a missing
+ * cache. The same mistake was fixed in the web app's config store.
+ * @param storage - an explicit storage, or `undefined` to use the browser's.
+ * @returns the storage, or `undefined` when there is none to be had.
+ */
+function resolveStorage(storage?: Storage): Storage | undefined {
+  if (storage !== undefined) return storage
+  try {
+    return typeof window === 'undefined' ? undefined : window.localStorage
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Wrap a `Storage` as a cache area.
  *
  * Every operation is guarded, because `localStorage` can throw on access alone
@@ -16,8 +35,7 @@ import type { CacheArea } from '@flomo/core'
  * @returns the cache area.
  */
 export function browserCacheArea(storage?: Storage): CacheArea {
-  const target =
-    storage ?? (typeof window === 'undefined' ? undefined : window.localStorage)
+  const target = resolveStorage(storage)
 
   return {
     getItem(key) {
@@ -42,8 +60,18 @@ export function browserCacheArea(storage?: Storage): CacheArea {
       }
     },
     keys() {
+      // Through the `Storage` interface rather than `Object.keys`. The real
+      // `localStorage` happens to expose its entries as enumerable properties, so
+      // `Object.keys` works there and returns the method names on anything else —
+      // which means a conforming implementation would silently enumerate nothing.
       try {
-        return target ? Object.keys(target) : []
+        if (target === undefined) return []
+        const out: string[] = []
+        for (let index = 0; index < target.length; index += 1) {
+          const key = target.key(index)
+          if (key !== null) out.push(key)
+        }
+        return out
       } catch {
         return []
       }
