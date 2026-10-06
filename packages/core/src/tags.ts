@@ -80,6 +80,66 @@ export function tagSegments(tag: string): string[] {
   return tag.split('/').filter((segment) => segment.length > 0)
 }
 
+/** A `#` run being typed, located in the text around the caret. */
+export interface TagFragment {
+  /** Index of the `#`. */
+  start: number
+  /** What has been typed after it, possibly empty. */
+  query: string
+}
+
+/**
+ * Find the `#` fragment the caret is currently inside.
+ *
+ * Deliberately does not require whitespace before the `#`: the tokenizer treats
+ * `今天读到#认知失调` as a tag, so a completion rule stricter than the parser
+ * would offer suggestions in places the parser agrees with and refuse in places
+ * it does not. The two must agree.
+ * @param text - the field's current value.
+ * @param caret - the caret offset.
+ * @returns the fragment, or `null` when the caret is not in one.
+ */
+export function tagFragmentAtCaret(text: string, caret: number): TagFragment | null {
+  const from = Math.max(0, Math.min(caret, text.length))
+  for (let index = from - 1; index >= 0; index -= 1) {
+    const char = text[index]
+    if (char === undefined) break
+    if (char === '#') return { start: index, query: text.slice(index + 1, from) }
+    if (/\s/.test(char)) return null
+  }
+  return null
+}
+
+/**
+ * Rank known tags against what is being typed.
+ *
+ * Prefix matches come before substring matches, and within each group the input
+ * order is preserved — which matters because callers pass {@link tagStats}
+ * output, already ordered by how often the tag is used. So the most-used prefix
+ * match wins, which is almost always the intended completion.
+ * @param query - what has been typed after the `#`.
+ * @param known - the corpus's tags, ideally frequency-ordered.
+ * @param limit - maximum suggestions.
+ * @returns the suggestions.
+ */
+export function suggestTags(
+  query: string,
+  known: readonly TagStat[],
+  limit = 8,
+): TagStat[] {
+  const needle = query.toLocaleLowerCase()
+  const prefix: TagStat[] = []
+  const contains: TagStat[] = []
+
+  for (const stat of known) {
+    const key = tagKey(stat.tag)
+    if (needle === '' || key.startsWith(needle)) prefix.push(stat)
+    else if (key.includes(needle)) contains.push(stat)
+  }
+
+  return [...prefix, ...contains].slice(0, Math.max(0, limit))
+}
+
 /** A run of body text, or a tag found inside it. */
 export interface TagToken {
   type: 'text' | 'tag'

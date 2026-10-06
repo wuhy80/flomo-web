@@ -35,6 +35,8 @@ import {
   resolveLinkTarget,
   searchMemos,
   streak,
+  suggestTags,
+  tagFragmentAtCaret,
   tagStats,
   tokenizeInline,
   corpusStats,
@@ -543,6 +545,68 @@ describe('tokenizeInline', () => {
 
   it('leaves a malformed marker in the text rather than eating it', () => {
     assert.deepEqual(tokenizeInline('[[   ]]'), [{ type: 'text', value: '[[   ]]' }])
+  })
+})
+
+describe('tag completion', () => {
+  const known = tagStats([
+    { tags: ['读书'] },
+    { tags: ['读书'] },
+    { tags: ['读书笔记'] },
+    { tags: ['深度工作'] },
+    { tags: ['架构'] },
+  ])
+
+  it('finds the fragment the caret sits inside', () => {
+    assert.deepEqual(tagFragmentAtCaret('今天 #读', 5), { start: 3, query: '读' })
+    assert.deepEqual(tagFragmentAtCaret('#', 1), { start: 0, query: '' })
+    assert.deepEqual(tagFragmentAtCaret('a #读', 4), { start: 2, query: '读' })
+  })
+
+  it('agrees with the tokenizer about where a tag starts', () => {
+    // The tokenizer accepts a tag glued to the preceding word, so completion
+    // must too — a rule stricter than the parser would refuse to help exactly
+    // where the parser is willing to accept the result.
+    assert.deepEqual(tagFragmentAtCaret('今天读到#认知', 7), { start: 4, query: '认知' })
+  })
+
+  it('returns nothing when the caret is not in a tag', () => {
+    assert.equal(tagFragmentAtCaret('没有井号', 4), null)
+    assert.equal(tagFragmentAtCaret('已经 #读完 了', 9), null, 'the caret is past the tag')
+    assert.equal(tagFragmentAtCaret('', 0), null)
+    assert.equal(tagFragmentAtCaret('#读\n新行', 5), null, 'a newline ends the fragment')
+  })
+
+  it('ranks prefix matches first, keeping frequency order inside each group', () => {
+    assert.deepEqual(
+      suggestTags('读', known).map((stat) => stat.tag),
+      ['读书', '读书笔记'],
+    )
+  })
+
+  it('offers the most-used tags for an empty query', () => {
+    assert.equal(suggestTags('', known)[0]?.tag, '读书')
+  })
+
+  it('falls back to substring matches', () => {
+    assert.deepEqual(
+      suggestTags('工作', known).map((stat) => stat.tag),
+      ['深度工作'],
+    )
+  })
+
+  it('honours the limit, and finds nothing for an unknown query', () => {
+    assert.equal(suggestTags('', known, 2).length, 2)
+    assert.deepEqual(suggestTags('完全不存在', known), [])
+    assert.deepEqual(suggestTags('', known, 0), [])
+  })
+
+  it('matches case-insensitively', () => {
+    const latin = tagStats([{ tags: ['DeepWork'] }])
+    assert.deepEqual(
+      suggestTags('deep', latin).map((stat) => stat.tag),
+      ['DeepWork'],
+    )
   })
 })
 

@@ -260,6 +260,39 @@ export const FLOMO_CSS = `
 
 .fl-composer-hint { font-size: 12px; color: var(--flomo-text-faint); }
 
+.fl-suggest {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 4px;
+  max-height: 216px;
+  overflow-y: auto;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius-sm);
+  background: var(--flomo-bg);
+}
+
+.fl-suggest-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--flomo-text);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fl-suggest-item[data-active="true"] {
+  background: var(--flomo-green-soft);
+  color: var(--flomo-green);
+}
+
 .fl-composer-actions { display: flex; align-items: center; gap: 8px; }
 
 .fl-button {

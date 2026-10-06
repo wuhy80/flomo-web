@@ -338,7 +338,11 @@ export function FlomoApp({
           ) : null}
 
           {showsComposer(view) ? (
-            <Composer onSubmit={handleAdd} focusToken={composeToken} />
+            <Composer
+              onSubmit={handleAdd}
+              knownTags={snapshot.tags}
+              focusToken={composeToken}
+            />
           ) : null}
 
           {view.kind === 'all' ? (

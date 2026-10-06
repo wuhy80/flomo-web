@@ -65,8 +65,17 @@ export type { SearchQuery } from './search.ts'
 export { corpusStats, heatmap, streak } from './stats.ts'
 export type { CorpusStats } from './stats.ts'
 
-export { hasTag, parseTags, tagKey, tagSegments, tagStats, tokenizeTags } from './tags.ts'
-export type { TagStat, TagToken } from './tags.ts'
+export {
+  hasTag,
+  parseTags,
+  suggestTags,
+  tagFragmentAtCaret,
+  tagKey,
+  tagSegments,
+  tagStats,
+  tokenizeTags,
+} from './tags.ts'
+export type { TagFragment, TagStat, TagToken } from './tags.ts'
 
 export {
   absoluteDayLabel,

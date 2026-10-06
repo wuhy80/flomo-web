@@ -1,14 +1,17 @@
 /**
  * The capture box — the single most-used control in flomo, so it gets the most
- * care: it auto-grows, submits on Cmd/Ctrl+Enter, and never loses a draft to a
- * stray click.
+ * care: it auto-grows, submits on Cmd/Ctrl+Enter, completes `#tags` from what
+ * the user has already written, and never loses a draft to a stray click.
  *
  * @module @flomo/ui/Composer
  */
 
 import type * as React from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+
+import { suggestTags, tagFragmentAtCaret } from '@flomo/core'
+import type { TagFragment, TagStat } from '@flomo/core'
 
 /** Largest height the textarea grows to before it starts scrolling. */
 const MAX_HEIGHT = 320
@@ -16,6 +19,8 @@ const MAX_HEIGHT = 320
 export interface ComposerProps {
   /** Called with the trimmed body when the user commits. */
   onSubmit: (content: string) => void
+  /** Tags already in the corpus, for completion. */
+  knownTags?: readonly TagStat[]
   /** Disables submission while a save is in flight, when desired. */
   disabled?: boolean
   placeholder?: string
@@ -34,18 +39,40 @@ export interface ComposerProps {
 
 /**
  * The memo input.
- * @param props - submission handler and presentation flags.
+ * @param props - submission handler, known tags and presentation flags.
  * @returns the composer element.
  */
 export function Composer({
   onSubmit,
+  knownTags = [],
   disabled = false,
   placeholder = '有什么值得记录的？',
   autoFocus = true,
   focusToken,
 }: ComposerProps): React.ReactElement {
   const [value, setValue] = useState('')
+  const [fragment, setFragment] = useState<TagFragment | null>(null)
+  const [active, setActive] = useState(0)
   const textarea = useRef<HTMLTextAreaElement>(null)
+
+  const suggestions = useMemo(
+    () => (fragment === null ? [] : suggestTags(fragment.query, knownTags)),
+    [fragment, knownTags],
+  )
+  const open = suggestions.length > 0
+
+  /**
+   * Recompute the `#` fragment under the caret.
+   *
+   * Read from the live DOM rather than from `value`, because React state is a
+   * render behind the keystroke that just happened.
+   */
+  const syncFragment = useCallback(() => {
+    const el = textarea.current
+    if (!el) return
+    setFragment(tagFragmentAtCaret(el.value, el.selectionStart ?? el.value.length))
+    setActive(0)
+  }, [])
 
   const resize = useCallback(() => {
     const el = textarea.current
@@ -67,11 +94,40 @@ export function Composer({
     textarea.current?.focus()
   }, [focusToken])
 
+  /**
+   * Replace the fragment under the caret with a complete tag.
+   * @param tag - the tag to insert, without its `#`.
+   */
+  const accept = useCallback(
+    (tag: string) => {
+      const el = textarea.current
+      if (!el || fragment === null) return
+      const caret = el.selectionStart ?? el.value.length
+      const next = `${value.slice(0, fragment.start)}#${tag} ${value.slice(caret)}`
+      // A trailing space so the next word does not get absorbed into the tag.
+      const nextCaret = fragment.start + tag.length + 2
+
+      setValue(next)
+      setFragment(null)
+      setActive(0)
+      requestAnimationFrame(() => {
+        const node = textarea.current
+        if (node === null) return
+        node.focus()
+        node.setSelectionRange(nextCaret, nextCaret)
+        resize()
+      })
+    },
+    [fragment, value, resize],
+  )
+
   const submit = useCallback(() => {
     const text = value.trim()
     if (text.length === 0 || disabled) return
     onSubmit(text)
     setValue('')
+    setFragment(null)
+    setActive(0)
     // Re-focus after React commits the cleared value, so the caret never jumps.
     requestAnimationFrame(() => {
       textarea.current?.focus()
@@ -81,12 +137,40 @@ export function Composer({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      // The completion menu owns the navigation keys only while it is open, so
+      // Enter still inserts a newline the rest of the time.
+      if (open) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault()
+          setActive((index) => (index + 1) % suggestions.length)
+          return
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault()
+          setActive((index) => (index - 1 + suggestions.length) % suggestions.length)
+          return
+        }
+        if (event.key === 'Enter' || event.key === 'Tab') {
+          const chosen = suggestions[active]
+          if (chosen !== undefined) {
+            event.preventDefault()
+            accept(chosen.tag)
+            return
+          }
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          setFragment(null)
+          return
+        }
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
         event.preventDefault()
         submit()
       }
     },
-    [submit],
+    [open, suggestions, active, accept, submit],
   )
 
   const canSend = value.trim().length > 0 && !disabled
@@ -96,12 +180,44 @@ export function Composer({
       <textarea
         ref={textarea}
         value={value}
-        onChange={(event) => setValue(event.target.value)}
+        onChange={(event) => {
+          setValue(event.target.value)
+          syncFragment()
+        }}
         onKeyDown={handleKeyDown}
+        onKeyUp={syncFragment}
+        onClick={syncFragment}
+        onSelect={syncFragment}
+        onBlur={() => setFragment(null)}
         placeholder={placeholder}
         aria-label="记录一条 MEMO"
         spellCheck={false}
       />
+
+      {open ? (
+        // A listbox with `option` children directly: wrapping each option in an
+        // `li` would be invalid inside a listbox role.
+        <div className="fl-suggest" role="listbox" aria-label="标签建议">
+          {suggestions.map((stat, index) => (
+            <button
+              key={stat.tag}
+              type="button"
+              role="option"
+              aria-selected={index === active}
+              className="fl-suggest-item"
+              data-active={index === active ? 'true' : 'false'}
+              // Keeps focus in the textarea so the click does not blur the
+              // field and close the menu before the click lands.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => accept(stat.tag)}
+            >
+              <span>#{stat.tag}</span>
+              <span className="fl-nav-count">{stat.count}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="fl-composer-bar">
         <span className="fl-composer-hint">
           {value.length > 0 ? `${value.length} 字 · ` : ''}Ctrl/Cmd + Enter 发送
