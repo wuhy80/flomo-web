@@ -175,6 +175,33 @@ try {
   const manifest = await fetch(`${base}/manifest.webmanifest`)
   check(manifest.status === 200, 'GET /manifest.webmanifest answers 200')
 
+  // ── the installable-app surface ───────────────────────────────────────────
+  // A manifest with no icons still installs, using the platform's placeholder —
+  // which is a strange look for an app that otherwise works offline.
+  let manifestBody = {}
+  try {
+    manifestBody = await manifest.json()
+  } catch {
+    check(false, 'manifest.webmanifest is valid JSON')
+  }
+
+  const icons = Array.isArray(manifestBody.icons) ? manifestBody.icons : []
+  check(icons.length > 0, 'the manifest declares icons')
+  check(
+    icons.some((icon) => icon.purpose === 'maskable'),
+    'one icon is maskable, or Android letterboxes the installed one',
+  )
+  for (const icon of icons) {
+    const src = typeof icon.src === 'string' ? icon.src : ''
+    const response = await fetch(new URL(src, `${base}/`))
+    const type = response.headers.get('content-type') ?? ''
+    check(
+      response.ok && type.startsWith('image/'),
+      `manifest icon resolves as an image: ${src}`,
+      `HTTP ${response.status} ${type}`,
+    )
+  }
+
   // ── the shell the worker promises to precache ─────────────────────────────
   // Guarded: a missing sw.js must be reported as a failed check with the rest of
   // the summary, not as a stack trace that hides every other finding.

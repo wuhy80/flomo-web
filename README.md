@@ -88,6 +88,13 @@
 - 只在生产构建里注册（开发环境下 Service Worker 会和 Vite 的模块图打架）
 - 出问题时的逃生口：`CACHE_NAME` 一改，`activate` 会删掉其他所有缓存
 
+**可安装（PWA）**
+- manifest 声明了 192/512 两种尺寸，外加一个 **maskable** 图标（少了它，Android
+  会把图标塞进一个方框里）
+- 单独的 `apple-touch-icon` —— iOS 不看 manifest 的图标
+- 图标由 `packages/web/scripts/make-icons.py` 生成并提交，所以 CI 不需要 Pillow。
+  生成脚本与插件图标 `packages/dsh-plugin/icon.svg` 是同一个形状
+
 ---
 
 ### 围栏不是散文

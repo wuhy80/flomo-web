@@ -58,6 +58,16 @@ pnpm smoke               # 部署冒烟测试（需先 build）
 > 产物测试会**自己构建 `lib/`**（`lib/` 是 gitignore 的）。所以干净检出能直接跑，
 > 而且测试不可能对着过期产物通过。
 
+### 图标
+
+```bash
+python packages/web/scripts/make-icons.py
+```
+
+一次性工具，**产物已提交**，所以 CI 不需要 Pillow。只在标记本身变化时重跑。
+`pnpm smoke` 会断言 manifest 声明了图标、其中一个是 maskable、且每个图标 URL
+都能作为图片取到 —— 少了图标 manifest 照样能安装，只是装出来是平台的占位图。
+
 ### 用真实浏览器看它
 
 ```bash

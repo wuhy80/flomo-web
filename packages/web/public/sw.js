@@ -27,7 +27,13 @@
 /** Bump this when the caching strategy changes, not on every build. */
 const CACHE_NAME = 'flomo-shell-v1'
 
-/** Fetched at install so a cold offline start has something to serve. */
+/**
+ * Fetched at install so a cold offline start has something to serve.
+ *
+ * The icons are deliberately absent: they are read by the platform when the app
+ * is installed, not by the page, and the browser caches them itself. Precaching
+ * them would slow every install to no benefit.
+ */
 const SHELL_URLS = ['./', './index.html', './manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
