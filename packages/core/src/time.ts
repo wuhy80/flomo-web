@@ -52,6 +52,23 @@ export function recentMonths(count: number, from: Date = new Date()): string[] {
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const
 
 /**
+ * Split a `YYYY-MM-DD` key into finite numbers.
+ *
+ * The finiteness check is the one that matters: a malformed key parses to `NaN`,
+ * not to `undefined`, so a guard written as an undefined check can never fire for
+ * the case it names and the caller gets `NaN年NaN月NaN日` back. Both are needed
+ * because only the undefined check narrows the types.
+ * @param dayKey - the key.
+ * @returns the parts, or `null` when the key is not a date.
+ */
+function partsOf(dayKey: string): { y: number; m: number; d: number } | null {
+  const [y, m, d] = dayKey.split('-').map(Number)
+  if (y === undefined || m === undefined || d === undefined) return null
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null
+  return { y, m, d }
+}
+
+/**
  * Human-readable Chinese label for a day, used as a feed group header.
  * @param dayKey - a `YYYY-MM-DD` key.
  * @param today - reference instant, defaulting to now.
@@ -64,8 +81,9 @@ export function dayLabel(dayKey: string, today: Date = new Date()): string {
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
   if (dayKey === dayOf(yesterday)) return '昨天'
 
-  const [y, m, d] = dayKey.split('-').map(Number)
-  if (y === undefined || m === undefined || d === undefined) return dayKey
+  const parts = partsOf(dayKey)
+  if (parts === null) return dayKey
+  const { y, m, d } = parts
   const date = new Date(y, m - 1, d)
   const weekday = WEEKDAYS[date.getDay()] ?? ''
   if (y === today.getFullYear()) return `${m}月${d}日 ${weekday}`
@@ -81,8 +99,9 @@ export function dayLabel(dayKey: string, today: Date = new Date()): string {
  * @returns a label such as `2026年10月6日 周二`.
  */
 export function absoluteDayLabel(dayKey: string): string {
-  const [y, m, d] = dayKey.split('-').map(Number)
-  if (y === undefined || m === undefined || d === undefined) return dayKey
+  const parts = partsOf(dayKey)
+  if (parts === null) return dayKey
+  const { y, m, d } = parts
   const weekday = WEEKDAYS[new Date(y, m - 1, d).getDay()] ?? ''
   return `${y}年${m}月${d}日 ${weekday}`
 }
