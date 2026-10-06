@@ -8,6 +8,7 @@ import type * as React from 'react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 
+import { createPrivateRepo } from '@flomo/core'
 import { injectFlomoStyles } from '@flomo/ui'
 
 import type { WebConfig } from './config.ts'
@@ -32,8 +33,35 @@ export function SetupForm({ initial, onSubmit, onCancel }: SetupFormProps): Reac
   const [branch, setBranch] = useState(initial?.branch ?? '')
   const [token, setToken] = useState(initial?.token ?? '')
   const [remember, setRemember] = useState(initial?.remember ?? true)
+  const [creating, setCreating] = useState(false)
+  const [createNote, setCreateNote] = useState<string | null>(null)
 
   const valid = owner.trim() && repo.trim() && token.trim()
+  const canCreate = token.trim() !== '' && repo.trim() !== '' && !creating
+
+  /**
+   * Create the data repository on the user's own account.
+   *
+   * Deliberately optional. It needs a broader token scope than anything else here
+   * ever uses, and pushing someone into granting `Administration: write` just to
+   * save one trip to github.com would be the wrong trade.
+   */
+  const createRepository = async (): Promise<void> => {
+    if (!canCreate) return
+    setCreating(true)
+    setCreateNote(null)
+    try {
+      const created = await createPrivateRepo(token.trim(), repo.trim())
+      // The authenticated account, whatever was typed into the owner field.
+      setOwner(created.owner)
+      setRepo(created.repo)
+      setCreateNote(`已创建私有仓库 ${created.owner}/${created.repo}。`)
+    } catch (error) {
+      setCreateNote(`创建失败：${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -82,6 +110,22 @@ export function SetupForm({ initial, onSubmit, onCancel }: SetupFormProps): Reac
               onChange={(event) => setRepo(event.target.value)}
             />
           </label>
+
+          <div style={{ marginBottom: 10 }}>
+            <button
+              type="button"
+              className="fl-button fl-button-ghost"
+              disabled={!canCreate}
+              onClick={() => void createRepository()}
+            >
+              {creating ? '创建中…' : '在我的账号下创建这个私有仓库'}
+            </button>
+            <p className="fl-recovery-hint" style={{ marginTop: 2 }}>
+              可选。这一步需要令牌额外具备 <code>Administration: Read and write</code>。
+              如果你自己已经建好仓库，就<strong>不要</strong>授予这个权限。
+            </p>
+            {createNote ? <div className="fl-import-report">{createNote}</div> : null}
+          </div>
 
           <label className="fl-field">
             <span className="fl-field-label">分支（可留空，默认分支）</span>

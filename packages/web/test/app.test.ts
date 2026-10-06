@@ -109,6 +109,21 @@ describe('web app shell', () => {
     assert.match(html, /在这台设备上记住/)
   })
 
+  it('offers to create the repository, and names what that costs', async () => {
+    delete (globalThis as { window?: unknown }).window
+    const module = await loadWebEntry()
+    const App = module['App'] as React.ComponentType
+
+    const html = renderToString(React.createElement(App))
+
+    assert.match(html, /在我的账号下创建这个私有仓库/)
+    // The extra scope has to be stated: this is the one place the app asks for
+    // more than it will ever use, so the user can decline it knowingly.
+    assert.match(html, /Administration: Read and write/)
+    assert.match(html, /可选。这一步需要令牌额外具备/)
+    assert.match(html, /不要<\/strong>授予这个权限/)
+  })
+
   it('goes straight to the vault gate when a repository is already stored', async () => {
     useWindow({
       'flomo-sim:config:v1': JSON.stringify({

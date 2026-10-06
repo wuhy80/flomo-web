@@ -18,6 +18,7 @@ import {
   ImportError,
   WrongPasswordError,
   backlinks,
+  createPrivateRepo,
   dailyReview,
   dayOf,
   exportFilename,
@@ -547,6 +548,53 @@ describe('tokenizeInline', () => {
 
   it('leaves a malformed marker in the text rather than eating it', () => {
     assert.deepEqual(tokenizeInline('[[   ]]'), [{ type: 'text', value: '[[   ]]' }])
+  })
+})
+
+describe('createPrivateRepo', () => {
+  it('creates under the authenticated account and returns the coordinates', async () => {
+    const calls: Array<{ url: string; body: unknown }> = []
+    const fetchImpl = (async (url: unknown, init: { body?: unknown }) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init.body)) })
+      return new Response(JSON.stringify({ owner: { login: 'me' }, name: 'flomo-data' }), {
+        status: 201,
+      })
+    }) as unknown as typeof fetch
+
+    const created = await createPrivateRepo('ghp_x', 'flomo-data', fetchImpl)
+    assert.deepEqual(created, { owner: 'me', repo: 'flomo-data' })
+
+    assert.equal(calls[0]?.url, 'https://api.github.com/user/repos')
+    assert.deepEqual(
+      calls[0]?.body,
+      {
+        name: 'flomo-data',
+        private: true,
+        auto_init: true,
+        description: 'flomo-sim encrypted memo store',
+      },
+      'the repository must be private; the notes inside it are ciphertext anyway',
+    )
+  })
+
+  it('surfaces the API message when the name is taken', async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ message: 'name already exists on this account' }), {
+        status: 422,
+      })) as unknown as typeof fetch
+
+    await assert.rejects(
+      () => createPrivateRepo('ghp_x', 'flomo-data', fetchImpl),
+      /name already exists/,
+      'a bare status code would leave the user with nothing to act on',
+    )
+  })
+
+  it('refuses a response it cannot read coordinates from', async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({}), { status: 201 })) as unknown as typeof fetch
+
+    await assert.rejects(() => createPrivateRepo('ghp_x', 'x', fetchImpl), /缺少 owner\/name/)
   })
 })
 

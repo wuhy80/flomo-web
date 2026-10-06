@@ -165,6 +165,11 @@ pnpm dev            # http://localhost:5273
 在 GitHub 的 **Settings → Developer settings → Fine-grained tokens** 创建。
 `vault.json` 不存在时，下一步会让你**创建保险库**并设置密码。
 
+**不想手动建仓库？** 表单上有一个可选的「在我的账号下创建这个私有仓库」。
+它是**可选**的，因为这一步需要令牌额外具备 `Administration: Read and write` ——
+比应用其它任何时候用到的都宽。如果你自己已经建好仓库，就**不要**授予这个权限。
+（这个按钮背后就是 `createPrivateRepo`，它会顺手把 `owner` 填成令牌所属的账号。）
+
 ### 部署到 GitHub Pages
 
 1. 推到一个公开仓库，`main` 分支
