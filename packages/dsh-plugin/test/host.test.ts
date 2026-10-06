@@ -16,7 +16,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, describe, it } from 'node:test'
 
-import { monthOf } from '@flomo/core'
+import { memosToJson, monthOf } from '@flomo/core'
+import type { Memo } from '@flomo/core'
 import { MemoryStore } from '@flomo/core/testing'
 
 import { FlomoHostService, PASSWORD_REF, TOKEN_REF } from '../src/host-service.ts'
@@ -184,8 +185,68 @@ describe('memos and shards', () => {
   })
 })
 
-describe('agent tools', () => {
-  it('registers the documented set and refuses while locked', async () => {
+describe('import', () => {
+  it('merges an exported document, reports what it did, and persists it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
+    temporaryDirs.push(dir)
+    const backing = new MemoryStore()
+    const { host } = await makeHost(dir, backing)
+
+    await host.apply({ kind: 'configure', owner: 'me', repo: 'r', token: 't' })
+    await host.apply({ kind: 'create', password: 'pw' })
+    await host.apply({ kind: 'add', content: '原有的一条 #旧' })
+    await host.apply({ kind: 'save' })
+
+    const payload = JSON.parse(memosToJson(host.memos())) as { memos: Memo[] }
+    assert.equal(payload.memos.length, 1)
+    payload.memos.push({
+      id: 'restored',
+      content: '从备份恢复的一条 #导入',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: ['假的'],
+    })
+
+    const state = await host.apply({ kind: 'import', payload: JSON.stringify(payload) })
+    assert.equal(state.error, null)
+    assert.equal(host.memos().length, 2)
+
+    const message = host.takeMessage()
+    assert.match(message ?? '', /已导入 1 条/)
+    assert.match(message ?? '', /跳过 1 条已存在/)
+
+    const imported = host.memos().find((m) => m.id === 'restored')
+    assert.deepEqual(imported?.tags, ['导入'], 'tags come from the body, not the payload')
+
+    // One-shot: the same outcome must not be reported by the next call.
+    assert.equal(host.takeMessage(), null)
+
+    // Durable, not merely in memory.
+    const reopened = new FlomoHostService({
+      credentials: fakeCredentials(),
+      configPath: join(dir, 'second.json'),
+      createStore: () => backing,
+    })
+    await reopened.ensureStarted()
+    await reopened.apply({ kind: 'configure', owner: 'me', repo: 'r', token: 't' })
+    await reopened.apply({ kind: 'unlock', password: 'pw' })
+    assert.equal(reopened.memos().length, 2)
+  })
+
+  it('refuses an unreadable file without touching the vault', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
+    temporaryDirs.push(dir)
+    const { host } = await makeHost(dir, new MemoryStore())
+    await host.apply({ kind: 'configure', owner: 'me', repo: 'r', token: 't' })
+    await host.apply({ kind: 'create', password: 'pw' })
+
+    const state = await host.apply({ kind: 'import', payload: '这不是 json' })
+    assert.match(state.error ?? '', /合法的 JSON/)
+    assert.equal(host.memos().length, 0)
+  })
+})
+
+describe('agent tools', () => {  it('registers the documented set and refuses while locked', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
     temporaryDirs.push(dir)
     const { host } = await makeHost(dir, new MemoryStore())

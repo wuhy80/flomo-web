@@ -503,6 +503,19 @@ export const FLOMO_CSS = `
 
 .fl-recovery-hint { margin-top: 8px; font-size: 12px; line-height: 1.65; color: var(--flomo-text-soft); }
 
+.fl-import-report {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border-radius: var(--flomo-radius-sm);
+  background: var(--flomo-green-soft);
+  color: var(--flomo-text);
+  font-family: var(--flomo-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ── random walk & review ────────────────────────────────────────────── */
 
 .fl-card-lg {

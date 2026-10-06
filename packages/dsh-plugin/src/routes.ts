@@ -17,8 +17,13 @@ import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { API_PREFIX, parseAction } from './protocol.ts'
 import type { FlomoHostService } from './host-service.ts'
 
-/** Largest accepted request body. A memo is text; anything larger is abuse. */
-const BODY_LIMIT = 2 * 1024 * 1024
+/**
+ * Largest accepted request body.
+ *
+ * Generous because an import carries an entire exported document inside one
+ * action; still finite, because nothing else here should approach it.
+ */
+const BODY_LIMIT = 8 * 1024 * 1024
 
 /**
  * Write a JSON response with no-store caching.
@@ -143,7 +148,9 @@ export function makeFlomoRoutes(host: FlomoHostService): WebRoute[] {
       const parsed = parseAction(body)
       if (parsed === undefined) return writeJson(res, 400, { ok: false, error: 'invalid-action' })
 
-      writeJson(res, 200, { ok: true, state: await host.apply(parsed) })
+      const state = await host.apply(parsed)
+      const message = host.takeMessage()
+      writeJson(res, 200, { ok: true, state, ...(message === null ? {} : { message }) })
     },
   }
 

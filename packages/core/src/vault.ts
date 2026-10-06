@@ -379,6 +379,34 @@ export class FlomoVault {
   }
 
   /**
+   * Merge imported memos into the vault.
+   *
+   * Additive and non-destructive by design: an id that already exists is left
+   * alone rather than overwritten, so importing a backup over a working vault
+   * cannot silently roll back newer edits. Tags are re-derived from the body
+   * for the same reason {@link parseMemosJson} does not trust them.
+   * @param memos - the memos to merge.
+   * @returns how many were added and how many were already present.
+   */
+  merge(memos: readonly Memo[]): { added: number; duplicates: number } {
+    let added = 0
+    let duplicates = 0
+
+    for (const memo of memos) {
+      if (this.memos.has(memo.id)) {
+        duplicates += 1
+        continue
+      }
+      const normalised: Memo = { ...memo, tags: parseTags(memo.content) }
+      this.memos.set(normalised.id, normalised)
+      this.dirty.add(monthOf(normalised.createdAt))
+      added += 1
+    }
+
+    return { added, duplicates }
+  }
+
+  /**
    * Seal and push every dirty shard.
    *
    * Writes are chained so overlapping calls cannot interleave. The dirty set is

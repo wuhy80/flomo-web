@@ -135,8 +135,10 @@ export class HostFlomoSession implements FlomoSession {
    * The in-flight counter drives the "保存中" indicator; it is a counter rather
    * than a flag so that overlapping actions cannot clear it early.
    * @param action - the action to send.
+   * @returns the response envelope, or `null` when the action failed (the
+   * failure having been recorded on the snapshot).
    */
-  private async act(action: FlomoAction): Promise<void> {
+  private async act(action: FlomoAction): Promise<ActionResponse | null> {
     this.pending += 1
     this.update({ saving: true, error: null })
     try {
@@ -145,8 +147,10 @@ export class HostFlomoSession implements FlomoSession {
         body: JSON.stringify(action),
       })
       this.adopt(body.state)
+      return body
     } catch (error) {
       this.update({ error: error instanceof Error ? error.message : String(error) })
+      return null
     } finally {
       this.pending -= 1
       if (this.pending <= 0) this.update({ saving: false })
@@ -234,5 +238,12 @@ export class HostFlomoSession implements FlomoSession {
   /** {@inheritDoc FlomoSession.save} */
   async save(): Promise<void> {
     await this.act({ kind: 'save' })
+  }
+
+  /** {@inheritDoc FlomoSession.importJson} */
+  async importJson(text: string): Promise<string> {
+    const body = await this.act({ kind: 'import', payload: text })
+    if (body === null) throw new Error(this.getSnapshot().error ?? '导入失败。')
+    return body.message ?? '导入完成。'
   }
 }

@@ -15,6 +15,7 @@ import {
   EXPORT_FORMAT,
   FlomoVault,
   GitHubConflictError,
+  ImportError,
   WrongPasswordError,
   dailyReview,
   dayOf,
@@ -22,6 +23,7 @@ import {
   memosToJson,
   memosToMarkdown,
   monthOf,
+  parseMemosJson,
   parseTags,
   pickRandom,
   randomBytes,
@@ -414,5 +416,138 @@ describe('export', () => {
   it('names the file after the export instant', () => {
     assert.equal(exportFilename('md', now), 'flomo-20261006-1430.md')
     assert.equal(exportFilename('json', now), 'flomo-20261006-1430.json')
+  })
+})
+
+describe('import', () => {
+  const now = new Date(2026, 9, 6, 14, 30)
+
+  it('round-trips an export', () => {
+    const source = [
+      memo({ id: 'a', content: '第一条 #x', createdAt: '2025-06-01T01:00:00.000Z' }),
+      memo({ id: 'b', content: '第二条 #y', createdAt: '2025-06-02T01:00:00.000Z' }),
+    ]
+    const result = parseMemosJson(memosToJson(source, now))
+    assert.equal(result.skipped, 0)
+    assert.deepEqual(result.memos, source)
+  })
+
+  it('accepts a bare array as well as the envelope', () => {
+    const result = parseMemosJson(JSON.stringify([{ id: 'x', content: '裸数组 #z' }]), now)
+    assert.equal(result.memos.length, 1)
+    assert.deepEqual(result.memos[0]?.tags, ['z'])
+    assert.equal(result.memos[0]?.createdAt, now.toISOString(), 'a missing timestamp falls back')
+  })
+
+  it('re-derives tags instead of trusting the file', () => {
+    const result = parseMemosJson(
+      JSON.stringify({ memos: [{ id: 'x', content: '真实标签是 #真', tags: ['假', '也是假的'] }] }),
+      now,
+    )
+    assert.deepEqual(result.memos[0]?.tags, ['真'], 'a hand-edited tags field must not win')
+  })
+
+  it('clamps an edit that precedes creation', () => {
+    const result = parseMemosJson(
+      JSON.stringify({
+        memos: [
+          {
+            id: 'x',
+            content: '时间倒流',
+            createdAt: '2025-06-02T00:00:00.000Z',
+            updatedAt: '2025-06-01T00:00:00.000Z',
+          },
+        ],
+      }),
+      now,
+    )
+    assert.equal(result.memos[0]?.updatedAt, result.memos[0]?.createdAt)
+  })
+
+  it('drops unusable entries with a reason, and keeps the rest', () => {
+    const result = parseMemosJson(
+      JSON.stringify({
+        memos: [
+          { id: 'ok', content: '这条没问题' },
+          { id: 'empty', content: '   ' },
+          { id: 'missing' },
+          'not an object',
+        ],
+      }),
+      now,
+    )
+    assert.equal(result.memos.length, 1)
+    assert.equal(result.skipped, 3)
+    // Reasons are de-duplicated so a large broken file reads as a short list.
+    assert.deepEqual(result.problems, ['有一条缺少正文', '有一项不是对象'])
+  })
+
+  it('keeps only the first of two entries sharing an id', () => {
+    const result = parseMemosJson(
+      JSON.stringify({
+        memos: [
+          { id: 'same', content: '先来的' },
+          { id: 'same', content: '后来的' },
+        ],
+      }),
+      now,
+    )
+    assert.equal(result.memos.length, 1)
+    assert.equal(result.memos[0]?.content, '先来的')
+  })
+
+  it('refuses payloads it cannot understand', () => {
+    assert.throws(() => parseMemosJson('这不是 json'), ImportError)
+    assert.throws(() => parseMemosJson('{"nope":1}'), ImportError)
+    assert.throws(() => parseMemosJson('42'), ImportError)
+  })
+})
+
+describe('vault.merge', () => {
+  it('adds new memos, skips existing ids, and re-derives tags', async () => {
+    const store = new MemoryStore()
+    const { vault } = await FlomoVault.create(store, PASSWORD, FAST)
+    const existing = vault.add('原有的一条 #旧')
+    await vault.flush()
+
+    const result = vault.merge([
+      { ...existing, content: '被篡改的正文 #新' },
+      {
+        id: 'fresh',
+        content: '导入进来的一条 #导入',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        tags: ['假的'],
+      },
+    ])
+
+    assert.deepEqual(result, { added: 1, duplicates: 1 })
+    assert.equal(vault.all().length, 2)
+
+    const kept = vault.all().find((m) => m.id === existing.id)
+    assert.equal(kept?.content, '原有的一条 #旧', 'an existing memo must not be overwritten')
+
+    const imported = vault.all().find((m) => m.id === 'fresh')
+    assert.deepEqual(imported?.tags, ['导入'], 'tags come from the body, not the payload')
+  })
+
+  it('persists merged memos like any other edit', async () => {
+    const store = new MemoryStore()
+    const { vault } = await FlomoVault.create(store, PASSWORD, FAST)
+    vault.merge([
+      {
+        id: 'restored',
+        content: '从备份恢复 #备份',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        tags: [],
+      },
+    ])
+    await vault.flush()
+
+    const reopened = await FlomoVault.open(store, PASSWORD)
+    await reopened.loadAll()
+    assert.equal(reopened.all()[0]?.content, '从备份恢复 #备份')
+    assert.deepEqual(reopened.all()[0]?.tags, ['备份'])
   })
 })

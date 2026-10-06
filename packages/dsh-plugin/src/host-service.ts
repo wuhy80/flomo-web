@@ -23,6 +23,8 @@ import {
   WrongPasswordError,
   corpusStats,
   dailyReview,
+  describeImportResult,
+  parseMemosJson,
   randomWalk,
   searchMemos,
   tagStats,
@@ -115,6 +117,7 @@ export class FlomoHostService {
   private started: Promise<void> | null = null
   private toolsRegistered = false
   private toolsError: string | null = null
+  private lastMessage: string | null = null
 
   /**
    * @param options - the credentials service, config path and store factory.
@@ -305,12 +308,29 @@ export class FlomoHostService {
    */
   async apply(action: FlomoAction): Promise<HostState> {
     await this.ensureStarted()
+    // Both are per-action: cleared up front so a stale message or a stale error
+    // can never be read as the outcome of the action that just ran.
+    this.lastMessage = null
+    this.error = null
     try {
       await this.applyInner(action)
     } catch (error) {
       this.error = describe(error)
     }
     return this.fullSnapshot()
+  }
+
+  /**
+   * Read and clear the message left by the most recent {@link apply}.
+   *
+   * A take-style accessor rather than a snapshot field, because it belongs to
+   * one response and must not persist into the next one.
+   * @returns the message, or `null` when the last action had nothing to say.
+   */
+  takeMessage(): string | null {
+    const message = this.lastMessage
+    this.lastMessage = null
+    return message
   }
 
   /**
@@ -397,6 +417,15 @@ export class FlomoHostService {
       case 'save':
         await this.save()
         return
+
+      case 'import': {
+        const vault = this.requireVault()
+        const result = parseMemosJson(action.payload)
+        const { added, duplicates } = vault.merge(result.memos)
+        await this.save()
+        this.lastMessage = describeImportResult(added, duplicates, result)
+        return
+      }
     }
   }
 

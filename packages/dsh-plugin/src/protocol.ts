@@ -65,11 +65,15 @@ export type FlomoAction =
   | { kind: 'remove'; id: string }
   | { kind: 'pin'; id: string; pinned?: boolean }
   | { kind: 'save' }
+  /** Merge an exported document; the payload is the raw file text. */
+  | { kind: 'import'; payload: string }
 
 /** The `POST /action` response envelope. */
 export interface ActionResponse {
   ok: boolean
   state: HostState
+  /** Optional human-readable outcome, currently only an import summary. */
+  message?: string
 }
 
 /**
@@ -107,6 +111,10 @@ export function parseAction(value: unknown): FlomoAction | undefined {
     case 'lock':
     case 'save':
       return { kind: v.kind }
+    case 'import': {
+      const payload = str('payload')
+      return payload ? { kind: 'import', payload } : undefined
+    }
     case 'add': {
       const content = str('content')
       return content ? { kind: 'add', content } : undefined

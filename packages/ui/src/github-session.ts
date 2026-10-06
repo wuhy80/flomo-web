@@ -14,6 +14,8 @@
 import {
   FlomoVault,
   GitHubContentsStore,
+  describeImportResult,
+  parseMemosJson,
   tagStats,
   WrongPasswordError,
 } from '@flomo/core'
@@ -203,6 +205,19 @@ export class GitHubVaultSession implements FlomoSession {
   /** {@inheritDoc FlomoSession.pin} */
   pin(id: string, pinned?: boolean): void {
     this.mutate((vault) => vault.pin(id, pinned))
+  }
+
+  /** {@inheritDoc FlomoSession.importJson} */
+  async importJson(text: string): Promise<string> {
+    if (!this.vault) throw new Error('保险库尚未解锁。')
+    const result = parseMemosJson(text)
+    const { added, duplicates } = this.vault.merge(result.memos)
+    this.syncFromVault()
+    this.scheduleAutoSave()
+    // Import is the one edit worth persisting eagerly: the user just handed us
+    // a file and will expect it to be safe without waiting out the debounce.
+    await this.save()
+    return describeImportResult(added, duplicates, result)
   }
 
   /**

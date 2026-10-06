@@ -76,6 +76,7 @@ export function FlomoApp({
   const [view, setView] = useState<FlomoView>({ kind: 'all' })
   const [query, setQuery] = useState('')
   const [randomTick, setRandomTick] = useState(0)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
   const probed = useRef(false)
 
   useEffect(() => {
@@ -125,6 +126,25 @@ export function FlomoApp({
       if (view.kind !== 'all') setView({ kind: 'all' })
     },
     [session, view.kind],
+  )
+
+  const handleImport = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const input = event.currentTarget
+      const file = input.files?.[0]
+      if (!file) return
+      try {
+        setImportMessage(await session.importJson(await file.text()))
+      } catch (error) {
+        setImportMessage(
+          `导入失败：${error instanceof Error ? error.message : String(error)}`,
+        )
+      } finally {
+        // Cleared so picking the same file twice still fires a change event.
+        input.value = ''
+      }
+    },
+    [session],
   )
 
   if (snapshot.status === 'probing') {
@@ -353,11 +373,27 @@ export function FlomoApp({
                   >
                     导出 JSON
                   </button>
+                  <label className="fl-button" style={{ cursor: 'pointer' }}>
+                    导入 JSON
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      className="fl-visually-hidden"
+                      onChange={(event) => void handleImport(event)}
+                    />
+                  </label>
                 </div>
                 <p className="fl-recovery-hint">
                   导出的是明文。请把它放在你信任的地方 —— 这也是万一忘记密码和恢复码时，
                   唯一能把文字带走的办法。
                 </p>
+                <p className="fl-recovery-hint">
+                  导入是<strong>只增不改</strong>的：id 相同的记录会被跳过，
+                  不会覆盖你现在的版本。
+                </p>
+                {importMessage ? (
+                  <pre className="fl-import-report">{importMessage}</pre>
+                ) : null}
               </div>
               {renderSettingsExtra?.()}
             </>

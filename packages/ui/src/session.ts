@@ -82,6 +82,16 @@ export interface FlomoSession {
   /** Toggle or set a memo's pinned flag. */
   pin(id: string, pinned?: boolean): void
 
+  /**
+   * Merge an exported document into the vault.
+   *
+   * Additive: memos whose id already exists are left alone, so importing a
+   * backup over a live vault can never silently roll back newer edits.
+   * @param text - the contents of an exported JSON file.
+   * @returns a human-readable summary of what happened.
+   */
+  importJson(text: string): Promise<string>
+
   /** Push pending changes now, bypassing the auto-save debounce. */
   save(): Promise<void>
 }
