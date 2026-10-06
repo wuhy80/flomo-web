@@ -450,6 +450,8 @@ describe('built client bundle', () => {
     assert.match(html, /class="fl-memo-tag"[^>]*role="button"/, 'tags are clickable')
     assert.match(html, /class="fl-memo-link"[^>]*role="button"/, 'links are clickable')
     assert.match(html, /\[\[心流\]\]/, 'the link keeps its markup in the body')
+    assert.match(html, /fl-shortcut-hint/, 'the shortcuts are discoverable')
+    assert.match(html, /搜索…（按 \/ 聚焦）/, 'the search box says how to reach it')
   })
 
   it('renders the password gate when the vault is locked', async () => {

@@ -21,6 +21,15 @@ export interface ComposerProps {
   placeholder?: string
   /** Focus the box on mount. */
   autoFocus?: boolean
+  /**
+   * Change this number to pull focus into the box from elsewhere.
+   *
+   * An imperative focus has to arrive as a value the component can observe,
+   * because the textarea's ref belongs to this component and a parent cannot
+   * reach it — and a callback ref would run on every render rather than when the
+   * user actually asked for focus.
+   */
+  focusToken?: number
 }
 
 /**
@@ -33,6 +42,7 @@ export function Composer({
   disabled = false,
   placeholder = '有什么值得记录的？',
   autoFocus = true,
+  focusToken,
 }: ComposerProps): React.ReactElement {
   const [value, setValue] = useState('')
   const textarea = useRef<HTMLTextAreaElement>(null)
@@ -49,6 +59,13 @@ export function Composer({
   useEffect(() => {
     if (autoFocus) textarea.current?.focus()
   }, [autoFocus])
+
+  useEffect(() => {
+    // Runs on mount and again whenever the token changes, so a host can both ask
+    // for focus later and leave the prop off entirely to opt out.
+    if (focusToken === undefined) return
+    textarea.current?.focus()
+  }, [focusToken])
 
   const submit = useCallback(() => {
     const text = value.trim()

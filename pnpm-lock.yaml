@@ -46,9 +46,6 @@ importers:
       '@flomo/core':
         specifier: workspace:*
         version: link:../core
-      react:
-        specifier: ^18.2.0
-        version: 18.3.1
     devDependencies:
       '@types/react':
         specifier: ~18.3.1
@@ -56,6 +53,9 @@ importers:
       '@types/react-dom':
         specifier: ~18.3.5
         version: 18.3.5(@types/react@18.3.31)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
 
   packages/web:
     dependencies:

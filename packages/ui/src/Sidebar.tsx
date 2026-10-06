@@ -108,6 +108,9 @@ export function Sidebar({
             <span>设置</span>
           </button>
         ) : null}
+        <div className="fl-shortcut-hint">
+          <kbd>/</kbd> 搜索 · <kbd>c</kbd> 记录 · <kbd>g</kbd> 全部 · <kbd>r</kbd> 回顾
+        </div>
       </div>
     </nav>
   )

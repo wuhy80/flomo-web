@@ -150,6 +150,23 @@ export const FLOMO_CSS = `
 
 .fl-sidebar-foot { margin-top: auto; padding-top: 16px; }
 
+.fl-shortcut-hint {
+  padding: 12px 10px 0;
+  font-size: 11.5px;
+  line-height: 1.9;
+  color: var(--flomo-text-faint);
+}
+
+.fl-shortcut-hint kbd {
+  font-family: var(--flomo-mono);
+  font-size: 10.5px;
+  padding: 1px 4px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 4px;
+  background: var(--flomo-bg-sunken);
+  color: var(--flomo-text-soft);
+}
+
 /* ── main column ─────────────────────────────────────────────────────── */
 
 .fl-main {

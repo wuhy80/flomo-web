@@ -32,6 +32,8 @@ import { Sidebar } from './Sidebar.tsx'
 import { UnlockGate } from './UnlockGate.tsx'
 import { injectFlomoStyles } from './styles.ts'
 import { useFlomoSession } from './useFlomoSession.ts'
+import { useShortcuts } from './shortcuts.ts'
+import type { ShortcutAction } from './shortcuts.ts'
 import { showsComposer, viewTitle } from './views.ts'
 import type { FlomoView } from './views.ts'
 import type { FlomoSession } from './session.ts'
@@ -87,8 +89,10 @@ export function FlomoApp({
   const [view, setView] = useState<FlomoView>({ kind: 'all' })
   const [query, setQuery] = useState('')
   const [randomTick, setRandomTick] = useState(0)
+  const [composeToken, setComposeToken] = useState(0)
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const probed = useRef(false)
+  const searchInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (injectStyles) injectFlomoStyles()
@@ -132,6 +136,12 @@ export function FlomoApp({
   const linkMatches = useMemo(
     () => (linkTarget === null ? [] : resolveLinkTarget(linkTarget, snapshot.memos)),
     [linkTarget, snapshot.memos],
+  )
+
+  /** Link results narrowed by the search box, mirroring the tag view. */
+  const linkVisible = useMemo(
+    () => (query.trim() === '' ? linkMatches : searchMemos(linkMatches, { text: query })),
+    [linkMatches, query],
   )
 
   const focused = useMemo(
@@ -211,6 +221,31 @@ export function FlomoApp({
     [session, handleTagClick, handleLinkClick, handleOpen],
   )
 
+  const handleShortcut = useCallback(
+    (action: ShortcutAction) => {
+      switch (action.kind) {
+        case 'search':
+          searchInput.current?.focus()
+          searchInput.current?.select()
+          return
+        case 'compose':
+          // The composer only exists where writing makes sense, so on a panel
+          // that has none, go to the feed first — the key should never be a
+          // silent no-op.
+          if (!showsComposer(view)) setView({ kind: 'all' })
+          setComposeToken((token) => token + 1)
+          return
+        case 'view':
+          setView({ kind: action.view })
+          setQuery('')
+          return
+      }
+    },
+    [view],
+  )
+
+  useShortcuts(handleShortcut)
+
   if (snapshot.status === 'probing') {
     return (
       <div className="fl-root">
@@ -279,12 +314,13 @@ export function FlomoApp({
         <div className="fl-column">
           <div className="fl-column-head">
             <h1 className="fl-column-title">{viewTitle(view)}</h1>
-            {view.kind === 'all' || view.kind === 'tag' ? (
+            {view.kind === 'all' || view.kind === 'tag' || view.kind === 'link' ? (
               <div className="fl-search">
                 <input
+                  ref={searchInput}
                   type="search"
                   value={query}
-                  placeholder="搜索…"
+                  placeholder="搜索…（按 / 聚焦）"
                   aria-label="搜索 MEMO"
                   onChange={(event) => setQuery(event.target.value)}
                 />
@@ -301,7 +337,9 @@ export function FlomoApp({
             </div>
           ) : null}
 
-          {showsComposer(view) ? <Composer onSubmit={handleAdd} /> : null}
+          {showsComposer(view) ? (
+            <Composer onSubmit={handleAdd} focusToken={composeToken} />
+          ) : null}
 
           {view.kind === 'all' ? (
             <>
@@ -335,7 +373,7 @@ export function FlomoApp({
 
           {view.kind === 'link' ? (
             <Feed
-              memos={linkMatches}
+              memos={linkVisible}
               emptyText={`还没有人用散文或标签提到过「${linkTarget}」。`}
               {...memoHandlers}
             />
