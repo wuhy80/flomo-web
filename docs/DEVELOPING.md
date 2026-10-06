@@ -197,3 +197,22 @@ pnpm typecheck && pnpm test && pnpm build && pnpm build:plugin && pnpm smoke
 
 `pnpm smoke` 会**像 GitHub Pages 那样**静态服务 `dist/`，检查每个引用是否解析得到、
 Service Worker 是否被拷进去、以及它承诺预缓存的 URL 是否都可达。CI 里它在发布之前跑。
+
+### 动了样式或组件结构，就要重截 README 的图
+
+```bash
+pnpm --filter @flomo/web dev            # 另开一个终端
+node packages/web/scripts/screenshot.mjs http://127.0.0.1:5273/ docs/screenshot-feed.png
+node packages/web/scripts/screenshot.mjs http://127.0.0.1:5273/ docs/screenshot-locked.png --locked
+node packages/web/scripts/screenshot.mjs http://127.0.0.1:5273/ docs/screenshot-mobile.png --size 420x900
+```
+
+**没有任何东西会提醒你。** `docs/` 里那三张图没有任何自动生成或校验，所以它们会悄悄
+落后于代码 —— 已经发生过一次：热力图加了月份标签之后，README 里的主图两个月都没跟上，
+展示的是一个不存在的界面。一份"用图说话"的文档，图过期比文字过期更糟。
+
+三张图分别在验证什么：信息流（样式与块渲染）、门禁（居中布局）、窄屏（响应式断点）。
+所以**改 `styles.ts`、改 `MemoItem` 的结构、或改任何布局相关的 class，都要重截**。
+
+> 截图里的日期是相对**生成时刻**的（fixture 用 `new Date()` 往前推），所以隔几天重截
+> 内容会不同 —— 那是 demo 数据，不是漂移。真正要盯的是**布局**。
