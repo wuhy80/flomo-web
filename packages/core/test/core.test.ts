@@ -561,7 +561,7 @@ describe('createPrivateRepo', () => {
       })
     }) as unknown as typeof fetch
 
-    const created = await createPrivateRepo('ghp_x', 'flomo-data', fetchImpl)
+    const created = await createPrivateRepo({ token: 'ghp_x', name: 'flomo-data', fetchImpl })
     assert.deepEqual(created, { owner: 'me', repo: 'flomo-data' })
 
     assert.equal(calls[0]?.url, 'https://api.github.com/user/repos')
@@ -584,7 +584,7 @@ describe('createPrivateRepo', () => {
       })) as unknown as typeof fetch
 
     await assert.rejects(
-      () => createPrivateRepo('ghp_x', 'flomo-data', fetchImpl),
+      () => createPrivateRepo({ token: 'ghp_x', name: 'flomo-data', fetchImpl }),
       /name already exists/,
       'a bare status code would leave the user with nothing to act on',
     )
@@ -594,7 +594,10 @@ describe('createPrivateRepo', () => {
     const fetchImpl = (async () =>
       new Response(JSON.stringify({}), { status: 201 })) as unknown as typeof fetch
 
-    await assert.rejects(() => createPrivateRepo('ghp_x', 'x', fetchImpl), /缺少 owner\/name/)
+    await assert.rejects(
+      () => createPrivateRepo({ token: 'ghp_x', name: 'x', fetchImpl }),
+      /缺少 owner\/name/,
+    )
   })
 })
 

@@ -51,7 +51,7 @@ export function SetupForm({ initial, onSubmit, onCancel }: SetupFormProps): Reac
     setCreating(true)
     setCreateNote(null)
     try {
-      const created = await createPrivateRepo(token.trim(), repo.trim())
+      const created = await createPrivateRepo({ token: token.trim(), name: repo.trim() })
       // The authenticated account, whatever was typed into the owner field.
       setOwner(created.owner)
       setRepo(created.repo)

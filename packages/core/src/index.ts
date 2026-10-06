@@ -40,7 +40,12 @@ export {
   RECOMMENDED_MAX_BYTES,
   createPrivateRepo,
 } from './github.ts'
-export type { GitHubContentsOptions, GitHubDirEntry, GitHubFile } from './github.ts'
+export type {
+  CreateRepoOptions,
+  GitHubContentsOptions,
+  GitHubDirEntry,
+  GitHubFile,
+} from './github.ts'
 
 export {
   EXPORT_FORMAT,

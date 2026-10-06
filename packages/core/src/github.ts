@@ -73,6 +73,14 @@ export interface GitHubContentsOptions {
   repo: string
   /** Target branch; omitted lets GitHub use the repository default. */
   branch?: string
+  /**
+   * API base URL.
+   *
+   * Overridable so the client can be pointed at GitHub Enterprise — and so the
+   * request shapes, base64 handling and status mapping can be tested against a
+   * local server rather than only against a fake that skips all of it.
+   */
+  apiBase?: string
   /** Injection point for tests. */
   fetchImpl?: typeof fetch
 }
@@ -111,16 +119,18 @@ export class GitHubContentsStore {
   private readonly owner: string
   private readonly repo: string
   private readonly branch: string | undefined
+  private readonly apiBase: string
   private readonly doFetch: typeof fetch
 
   /**
-   * @param options - token, repository coordinates and branch.
+   * @param options - token, repository coordinates, branch and API base.
    */
   constructor(options: GitHubContentsOptions) {
     this.token = options.token
     this.owner = options.owner
     this.repo = options.repo
     this.branch = options.branch
+    this.apiBase = options.apiBase ?? API_BASE
     this.doFetch = options.fetchImpl ?? globalThis.fetch.bind(globalThis)
   }
 
@@ -148,7 +158,7 @@ export class GitHubContentsStore {
    * @returns the full URL.
    */
   private url(path: string): string {
-    const base = `${API_BASE}${path}`
+    const base = `${this.apiBase}${path}`
     if (!this.branch) return base
     return `${base}${path.includes('?') ? '&' : '?'}ref=${encodeURIComponent(this.branch)}`
   }
@@ -219,7 +229,7 @@ export class GitHubContentsStore {
     if (this.branch) payload.branch = this.branch
 
     const response = await this.doFetch(
-      `${API_BASE}/repos/${this.owner}/${this.repo}/contents/${path}`,
+      `${this.apiBase}/repos/${this.owner}/${this.repo}/contents/${path}`,
       { method: 'PUT', headers: this.headers(), body: JSON.stringify(payload) },
     )
     if (response.status === 409 || response.status === 422) {
@@ -271,7 +281,7 @@ export class GitHubContentsStore {
    */
   async verifyAccess(): Promise<{ defaultBranch: string; private: boolean }> {
     const response = await this.doFetch(
-      `${API_BASE}/repos/${this.owner}/${this.repo}`,
+      `${this.apiBase}/repos/${this.owner}/${this.repo}`,
       { headers: this.headers() },
     )
     if (!response.ok) {
@@ -285,31 +295,40 @@ export class GitHubContentsStore {
   }
 }
 
+/** How to create a repository. */
+export interface CreateRepoOptions {
+  /** A PAT permitted to create repositories. */
+  token: string
+  /** Repository name. */
+  name: string
+  /** API base URL; overridable for GitHub Enterprise and for tests. */
+  apiBase?: string
+  /** Injection point for tests. */
+  fetchImpl?: typeof fetch
+}
+
 /**
  * Create a private repository for a user account, if it does not exist yet.
  *
  * Used only by first-run onboarding, so that setting up a data store is one
  * click rather than a manual trip to github.com.
- * @param token - a PAT with `Administration` write or `repo` scope.
- * @param name - repository name.
- * @param fetchImpl - injection point for tests.
+ * @param options - token, name, and optional API base.
  * @returns the repository coordinates.
  */
 export async function createPrivateRepo(
-  token: string,
-  name: string,
-  fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),
+  options: CreateRepoOptions,
 ): Promise<{ owner: string; repo: string }> {
-  const response = await fetchImpl(`${API_BASE}/user/repos`, {
+  const doFetch = options.fetchImpl ?? globalThis.fetch.bind(globalThis)
+  const response = await doFetch(`${options.apiBase ?? API_BASE}/user/repos`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${options.token}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': API_VERSION,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      name,
+      name: options.name,
       private: true,
       auto_init: true,
       description: 'flomo-sim encrypted memo store',
@@ -322,13 +341,13 @@ export async function createPrivateRepo(
     } catch {
       /* not JSON */
     }
-    throw new GitHubError(message, response.status, name)
+    throw new GitHubError(message, response.status, options.name)
   }
   const body = (await response.json()) as { owner?: { login?: string }; name?: string }
   const owner = body.owner?.login
   const repo = body.name
   if (!owner || !repo) {
-    throw new GitHubError('仓库已创建，但响应缺少 owner/name。', response.status, name)
+    throw new GitHubError('仓库已创建，但响应缺少 owner/name。', response.status, options.name)
   }
   return { owner, repo }
 }

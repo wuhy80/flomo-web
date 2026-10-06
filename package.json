@@ -12,7 +12,7 @@
     "build:plugin": "pnpm --filter dsh-flomo build",
     "watch:plugin": "pnpm --filter dsh-flomo watch",
     "smoke": "pnpm --filter @flomo/web smoke",
-    "test": "node --test packages/core/test/core.test.ts packages/core/test/cache.test.ts packages/ui/test/shortcuts.test.ts packages/ui/test/styles.test.ts packages/ui/test/github-session.test.ts packages/dsh-plugin/test/host.test.ts packages/dsh-plugin/test/artifacts.test.ts packages/web/test/app.test.ts packages/web/test/service-worker.test.ts",
+    "test": "node --test packages/core/test/core.test.ts packages/core/test/cache.test.ts packages/core/test/github.test.ts packages/ui/test/shortcuts.test.ts packages/ui/test/styles.test.ts packages/ui/test/github-session.test.ts packages/dsh-plugin/test/host.test.ts packages/dsh-plugin/test/artifacts.test.ts packages/web/test/app.test.ts packages/web/test/service-worker.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
