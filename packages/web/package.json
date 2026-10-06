@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview --port 4173",
     "smoke": "node scripts/smoke.mjs",
-    "shots": "node scripts/screenshot.mjs"
+    "shots": "node scripts/screenshot.mjs",
+    "interact": "node scripts/interact.mjs"
   },
   "dependencies": {
     "@flomo/core": "workspace:*",
