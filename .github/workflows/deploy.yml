@@ -5,7 +5,9 @@
 # the browser. So this workflow's output is safe to serve publicly.
 #
 # Note that this deploys the *web app*. The DeepSeek Harness plugin is not
-# published anywhere — it is built locally and linked into a DSH profile.
+# published anywhere — it is built locally and linked into a DSH profile. Its
+# checks live in ci.yml, which runs on every change rather than only on the paths
+# that affect the published site.
 
 name: Deploy web app to GitHub Pages
 
@@ -39,9 +41,12 @@ jobs:
         with:
           version: 11
 
+      # Node 24, matching development and ci.yml: the test runner executes `.ts`
+      # files via type stripping, which Node 22 only enabled by default from
+      # 22.18.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile

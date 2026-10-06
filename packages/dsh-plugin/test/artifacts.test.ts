@@ -10,9 +10,15 @@
  * The panel is then rendered with `react-dom/server`, which is the strongest
  * check available without a browser: it exercises the same component tree the
  * DeepSeek Harness mounts into its center column.
+ *
+ * `lib/` is gitignored, so this suite builds it first. Two reasons, and the
+ * second is the important one: a clean clone has no `lib/` at all, and a stale
+ * one would let these tests pass against output that no longer matches the
+ * source — which is exactly how a corrupted bundle once went unnoticed here.
  */
 
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:http'
@@ -21,7 +27,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import vm from 'node:vm'
-import { after, describe, it } from 'node:test'
+import { after, before, describe, it } from 'node:test'
 
 import * as React from 'react'
 import { renderToString } from 'react-dom/server'
@@ -41,6 +47,23 @@ const clientBundlePath = join(pluginRoot, 'lib', 'client.js')
 const temporaryDirs: string[] = []
 after(async () => {
   for (const dir of temporaryDirs) await rm(dir, { recursive: true, force: true })
+})
+
+// Built through the real build script rather than a copy of its configuration,
+// so this cannot drift from what actually ships.
+before(async () => {
+  await new Promise<void>((resolvePromise, rejectPromise) => {
+    const child = spawn(process.execPath, [join(pluginRoot, 'build.mjs')], {
+      cwd: pluginRoot,
+      stdio: 'inherit',
+    })
+    child.once('error', rejectPromise)
+    child.once('exit', (code) =>
+      code === 0
+        ? resolvePromise()
+        : rejectPromise(new Error(`build.mjs exited with ${String(code)}`)),
+    )
+  })
 })
 
 /** Let queued microtasks and the lazy tool import settle. */

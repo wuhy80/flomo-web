@@ -1,0 +1,53 @@
+# The check suite, on every push and pull request.
+#
+# This exists separately from the deploy workflow because the two have different
+# triggers and only one of them should publish. The deploy workflow runs on the
+# paths that affect the published site; this runs on everything, so a change to
+# the DeepSeek Harness plugin — which is never published — is still checked.
+#
+# `pnpm test` is self-sufficient: the artifact tests build the plugin's `lib/`
+# themselves, through the real build script, so a clean clone works and the tests
+# can never pass against a stale bundle.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      # Node 24, matching development. The test runner executes `.ts` files
+      # directly via type stripping, which Node 22 only enabled by default from
+      # 22.18 — so pinning the major that is actually used avoids a suite that
+      # passes or fails depending on which 22.x the runner happens to install.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+      - run: pnpm test
+
+      # The web build and the deployment checks. The plugin's own build is run by
+      # the artifact tests, so it is not repeated here.
+      - run: pnpm build
+      - run: pnpm smoke
