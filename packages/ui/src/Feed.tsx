@@ -17,10 +17,17 @@ export interface FeedProps {
   memos: readonly Memo[]
   /** Shown when the list is empty. */
   emptyText?: string
+  /**
+   * Group by day. Turned off where the day headings would be noise — a single
+   * memo's backlink list, for instance, is short and already scoped.
+   */
+  groupByDay?: boolean
   onEdit: MemoItemProps['onEdit']
   onRemove: MemoItemProps['onRemove']
   onPin: MemoItemProps['onPin']
   onTagClick: MemoItemProps['onTagClick']
+  onLinkClick: MemoItemProps['onLinkClick']
+  onOpen: MemoItemProps['onOpen']
 }
 
 /** A day (or the pinned bucket) and the memos under it. */
@@ -70,20 +77,25 @@ function group(memos: readonly Memo[]): Group[] {
 export function Feed({
   memos,
   emptyText = '还没有记录，写下第一条吧。',
+  groupByDay = true,
   onEdit,
   onRemove,
   onPin,
   onTagClick,
+  onLinkClick,
+  onOpen,
 }: FeedProps): React.ReactElement {
   if (memos.length === 0) {
     return <div className="fl-empty">{emptyText}</div>
   }
 
+  const sections = groupByDay ? group(memos) : [{ key: 'flat', label: '', memos: [...memos] }]
+
   return (
     <div className="fl-feed">
-      {group(memos).map((section) => (
+      {sections.map((section) => (
         <section key={section.key}>
-          <div className="fl-day">{section.label}</div>
+          {section.label ? <div className="fl-day">{section.label}</div> : null}
           {section.memos.map((memo) => (
             <MemoItem
               key={memo.id}
@@ -92,6 +104,8 @@ export function Feed({
               onRemove={onRemove}
               onPin={onPin}
               onTagClick={onTagClick}
+              onLinkClick={onLinkClick}
+              onOpen={onOpen}
             />
           ))}
         </section>

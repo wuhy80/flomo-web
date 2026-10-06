@@ -1,14 +1,17 @@
 /**
  * One memo in the feed, with inline editing.
  *
+ * The body is rendered from the core tokenizer, so a `#tag` or a `[[link]]` here
+ * is guaranteed to be exactly what the tag index and the link resolver saw.
+ *
  * @module @flomo/ui/MemoItem
  */
 
 import type * as React from 'react'
 import { useCallback, useState } from 'react'
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 
-import { clockOf, tokenizeTags } from '@flomo/core'
+import { clockOf, tokenizeInline } from '@flomo/core'
 import type { Memo } from '@flomo/core'
 
 export interface MemoItemProps {
@@ -21,44 +24,96 @@ export interface MemoItemProps {
   onPin: (id: string) => void
   /** Navigate to a tag. */
   onTagClick: (tag: string) => void
+  /** Navigate to what a `[[link]]` resolves to. */
+  onLinkClick: (target: string) => void
+  /** Open this memo's detail page. */
+  onOpen: (id: string) => void
 }
 
 /**
- * Render a memo body with its tags as clickable spans.
+ * An interactive `#tag` or `[[link]]` inside a memo body.
  *
- * Splitting goes through the core tokenizer, so what is highlighted here is
- * exactly what the tag index counted.
- * @param memo - the memo to render.
- * @param onTagClick - navigation callback.
- * @returns the body nodes.
+ * Factored out so the click-versus-keyboard contract is written once rather than
+ * three times, and so both markers stop propagation identically — the body will
+ * eventually gain its own click target, and a tag click must never be read as a
+ * click on the body.
+ * @param props - the marker kind, its text, and what activating it does.
+ * @returns the marker element.
  */
-function renderBody(memo: Memo, onTagClick: (tag: string) => void): React.ReactNode[] {
-  return tokenizeTags(memo.content).map((token, index) =>
-    token.type === 'tag' ? (
-      <span
-        key={`${index}-tag`}
-        className="fl-memo-tag"
-        role="button"
-        tabIndex={0}
-        onClick={() => onTagClick(token.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            onTagClick(token.value)
-          }
-        }}
-      >
-        #{token.value}
-      </span>
-    ) : (
-      <span key={`${index}-text`}>{token.value}</span>
-    ),
+function InlineMark({
+  kind,
+  value,
+  onActivate,
+}: {
+  kind: 'tag' | 'link'
+  value: string
+  onActivate: () => void
+}): React.ReactElement {
+  const activate = useCallback(
+    (event: MouseEvent | KeyboardEvent) => {
+      if ('key' in event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+      }
+      event.stopPropagation()
+      onActivate()
+    },
+    [onActivate],
+  )
+
+  return (
+    <span
+      className={kind === 'tag' ? 'fl-memo-tag' : 'fl-memo-link'}
+      role="button"
+      tabIndex={0}
+      onClick={activate}
+      onKeyDown={activate}
+    >
+      {kind === 'tag' ? `#${value}` : `[[${value}]]`}
+    </span>
   )
 }
 
 /**
+ * Render a memo body with its tags and links interactive.
+ * @param memo - the memo to render.
+ * @param onTagClick - tag navigation.
+ * @param onLinkClick - link navigation.
+ * @returns the body nodes.
+ */
+function renderBody(
+  memo: Memo,
+  onTagClick: (tag: string) => void,
+  onLinkClick: (target: string) => void,
+): React.ReactNode[] {
+  return tokenizeInline(memo.content).map((token, index) => {
+    if (token.type === 'tag') {
+      return (
+        <InlineMark
+          key={`${index}-tag`}
+          kind="tag"
+          value={token.value}
+          onActivate={() => onTagClick(token.value)}
+        />
+      )
+    }
+    if (token.type === 'link') {
+      return (
+        <InlineMark
+          key={`${index}-link`}
+          kind="link"
+          value={token.value}
+          onActivate={() => onLinkClick(token.value)}
+        />
+      )
+    }
+    return <span key={`${index}-text`}>{token.value}</span>
+  })
+}
+
+/**
  * A single memo card.
- * @param props - the memo plus its mutation callbacks.
+ * @param props - the memo plus its mutation and navigation callbacks.
  * @returns the card element.
  */
 export function MemoItem({
@@ -67,6 +122,8 @@ export function MemoItem({
   onRemove,
   onPin,
   onTagClick,
+  onLinkClick,
+  onOpen,
 }: MemoItemProps): React.ReactElement {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(memo.content)
@@ -131,6 +188,14 @@ export function MemoItem({
         <button
           type="button"
           className="fl-icon-button"
+          onClick={() => onOpen(memo.id)}
+          title="打开单条笔记与反向链接"
+        >
+          详情
+        </button>
+        <button
+          type="button"
+          className="fl-icon-button"
           onClick={() => onPin(memo.id)}
           title={memo.pinned ? '取消置顶' : '置顶'}
         >
@@ -169,7 +234,7 @@ export function MemoItem({
         )}
       </div>
 
-      <div className="fl-memo-body">{renderBody(memo, onTagClick)}</div>
+      <div className="fl-memo-body">{renderBody(memo, onTagClick, onLinkClick)}</div>
 
       <div className="fl-memo-foot">
         <span>
@@ -179,21 +244,12 @@ export function MemoItem({
         </span>
         <span className="fl-memo-tags">
           {memo.tags.map((tag) => (
-            <span
+            <InlineMark
               key={tag}
-              className="fl-memo-tag"
-              role="button"
-              tabIndex={0}
-              onClick={() => onTagClick(tag)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  onTagClick(tag)
-                }
-              }}
-            >
-              #{tag}
-            </span>
+              kind="tag"
+              value={tag}
+              onActivate={() => onTagClick(tag)}
+            />
           ))}
         </span>
       </div>

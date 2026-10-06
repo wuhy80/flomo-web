@@ -1,21 +1,14 @@
 /**
  * `#tag` extraction and aggregation.
  *
- * flomo's tags live inline in the body rather than in a separate field, so the
- * canonical form is whatever the user typed. We cache the parsed list on each
- * memo for listing, but always re-parse from `content` on write.
+ * Tagging is really just one view of the inline tokenizer — see
+ * {@link module:@flomo/core/inline} — so this module owns the *policy* about
+ * tags (what counts as one, how they group) and nothing about the syntax.
  *
  * @module @flomo/core/tags
  */
 
-/** A `#` followed by at least one non-space, non-`#` run. */
-const TAG_PATTERN = /#([^\s#]+)/g
-
-/**
- * Punctuation that terminates a tag when it directly abuts one. Without this,
- * the sentence `今天读了 #深度工作。` would yield the tag `深度工作。`.
- */
-const TRAILING_PUNCTUATION = /[，。！？；：、,.!?;:)\]）】》"'”’…]+$/u
+import { tokenizeInline } from './inline.ts'
 
 /**
  * Extract the distinct tags from a memo body, in first-appearance order.
@@ -24,9 +17,8 @@ const TRAILING_PUNCTUATION = /[，。！？；：、,.!?;:)\]）】》"'”’�
  */
 export function parseTags(content: string): string[] {
   const seen = new Set<string>()
-  for (const match of content.matchAll(TAG_PATTERN)) {
-    const raw = (match[1] ?? '').replace(TRAILING_PUNCTUATION, '')
-    if (raw.length > 0) seen.add(raw)
+  for (const token of tokenizeInline(content)) {
+    if (token.type === 'tag') seen.add(token.value)
   }
   return [...seen]
 }
@@ -96,27 +88,17 @@ export interface TagToken {
 }
 
 /**
- * Split a memo body into literal text and tag runs, for rendering.
+ * Split a memo body into literal text and tag runs.
  *
- * The renderer uses this rather than a regex of its own so that what the UI
- * highlights can never disagree with what {@link parseTags} stores.
+ * Links are returned as text: this is the tag-only view, and it still covers the
+ * whole input so a caller can render it verbatim.
  * @param content - the raw memo body.
- * @returns the alternating tokens, covering the entire input.
+ * @returns the alternating tokens.
  */
 export function tokenizeTags(content: string): TagToken[] {
-  const tokens: TagToken[] = []
-  let cursor = 0
-
-  for (const match of content.matchAll(TAG_PATTERN)) {
-    const cleaned = (match[1] ?? '').replace(TRAILING_PUNCTUATION, '')
-    if (cleaned.length === 0) continue
-
-    const start = match.index ?? 0
-    if (start > cursor) tokens.push({ type: 'text', value: content.slice(cursor, start) })
-    tokens.push({ type: 'tag', value: cleaned })
-    cursor = start + 1 + cleaned.length
-  }
-
-  if (cursor < content.length) tokens.push({ type: 'text', value: content.slice(cursor) })
-  return tokens
+  return tokenizeInline(content).map((token) =>
+    token.type === 'link'
+      ? { type: 'text' as const, value: `[[${token.value}]]` }
+      : { type: token.type, value: token.value },
+  )
 }

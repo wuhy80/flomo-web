@@ -47,6 +47,18 @@ export type { ExportPayload } from './export.ts'
 export { ImportError, describeImportResult, parseMemosJson } from './import.ts'
 export type { ImportResult } from './import.ts'
 
+export { tokenizeInline } from './inline.ts'
+export type { InlineToken } from './inline.ts'
+
+export {
+  backlinks,
+  matchesLinkTarget,
+  outgoingLinks,
+  parseLinks,
+  resolveLinkTarget,
+} from './links.ts'
+export type { Backlink, OutgoingLink } from './links.ts'
+
 export { dailyReview, pickRandom, randomWalk, searchMemos } from './search.ts'
 export type { SearchQuery } from './search.ts'
 

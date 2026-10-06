@@ -17,21 +17,26 @@ import {
   GitHubConflictError,
   ImportError,
   WrongPasswordError,
+  backlinks,
   dailyReview,
   dayOf,
   exportFilename,
   memosToJson,
   memosToMarkdown,
   monthOf,
+  outgoingLinks,
+  parseLinks,
   parseMemosJson,
   parseTags,
   pickRandom,
   randomBytes,
   rawKeyFromRecoveryCode,
   recentMonths,
+  resolveLinkTarget,
   searchMemos,
   streak,
   tagStats,
+  tokenizeInline,
   corpusStats,
 } from '../src/index.ts'
 import type { Memo } from '../src/index.ts'
@@ -500,6 +505,137 @@ describe('import', () => {
     assert.throws(() => parseMemosJson('这不是 json'), ImportError)
     assert.throws(() => parseMemosJson('{"nope":1}'), ImportError)
     assert.throws(() => parseMemosJson('42'), ImportError)
+  })
+})
+
+describe('tokenizeInline', () => {
+  it('covers the whole input, so a renderer can rebuild the body verbatim', () => {
+    const samples = [
+      '',
+      '纯文本',
+      '#标签 在中间 #另一个',
+      '见 [[链接]] 和 #标签',
+      '[[]] 空的和 [[   ]] 也是',
+      '结尾是 #尾巴。',
+      '连续##两个#号',
+    ]
+    for (const sample of samples) {
+      const rebuilt = tokenizeInline(sample)
+        .map((token) =>
+          token.type === 'link'
+            ? `[[${token.value}]]`
+            : token.type === 'tag'
+              ? `#${token.value}`
+              : token.value,
+        )
+        .join('')
+      assert.equal(rebuilt, sample, `rebuild mismatch for ${JSON.stringify(sample)}`)
+    }
+  })
+
+  it('treats a # inside a link as part of the link, not as a tag', () => {
+    assert.deepEqual(tokenizeInline('[[#不是标签]]'), [
+      { type: 'link', value: '#不是标签' },
+    ])
+    assert.deepEqual(parseTags('[[#不是标签]]'), [])
+    assert.deepEqual(parseLinks('[[#不是标签]]'), ['#不是标签'])
+  })
+
+  it('leaves a malformed marker in the text rather than eating it', () => {
+    assert.deepEqual(tokenizeInline('[[   ]]'), [{ type: 'text', value: '[[   ]]' }])
+  })
+})
+
+describe('links', () => {
+  /**
+   * Build a memo with tags derived the way the vault would derive them.
+   * @param id - the id.
+   * @param content - the body.
+   * @param createdAt - the creation timestamp.
+   * @returns the memo.
+   */
+  const t = (id: string, content: string, createdAt: string): Memo =>
+    memo({ id, content, createdAt, tags: parseTags(content) })
+
+  it('parses distinct targets in first-appearance order', () => {
+    assert.deepEqual(parseLinks('见 [[深度工作]] 和 [[心流]]，还有 [[深度工作]]'), [
+      '深度工作',
+      '心流',
+    ])
+  })
+
+  it('ignores empty targets, stray brackets and plain text', () => {
+    assert.deepEqual(parseLinks('[[]] 和 [[   ]] 和 [[a[b]]'), [])
+    assert.deepEqual(parseLinks('没有链接'), [])
+  })
+
+  it('resolves to memos that discuss the target or carry it as a tag', () => {
+    const corpus = [
+      t('prose', '最近在读深度工作，很有收获', '2025-06-01T00:00:00.000Z'),
+      t('tag', '随手记 #深度工作', '2025-06-02T00:00:00.000Z'),
+      t('other', '完全无关', '2025-06-03T00:00:00.000Z'),
+    ]
+    assert.deepEqual(
+      resolveLinkTarget('深度工作', corpus).map((m) => m.id),
+      ['tag', 'prose'],
+    )
+  })
+
+  it('never resolves a link back to the memo that wrote it', () => {
+    const self = t('self', '关于 [[深度工作]]：深度工作很重要', '2025-06-01T00:00:00.000Z')
+    assert.deepEqual(resolveLinkTarget('深度工作', [self], self.id), [])
+    assert.deepEqual(backlinks(self, [self]), [])
+  })
+
+  it('does not make two memos mutual backlinks for linking to the same thing', () => {
+    const corpus = [
+      t('a', 'A 提到 [[深度工作]]', '2025-06-01T00:00:00.000Z'),
+      t('b', 'B 也提到 [[深度工作]]', '2025-06-02T00:00:00.000Z'),
+      t('c', 'C 认真讨论了深度工作这件事', '2025-06-03T00:00:00.000Z'),
+    ]
+
+    // Both link to the same target, but neither memo *discusses* it, so the
+    // only memo either link lands on is C.
+    assert.deepEqual(
+      resolveLinkTarget('深度工作', corpus, 'a').map((m) => m.id),
+      ['c'],
+    )
+    assert.deepEqual(backlinks(corpus[0]!, corpus), [])
+    assert.deepEqual(
+      backlinks(corpus[2]!, corpus)
+        .map((link) => link.source.id)
+        .sort(),
+      ['a', 'b'],
+    )
+  })
+
+  it('matches case-insensitively', () => {
+    const corpus = [t('x', 'I read Deep Work last week', '2025-06-01T00:00:00.000Z')]
+    assert.equal(resolveLinkTarget('deep work', corpus).length, 1)
+  })
+
+  it('reports each outgoing link with where it lands', () => {
+    const corpus = [
+      t('source', '想看 [[心流]] 和 [[不存在的]]', '2025-06-01T00:00:00.000Z'),
+      t('hit', '心流是一种状态', '2025-06-02T00:00:00.000Z'),
+    ]
+    const outgoing = outgoingLinks(corpus[0]!, corpus)
+    assert.deepEqual(
+      outgoing.map((link) => link.target),
+      ['心流', '不存在的'],
+    )
+    assert.deepEqual(outgoing[0]?.matches.map((m) => m.id), ['hit'])
+    assert.deepEqual(outgoing[1]?.matches, [])
+  })
+
+  it('reports which of a source memo links landed here', () => {
+    const corpus = [
+      t('source', '同时提到 [[甲]] 和 [[乙]]', '2025-06-01T00:00:00.000Z'),
+      t('target', '这条讲的是乙', '2025-06-02T00:00:00.000Z'),
+    ]
+    const found = backlinks(corpus[1]!, corpus)
+    assert.equal(found.length, 1)
+    assert.equal(found[0]?.target, '乙', 'the landing link is named, not just the source')
   })
 })
 

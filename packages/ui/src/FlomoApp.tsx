@@ -11,7 +11,18 @@
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { corpusStats, dailyReview, exportFilename, memosToJson, memosToMarkdown, randomWalk, searchMemos } from '@flomo/core'
+import {
+  backlinks,
+  corpusStats,
+  dailyReview,
+  exportFilename,
+  memosToJson,
+  memosToMarkdown,
+  outgoingLinks,
+  randomWalk,
+  resolveLinkTarget,
+  searchMemos,
+} from '@flomo/core'
 
 import { Composer } from './Composer.tsx'
 import { downloadText } from './download.ts'
@@ -21,7 +32,7 @@ import { Sidebar } from './Sidebar.tsx'
 import { UnlockGate } from './UnlockGate.tsx'
 import { injectFlomoStyles } from './styles.ts'
 import { useFlomoSession } from './useFlomoSession.ts'
-import { sameView, viewTitle } from './views.ts'
+import { showsComposer, viewTitle } from './views.ts'
 import type { FlomoView } from './views.ts'
 import type { FlomoSession } from './session.ts'
 
@@ -113,6 +124,31 @@ export function FlomoApp({
     [snapshot.memos, snapshot.tags.length],
   )
 
+  // Narrowed to plain values before the hooks, so the memo dependencies are the
+  // link target and the memo id rather than the whole view object.
+  const linkTarget = view.kind === 'link' ? view.target : null
+  const focusId = view.kind === 'focus' ? view.id : null
+
+  const linkMatches = useMemo(
+    () => (linkTarget === null ? [] : resolveLinkTarget(linkTarget, snapshot.memos)),
+    [linkTarget, snapshot.memos],
+  )
+
+  const focused = useMemo(
+    () => (focusId === null ? null : (snapshot.memos.find((memo) => memo.id === focusId) ?? null)),
+    [focusId, snapshot.memos],
+  )
+
+  const focusedLinks = useMemo(
+    () => (focused === null ? [] : outgoingLinks(focused, snapshot.memos)),
+    [focused, snapshot.memos],
+  )
+
+  const focusedBacklinks = useMemo(
+    () => (focused === null ? [] : backlinks(focused, snapshot.memos)),
+    [focused, snapshot.memos],
+  )
+
   const handleTagClick = useCallback((tag: string) => {
     setView({ kind: 'tag', tag })
     setQuery('')
@@ -145,6 +181,34 @@ export function FlomoApp({
       }
     },
     [session],
+  )
+
+  const handleLinkClick = useCallback((target: string) => {
+    setView({ kind: 'link', target })
+    setQuery('')
+  }, [])
+
+  const handleOpen = useCallback((id: string) => {
+    setView({ kind: 'focus', id })
+    setQuery('')
+  }, [])
+
+  /**
+   * The mutation and navigation callbacks every feed shares.
+   *
+   * Built once and spread into each `<Feed>`, so adding a callback does not mean
+   * remembering to thread it through five call sites.
+   */
+  const memoHandlers = useMemo(
+    () => ({
+      onEdit: (id: string, content: string) => session.edit(id, content),
+      onRemove: (id: string) => session.remove(id),
+      onPin: (id: string) => session.pin(id),
+      onTagClick: handleTagClick,
+      onLinkClick: handleLinkClick,
+      onOpen: handleOpen,
+    }),
+    [session, handleTagClick, handleLinkClick, handleOpen],
   )
 
   if (snapshot.status === 'probing') {
@@ -237,11 +301,9 @@ export function FlomoApp({
             </div>
           ) : null}
 
-          {view.kind !== 'settings' && view.kind !== 'random' ? (
-            <Composer onSubmit={handleAdd} />
-          ) : null}
+          {showsComposer(view) ? <Composer onSubmit={handleAdd} /> : null}
 
-          {view.kind === 'all' || view.kind === 'tag' ? (
+          {view.kind === 'all' ? (
             <>
               <Heatmap memos={snapshot.memos} />
               <div className="fl-stats-strip">
@@ -256,19 +318,80 @@ export function FlomoApp({
                 </span>
                 <span>{snapshot.saving ? '保存中…' : savedLabel(snapshot.lastSavedAt)}</span>
               </div>
-              <Feed
-                memos={visible}
-                emptyText={
-                  searching || view.kind === 'tag'
-                    ? '没有匹配的记录。'
-                    : '还没有记录，写下第一条吧。'
-                }
-                onEdit={(id, content) => session.edit(id, content)}
-                onRemove={(id) => session.remove(id)}
-                onPin={(id) => session.pin(id)}
-                onTagClick={handleTagClick}
-              />
             </>
+          ) : null}
+
+          {view.kind === 'all' || view.kind === 'tag' ? (
+            <Feed
+              memos={visible}
+              emptyText={
+                searching || view.kind === 'tag'
+                  ? '没有匹配的记录。'
+                  : '还没有记录，写下第一条吧。'
+              }
+              {...memoHandlers}
+            />
+          ) : null}
+
+          {view.kind === 'link' ? (
+            <Feed
+              memos={linkMatches}
+              emptyText={`还没有人用散文或标签提到过「${linkTarget}」。`}
+              {...memoHandlers}
+            />
+          ) : null}
+
+          {view.kind === 'focus' ? (
+            focused === null ? (
+              <div className="fl-empty">这条记录已经不在了。</div>
+            ) : (
+              <>
+                <div className="fl-card-lg">
+                  <Feed memos={[focused]} groupByDay={false} {...memoHandlers} />
+                </div>
+
+                {focusedLinks.length > 0 ? (
+                  <>
+                    <div className="fl-sidebar-section" style={{ margin: '24px 0 6px' }}>
+                      出链
+                    </div>
+                    <div className="fl-link-list">
+                      {focusedLinks.map((link) => (
+                        <button
+                          key={link.target}
+                          type="button"
+                          className="fl-link-row"
+                          onClick={() => handleLinkClick(link.target)}
+                          title={
+                            link.matches.length === 0
+                              ? '还没有记录提到它'
+                              : `${link.matches.length} 条记录`
+                          }
+                        >
+                          <span className="fl-tag-name">[[{link.target}]]</span>
+                          <span className="fl-nav-count">{link.matches.length}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+
+                <div className="fl-sidebar-section" style={{ margin: '24px 0 6px' }}>
+                  反向链接 {focusedBacklinks.length}
+                </div>
+                {focusedBacklinks.length === 0 ? (
+                  <p className="fl-review-note">
+                    还没有其他记录链接到这里。在别处写 <code>[[正文里的一个词]]</code> 就会连过来。
+                  </p>
+                ) : (
+                  <Feed
+                    memos={focusedBacklinks.map((link) => link.source)}
+                    groupByDay={false}
+                    {...memoHandlers}
+                  />
+                )}
+              </>
+            )
           ) : null}
 
           {view.kind === 'review' ? (
@@ -279,10 +402,7 @@ export function FlomoApp({
               <Feed
                 memos={reviewMemos}
                 emptyText="还没有足够的旧记录可供回顾。"
-                onEdit={(id, content) => session.edit(id, content)}
-                onRemove={(id) => session.remove(id)}
-                onPin={(id) => session.pin(id)}
-                onTagClick={handleTagClick}
+                {...memoHandlers}
               />
             </>
           ) : null}
@@ -292,13 +412,7 @@ export function FlomoApp({
               <p className="fl-review-note">随机漫步：每次一条，翻到哪里算哪里。</p>
               {randomMemo ? (
                 <div className="fl-card-lg">
-                  <Feed
-                    memos={[randomMemo]}
-                    onEdit={(id, content) => session.edit(id, content)}
-                    onRemove={(id) => session.remove(id)}
-                    onPin={(id) => session.pin(id)}
-                    onTagClick={handleTagClick}
-                  />
+                  <Feed memos={[randomMemo]} groupByDay={false} {...memoHandlers} />
                 </div>
               ) : (
                 <div className="fl-empty">还没有记录。</div>

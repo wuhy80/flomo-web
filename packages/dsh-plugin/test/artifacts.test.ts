@@ -419,7 +419,7 @@ describe('built client bundle', () => {
     assert.match(html, /data-dsh-panel-entry="flomo"/)
   })
 
-  it('renders the unlocked flomo UI with a composer, day group and tags', async () => {
+  it('renders the unlocked flomo UI with a composer, day group, tags and links', async () => {
     const { registrations } = await loadClientBundle()
     const page = registrations.find((r) => r.name === 'main')
     assert.ok(page)
@@ -427,7 +427,12 @@ describe('built client bundle', () => {
 
     const { session } = fakeSession({
       status: 'unlocked',
-      memos: [memo({ content: '读完《深度工作》很有收获 #读书', tags: ['读书'] })],
+      memos: [
+        memo({
+          content: '读完《深度工作》很有收获 #读书，顺便想到 [[心流]]',
+          tags: ['读书'],
+        }),
+      ],
       tags: [{ tag: '读书', count: 1 }],
       lastSavedAt: new Date().toISOString(),
     })
@@ -441,6 +446,10 @@ describe('built client bundle', () => {
     assert.match(html, /今天/, 'the feed groups by day')
     assert.match(html, /每日回顾/)
     assert.match(html, /随机漫步/)
+    // Both inline markers are interactive, so both carry the click affordance.
+    assert.match(html, /class="fl-memo-tag"[^>]*role="button"/, 'tags are clickable')
+    assert.match(html, /class="fl-memo-link"[^>]*role="button"/, 'links are clickable')
+    assert.match(html, /\[\[心流\]\]/, 'the link keeps its markup in the body')
   })
 
   it('renders the password gate when the vault is locked', async () => {

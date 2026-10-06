@@ -322,6 +322,41 @@ export const FLOMO_CSS = `
 .fl-memo-tag { color: var(--flomo-text-soft); cursor: pointer; }
 .fl-memo-tag:hover { color: var(--flomo-green); }
 
+/* A [[link]] is prose that happens to be navigable, so it reads as emphasis
+   rather than as a tag: green and underlined on hover, not grey. */
+.fl-memo-link { color: var(--flomo-green); cursor: pointer; }
+.fl-memo-link:hover { text-decoration: underline; }
+
+.fl-link-list { display: flex; flex-direction: column; gap: 1px; }
+
+.fl-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--flomo-radius-sm);
+  background: transparent;
+  color: var(--flomo-text);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fl-link-row:hover { background: var(--flomo-hover); }
+
+.fl-review-note code,
+.fl-recovery-hint code {
+  font-family: var(--flomo-mono);
+  font-size: 0.92em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--flomo-bg-sunken);
+}
+
 .fl-memo-pin { color: var(--flomo-green); font-size: 11px; }
 
 .fl-memo-actions {

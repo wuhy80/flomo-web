@@ -10,6 +10,10 @@ export type FlomoView =
   | { kind: 'all' }
   /** The feed filtered to one tag. */
   | { kind: 'tag'; tag: string }
+  /** The memos a `[[link]]` resolves to. */
+  | { kind: 'link'; target: string }
+  /** One memo in full, with its outgoing links and its backlinks. */
+  | { kind: 'focus'; id: string }
   /** A handful of older notes, stable for the whole day. */
   | { kind: 'review' }
   /** One note at a time, drawn at random. */
@@ -26,6 +30,8 @@ export type FlomoView =
 export function sameView(a: FlomoView, b: FlomoView): boolean {
   if (a.kind !== b.kind) return false
   if (a.kind === 'tag' && b.kind === 'tag') return a.tag === b.tag
+  if (a.kind === 'link' && b.kind === 'link') return a.target === b.target
+  if (a.kind === 'focus' && b.kind === 'focus') return a.id === b.id
   return true
 }
 
@@ -40,6 +46,10 @@ export function viewTitle(view: FlomoView): string {
       return '全部记录'
     case 'tag':
       return `#${view.tag}`
+    case 'link':
+      return `[[${view.target}]]`
+    case 'focus':
+      return '单条笔记'
     case 'review':
       return '每日回顾'
     case 'random':
@@ -47,4 +57,16 @@ export function viewTitle(view: FlomoView): string {
     case 'settings':
       return '设置'
   }
+}
+
+/**
+ * Whether a view shows the capture box.
+ *
+ * Writing is a feed activity: it makes no sense to offer the composer over a
+ * single memo's detail page or over the settings form.
+ * @param view - the view.
+ * @returns true when the composer belongs on this panel.
+ */
+export function showsComposer(view: FlomoView): boolean {
+  return view.kind === 'all' || view.kind === 'tag' || view.kind === 'link'
 }
