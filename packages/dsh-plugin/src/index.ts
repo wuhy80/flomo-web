@@ -97,16 +97,30 @@ export function apply(ctx: HostContext): void {
 
     if (cancelled || disposeTools !== undefined) return
 
-    try {
-      const disposers = buildFlomoTools(host, defineTool).map((tool) => tools.register(tool))
-      disposeTools = () => {
-        for (const dispose of disposers.splice(0)) dispose()
+    // Registered one at a time, collecting failures rather than letting the first
+    // throw abandon the rest. All six share a shape today, so in practice they
+    // fail together — but a single rejected definition must not be able to take
+    // the other five with it, and the message names which one was refused.
+    const disposers: Array<() => void> = []
+    const failures: string[] = []
+
+    for (const tool of buildFlomoTools(host, defineTool)) {
+      try {
+        disposers.push(tools.register(tool))
+      } catch (error) {
+        failures.push(`${tool.name}: ${error instanceof Error ? error.message : String(error)}`)
       }
+    }
+
+    disposeTools = () => {
+      for (const dispose of disposers.splice(0)) dispose()
+    }
+
+    if (failures.length === 0) {
       host.setToolsStatus(true, null)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      host.setToolsStatus(false, message)
-      console.warn('[flomo] 注册 agent 工具失败：', error)
+    } else {
+      host.setToolsStatus(false, failures.join(' | '))
+      console.warn('[flomo] 部分 agent 工具注册失败：', failures)
     }
   }
 

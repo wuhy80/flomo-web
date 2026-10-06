@@ -246,7 +246,8 @@ describe('import', () => {
   })
 })
 
-describe('agent tools', () => {  it('registers the documented set and refuses while locked', async () => {
+describe('agent tools', () => {
+  it('registers the documented set and refuses while locked', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
     temporaryDirs.push(dir)
     const { host } = await makeHost(dir, new MemoryStore())
@@ -256,6 +257,20 @@ describe('agent tools', () => {  it('registers the documented set and refuses wh
       tools.map((tool) => tool.name),
       [...FLOMO_TOOL_NAMES],
     )
+
+    // The registry validates output.schema and refuses the `{ type: 'json' }`
+    // shorthand that the Harness's own defineTool would have expanded. A plugin
+    // falling back to an identity helper therefore has to hand over a schema that
+    // stands on its own — this is what silently disabled every tool in a real
+    // install, with nothing but a status string to show for it.
+    const allowed = ['object', 'array', 'string', 'number', 'integer', 'boolean', 'null']
+    for (const tool of tools) {
+      const schema = tool.output.schema as { type?: unknown }
+      assert.ok(
+        allowed.includes(String(schema.type)),
+        `${tool.name} declares an output schema the registry will refuse: ${JSON.stringify(schema)}`,
+      )
+    }
 
     const search = tools.find((tool) => tool.name === 'flomo_search')
     assert.ok(search)

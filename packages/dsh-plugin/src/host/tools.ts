@@ -27,14 +27,30 @@ import type { FlomoHostService } from '../host-service.ts'
 export type DefineTool = (definition: ToolDefinition) => ToolDefinition
 
 /**
+ * The output schema every tool declares.
+ *
+ * Spelled out rather than using the `{ type: 'json' }` shorthand, which is what
+ * the Harness's own `defineTool` accepts and expands. A plugin that cannot
+ * resolve the tool package falls back to an identity helper, and the registry
+ * then refuses the shorthand with `schema.type must be one of object/array/
+ * string/number/integer/boolean/null` — every tool registers as nothing, and the
+ * only evidence is a status string. A schema that is valid on its own works
+ * either way, so that is the only version worth writing.
+ */
+export const JSON_OUTPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: true,
+} as const
+
+/**
  * Fallback used when the Harness tool package is not resolvable.
  *
  * The tool package is delivered by the Harness rather than by npm, and a
  * hot-pluggable install (a `link:` into the profile) can end up somewhere that
- * cannot resolve it. `defineTool` is a declaration helper — it fixes the
- * accepted shape and its types — so an identity implementation produces an
- * equivalent definition, and the tools keep working instead of silently
- * disappearing.
+ * cannot resolve it. `defineTool` is not quite an identity function — it also
+ * expands the `{ type: 'json' }` output shorthand — so this fallback is only
+ * safe because every definition below already carries a schema the registry
+ * accepts on its own.
  */
 export const identityDefineTool: DefineTool = (definition) => definition
 
@@ -139,7 +155,7 @@ export function buildFlomoTools(
         description: 'The memo body, tags included inline (for example "读完《深度工作》#读书").',
       },
     },
-    output: { schema: { type: 'json' }, render: renderJson },
+    output: { schema: JSON_OUTPUT_SCHEMA, render: renderJson },
     isConcurrencySafe: () => false,
     async execute(args) {
       await host.ensureStarted()
@@ -165,7 +181,7 @@ export function buildFlomoTools(
       tag: { type: 'string', description: 'Restrict to memos carrying this tag, without the leading #.' },
       limit: { type: 'integer', description: `Maximum results (default ${DEFAULT_LIST_LIMIT}).` },
     },
-    output: { schema: { type: 'json' }, render: renderJson },
+    output: { schema: JSON_OUTPUT_SCHEMA, render: renderJson },
     isConcurrencySafe: () => true,
     async execute(args) {
       await host.ensureStarted()
@@ -192,7 +208,7 @@ export function buildFlomoTools(
     parameters: {
       limit: { type: 'integer', description: `How many memos to return (default ${DEFAULT_LIST_LIMIT}, maximum 200).` },
     },
-    output: { schema: { type: 'json' }, render: renderJson },
+    output: { schema: JSON_OUTPUT_SCHEMA, render: renderJson },
     isConcurrencySafe: () => true,
     async execute(args) {
       await host.ensureStarted()
@@ -215,7 +231,7 @@ export function buildFlomoTools(
     parameters: {
       count: { type: 'integer', description: 'How many memos to surface (default 3, maximum 20).' },
     },
-    output: { schema: { type: 'json' }, render: renderJson },
+    output: { schema: JSON_OUTPUT_SCHEMA, render: renderJson },
     isConcurrencySafe: () => true,
     async execute(args) {
       await host.ensureStarted()
@@ -238,7 +254,7 @@ export function buildFlomoTools(
     parameters: {
       limit: { type: 'integer', description: 'Maximum tags to return (default 100).' },
     },
-    output: { schema: { type: 'json' }, render: renderJson },
+    output: { schema: JSON_OUTPUT_SCHEMA, render: renderJson },
     isConcurrencySafe: () => true,
     async execute(args) {
       await host.ensureStarted()
@@ -263,7 +279,7 @@ export function buildFlomoTools(
       'Triggers: 随机漫步, 随便翻一条, flomo random, 抽一条笔记.',
     ].join(' '),
     parameters: {},
-    output: { schema: { type: 'json' }, render: renderJson },
+    output: { schema: JSON_OUTPUT_SCHEMA, render: renderJson },
     isConcurrencySafe: () => true,
     async execute() {
       await host.ensureStarted()

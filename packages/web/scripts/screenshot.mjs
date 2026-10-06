@@ -16,6 +16,7 @@
  * Options:
  *   --locked         stop at the password gate instead of unlocking
  *   --click <label>  click the first button whose text is exactly <label>
+ *   --open <text>    open the detail view of the memo containing <text>
  *   --size <WxH>     viewport to emulate (default 1280x1000)
  *
  * Requires the dev server (`pnpm dev`) or a static host to already be running,
@@ -222,11 +223,12 @@ if (url === undefined || outArg === undefined) {
 
 /** Parse the flags. */
 function parseOptions(args) {
-  const options = { stopAtGate: false, click: null, width: 1280, height: 1000 }
+  const options = { stopAtGate: false, click: null, open: null, width: 1280, height: 1000 }
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
     if (arg === '--locked') options.stopAtGate = true
     else if (arg === '--click') options.click = args[index += 1] ?? null
+    else if (arg === '--open') options.open = args[index += 1] ?? null
     else if (arg === '--size') {
       const [width, height] = (args[index += 1] ?? '').split('x').map(Number)
       if (!width || !height) throw new Error('--size wants WxH, e.g. 420x900')
@@ -352,6 +354,24 @@ try {
       return true;
     })()`)
     if (clicked !== true) throw new Error(`no button labelled ${JSON.stringify(options.click)}`)
+    await new Promise((ready) => setTimeout(ready, 500))
+  }
+
+  // Opens the detail view of a *specific* memo. Clicking the first 详情 button
+  // only ever reaches the newest note, which is never the one with backlinks.
+  if (options.open !== null) {
+    const opened = await evaluate(`(() => {
+      const wanted = ${JSON.stringify(options.open)};
+      const memo = [...document.querySelectorAll('.fl-memo')]
+        .find((node) => node.textContent.includes(wanted));
+      if (memo === undefined) return false;
+      const button = [...memo.querySelectorAll('button')]
+        .find((candidate) => candidate.textContent.trim() === '详情');
+      if (button === undefined) return false;
+      button.click();
+      return true;
+    })()`)
+    if (opened !== true) throw new Error(`no memo containing ${JSON.stringify(options.open)}`)
     await new Promise((ready) => setTimeout(ready, 500))
   }
 

@@ -42,7 +42,17 @@ declare module '@deepseek-ai/dsh-tools' {
     description: string
     parameters: Record<string, ToolParameter>
     output: {
-      schema: { type: 'json' }
+      /**
+       * A JSON Schema for the tool's return value.
+       *
+       * Typed loosely on purpose. The Harness's own `defineTool` also accepts a
+       * `{ type: 'json' }` shorthand and expands it, but the registry validates
+       * what it is finally given — so a plugin that supplies its own helper must
+       * hand over a schema that stands on its own. This shim originally declared
+       * the shorthand as the contract, which is what made that mistake look
+       * correct at compile time.
+       */
+      schema: Record<string, unknown>
       render: (args: unknown, value: unknown) => ToolContentBlock[]
     }
     isConcurrencySafe?: () => boolean

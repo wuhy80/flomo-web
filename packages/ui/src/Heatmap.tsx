@@ -66,22 +66,54 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
     return out
   }, [memos, weeks, today])
 
+  /**
+   * The month label to draw at each column, or `null` where there is none.
+   *
+   * A label appears on the first column and then only where the month changes, so
+   * the axis stays readable without a label per week.
+   */
+  const months = useMemo(
+    () =>
+      columns.map((column, index) => {
+        const key = column[0]?.key
+        if (key === undefined) return null
+        const month = key.slice(0, 7)
+        const before = index === 0 ? null : (columns[index - 1]?.[0]?.key.slice(0, 7) ?? null)
+        return month === before ? null : `${Number(month.slice(5, 7))}月`
+      }),
+    [columns],
+  )
+
   return (
-    <div className="fl-heatmap" role="img" aria-label="记录热力图">
-      {columns.map((column, index) => (
-        <div className="fl-heatmap-week" key={column[0]?.key ?? index}>
-          {column.map((cell) => (
-            <div
-              key={cell.key}
-              className="fl-heatmap-cell"
-              data-level={cell.future ? 0 : level(cell.count)}
-              style={cell.future ? { opacity: 0.35 } : undefined}
-              title={`${cell.key}：${cell.count} 条`}
-            />
-          ))}
-        </div>
-      ))}
-      <span className="fl-visually-hidden">{`每格 ${CELL} 像素`}</span>
+    <div className="fl-heatmap-wrap">
+      {/* Month labels, absolutely placed at the column where each month starts.
+          Without them the grid reads as a decorative texture rather than as
+          something with a time axis. */}
+      <div className="fl-heatmap-months" aria-hidden="true">
+        {months.map((label, index) =>
+          label === null ? null : (
+            <span key={`${label}-${index}`} className="fl-heatmap-month" style={{ left: index * CELL }}>
+              {label}
+            </span>
+          ),
+        )}
+      </div>
+      <div className="fl-heatmap" role="img" aria-label="记录热力图">
+        {columns.map((column, index) => (
+          <div className="fl-heatmap-week" key={column[0]?.key ?? index}>
+            {column.map((cell) => (
+              <div
+                key={cell.key}
+                className="fl-heatmap-cell"
+                data-level={cell.future ? 0 : level(cell.count)}
+                style={cell.future ? { opacity: 0.35 } : undefined}
+                title={`${cell.key}：${cell.count} 条`}
+              />
+            ))}
+          </div>
+        ))}
+        <span className="fl-visually-hidden">{`每格 ${CELL} 像素`}</span>
+      </div>
     </div>
   )
 }

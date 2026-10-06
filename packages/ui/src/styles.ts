@@ -652,7 +652,22 @@ export const FLOMO_CSS = `
 
 /* ── heatmap ─────────────────────────────────────────────────────────── */
 
-.fl-heatmap { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+/* The wrapper scrolls, not the grid, so the month labels travel with the cells
+   they label instead of staying behind. */
+.fl-heatmap-wrap { overflow-x: auto; padding-bottom: 4px; }
+
+.fl-heatmap-months { position: relative; height: 13px; margin-bottom: 3px; }
+
+.fl-heatmap-month {
+  position: absolute;
+  top: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--flomo-text-faint);
+  white-space: nowrap;
+}
+
+.fl-heatmap { display: flex; gap: 3px; }
 .fl-heatmap-week { display: flex; flex-direction: column; gap: 3px; }
 
 .fl-heatmap-cell {
