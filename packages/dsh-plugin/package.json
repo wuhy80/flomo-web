@@ -1,0 +1,44 @@
+{
+  "name": "dsh-flomo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "flomo inside DeepSeek Harness: a native sidebar panel plus agent tools, backed by the same client-side-encrypted vault as the web app.",
+  "icon": "icon.svg",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "@flomo/core": "workspace:*",
+    "@flomo/ui": "workspace:*",
+    "@types/react": "~18.3.1",
+    "esbuild": "^0.24.2",
+    "react": "^18.3.1"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0"
+  }
+}

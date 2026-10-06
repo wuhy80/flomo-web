@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+
+# esbuild ships its platform binary through a postinstall script, which pnpm
+# blocks by default. It is a build-time-only dependency of the DSH panel bundle.
+allowBuilds:
+  esbuild: true

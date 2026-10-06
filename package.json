@@ -1,0 +1,21 @@
+{
+  "name": "flomo-sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A flomo-inspired minimal memo app with client-side encryption, GitHub-backed storage, and a DeepSeek Harness panel plugin.",
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "dev": "pnpm --filter @flomo/web dev",
+    "build": "pnpm --filter @flomo/web build",
+    "preview": "pnpm --filter @flomo/web preview",
+    "build:plugin": "pnpm --filter dsh-flomo build",
+    "watch:plugin": "pnpm --filter dsh-flomo watch",
+    "test": "node --test packages/core/test/core.test.ts packages/dsh-plugin/test/host.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "~5.7.2"
+  }
+}

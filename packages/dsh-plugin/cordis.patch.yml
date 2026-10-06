@@ -1,0 +1,12 @@
+# dsh-flomo bundle patch: inserts the dual-face plugin row into the profile
+# roster.
+#
+# The row is a bare plugin addressed by package name. The node half
+# (`exports "."` → lib/index.js) runs in the host process and owns the vault,
+# the credentials and the agent tools. The `dsh.client` declaration in
+# package.json makes the browser half (`exports "./client"` → lib/client.js,
+# served at /plugins/dsh-flomo/client.js) load in the Web GUI, where it
+# registers the sidebar row and the center-column page.
+- insert:
+    - id: flomo
+      name: dsh-flomo

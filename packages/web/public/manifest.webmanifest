@@ -1,0 +1,11 @@
+{
+  "name": "flomo",
+  "short_name": "flomo",
+  "description": "端到端加密的极简笔记",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#18a058",
+  "lang": "zh-CN"
+}

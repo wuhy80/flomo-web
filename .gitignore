@@ -1,0 +1,11 @@
+node_modules/
+dist/
+lib/
+.vite/
+*.log
+
+# Local secrets — never commit. The web app keeps these in browser storage,
+# and the DSH plugin reads them from ~/.dsh/.credentials.yaml instead.
+.env
+.env.local
+.credentials.yaml

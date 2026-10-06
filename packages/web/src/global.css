@@ -1,0 +1,21 @@
+/**
+ * Page-level reset. Everything visual lives in the shared `@flomo/ui`
+ * stylesheet; this file only makes the document itself full-height.
+ */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #fff;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  display: flex;
+}

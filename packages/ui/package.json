@@ -1,0 +1,22 @@
+{
+  "name": "@flomo/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "flomo-style React components and stylesheet, shared by the web app and the DeepSeek Harness panel.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@flomo/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.5"
+  }
+}
