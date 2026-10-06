@@ -131,6 +131,10 @@ function fakeHostContext(credentials: ReturnType<typeof fakeCredentials>): {
   const disposers: Array<() => void> = []
 
   const ctx: Record<string, unknown> = {
+    // Injected services are properties on the context, which is how the rest of the
+    // profile reads them and the path `apply` prefers. Provided here so the test
+    // exercises that path rather than only the `get` fallback.
+    credentials,
     get(name: string) {
       if (name === 'credentials') return credentials
       if (name === 'tools') {
@@ -318,7 +322,12 @@ describe('built host bundle', () => {
   it('registers both routes and all six tools without the Harness tool package', async () => {
     const bundle = await loadHostBundle()
     assert.equal(bundle.name, 'flomo')
-    assert.deepEqual([...bundle.inject], ['webServer'])
+
+    // `credentials` is declared, not merely pulled. Cordis only guarantees a
+    // service is available for the ones you inject, so listing only `webServer` and
+    // then calling `ctx.get('credentials')` returned undefined — and the panel
+    // reported that the deployment had no credentials service, which was false.
+    assert.deepEqual([...bundle.inject].sort(), ['credentials', 'webServer'].sort())
 
     const credentials = fakeCredentials()
     const { ctx, routes, tools } = fakeHostContext(credentials)

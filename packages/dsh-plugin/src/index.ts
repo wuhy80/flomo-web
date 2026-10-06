@@ -6,9 +6,15 @@
  * and the agent tools drive the very same object — which is what makes a memo
  * captured in a chat turn appear in the sidebar panel without a refresh.
  *
- * Failure policy: a missing optional service (the tool registry, the
- * credentials store) degrades the surface rather than failing the boot, since
- * a plugin that throws during `apply` takes the whole harness down with it.
+ * Failure policy: the optional tool registry degrades the surface rather than
+ * failing the boot, since a plugin that throws during `apply` takes the whole
+ * harness down with it.
+ *
+ * `credentials` is declared rather than merely pulled. Cordis only guarantees a
+ * service is available for the ones you inject, so an earlier version that listed
+ * only `webServer` and then called `ctx.get('credentials')` got `undefined` — and
+ * the panel could not save the token, reporting that the deployment had no
+ * credentials service. It does; this plugin was not asking for it properly.
  *
  * @module dsh-flomo
  */
@@ -25,8 +31,14 @@ import { makeFlomoRoutes } from './routes.ts'
 /** Loader entry name. */
 export const name = 'flomo'
 
-/** The one service this plugin cannot work without. */
-export const inject = ['webServer']
+/**
+ * Services this plugin needs.
+ *
+ * `webServer` hosts the routes and `credentials` holds the PAT. Both are core
+ * services, and declaring them is what makes them present by the time `apply`
+ * runs — pulling one that was never declared is how the token ended up unsavable.
+ */
+export const inject = ['webServer', 'credentials']
 
 /** The slice of the tool registry this plugin uses. */
 interface ToolRegistryFace {
@@ -41,6 +53,14 @@ interface HostContext {
   get(name: string): unknown
   effect(callback: () => (() => void) | void, label?: string): void
   webServer: { register(route: WebRoute): () => void }
+  /**
+   * An injected service, exposed as a property.
+   *
+   * This is how every other plugin in the profile reads it — `ctx.credentials`,
+   * not `ctx.get('credentials')`. Both are tried, because the property is the
+   * documented shape and the getter is the fallback.
+   */
+  credentials?: CredentialsFace
   inject?: (names: readonly string[], callback: (scoped: HostContext) => unknown) => unknown
 }
 
@@ -49,14 +69,15 @@ interface HostContext {
  * @param ctx - the plugin context (webServer injected).
  */
 export function apply(ctx: HostContext): void {
-  const credentials = ctx.get('credentials') as CredentialsFace | undefined
+  // The injected property first, then the getter: the property is what the rest of
+  // the profile uses, and reading only the getter is what left this plugin without
+  // a credentials service and made the token unsavable.
+  const credentials = ctx.credentials ?? (ctx.get('credentials') as CredentialsFace | undefined)
 
-  // Mount even without a credentials service: the panel must still be able to
-  // explain what is missing. A `configure` that carries a token fails with that
-  // message rather than the whole plugin disappearing.
-  const host = new FlomoHostService(
-    credentials ? { credentials } : {},
-  )
+  // The fallback stays as a belt-and-braces guard, but with `credentials` declared
+  // above it should never be taken: a deployment that lacks the service never
+  // reaches `apply` at all, which is the trade for having the service present.
+  const host = new FlomoHostService(credentials ? { credentials } : {})
   void host.ensureStarted()
 
   let disposeTools: (() => void) | undefined
