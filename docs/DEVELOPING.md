@@ -43,12 +43,20 @@ packages/
 ```bash
 pnpm install
 pnpm dev                 # 网页版开发服务器 → http://localhost:5273
-pnpm test                # 155 个测试
-pnpm typecheck
+pnpm test                # 156 个测试（glob 收集，新增测试文件不用改脚本）
+pnpm typecheck           # 覆盖 src/、test/ 和 vite.config.ts
 pnpm build               # 网页版产物
 pnpm build:plugin        # 插件两半
 pnpm smoke               # 部署冒烟测试（需先 build）
 ```
+
+> `tsconfig.json` 的 `include` **包含 `test/`**。这是刻意的：测试是对外的公开 API 的
+> 第一批使用者，让它们过类型检查等于顺带验证了 API 的类型契约。
+> 另外 `pnpm test` 用 glob 而不是文件清单 —— 清单会漏，而漏掉的测试**不会报错，
+> 只是不跑**。
+>
+> 产物测试会**自己构建 `lib/`**（`lib/` 是 gitignore 的）。所以干净检出能直接跑，
+> 而且测试不可能对着过期产物通过。
 
 ### 用真实浏览器看它
 

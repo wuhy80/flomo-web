@@ -22,9 +22,19 @@ function key(key: string, overrides: Partial<ShortcutEvent> = {}): ShortcutEvent
   return { key, metaKey: false, ctrlKey: false, altKey: false, target: null, ...overrides }
 }
 
-/** A stand-in event target with a tag name. */
-function element(tagName: string, isContentEditable = false): EventTarget {
-  return { tagName, isContentEditable } as unknown as EventTarget
+/** A stand-in element carrying the two properties the resolver reads. */
+interface FakeElement extends EventTarget {
+  tagName: string
+}
+
+/**
+ * Build a stand-in event target.
+ * @param tagName - its tag name.
+ * @param isContentEditable - whether it is an editable region.
+ * @returns the element.
+ */
+function element(tagName: string, isContentEditable = false): FakeElement {
+  return { tagName, isContentEditable } as unknown as FakeElement
 }
 
 describe('isTypingTarget', () => {
@@ -66,7 +76,7 @@ describe('resolveShortcut', () => {
         assert.equal(
           resolveShortcut(key(letter, { target })),
           null,
-          `${letter} must not fire from a ${String((target as { tagName: string }).tagName)}`,
+          `${letter} must not fire from a ${target.tagName}`,
         )
       }
     }

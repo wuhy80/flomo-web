@@ -1,8 +1,18 @@
 node_modules/
-dist/
-lib/
 .vite/
 *.log
+*.tsbuildinfo
+
+# Build output. Named by full path rather than by directory name: a bare `lib/`
+# or `dist/` would also ignore a future source directory that happened to use
+# either name, and code that is silently never committed is a nasty thing to
+# discover late.
+/packages/dsh-plugin/lib/
+/packages/web/dist/
+
+# OS noise.
+.DS_Store
+Thumbs.db
 
 # Local secrets — never commit. The web app keeps these in browser storage,
 # and the DSH plugin reads them from ~/.dsh/.credentials.yaml instead.
