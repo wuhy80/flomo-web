@@ -174,6 +174,90 @@ try {
   )
   const hits = await app.evaluate('document.querySelectorAll(".fl-memo").length')
   check(hits === 1, 'search narrows the feed to the one matching memo', `${hits} shown`)
+
+  // Clearing matters: a live filter hides most of the feed, so anything that looks
+  // for a different memo afterwards would fail on a DOM that is behaving correctly.
+  await app.clearText('.fl-search input')
+  await app.waitFor(
+    `document.querySelectorAll(".fl-memo").length > 1`,
+    'the feed to come back',
+  )
+  check(true, 'clearing the search restores the feed')
+  // ── editing an existing note ───────────────────────────────────────────────
+  // The only UI path that rewrites data that already exists, which makes it the
+  // riskiest one here: a bug does not add a note, it replaces one.
+  const EDITED = `${MARKER}-已改`
+  await app.clickInMemo(MARKER, '编辑')
+  await app.replaceText('.fl-memo-edit textarea', EDITED)
+  await app.clickLabel('保存')
+  await app.waitFor(
+    `document.body.innerText.includes(${JSON.stringify(EDITED)})`,
+    'the edited body to appear',
+  )
+  const bodies = await app.memos()
+  check(
+    bodies.some((body) => String(body).includes(EDITED)),
+    'the edit replaced the body',
+    JSON.stringify(bodies),
+  )
+  check(
+    !bodies.some((body) => String(body).includes(MARKER) && !String(body).includes(EDITED)),
+    'and the old body is gone rather than duplicated',
+  )
+
+  // ── pinning reorders the feed ──────────────────────────────────────────────
+  // Note that the newly captured memo is not necessarily first: the fixture carries
+  // memos stamped later in the day than the moment this runs, so "newest" and "top"
+  // are not the same thing here. What matters is that the target starts somewhere
+  // other than the top, and that pinning moves it.
+  const target = '晚饭后散步'
+  const beforePin = await app.memos()
+  check(
+    !String(beforePin[0]).includes(target),
+    'the memo about to be pinned does not already start at the top',
+    JSON.stringify(beforePin[0]),
+  )
+
+  await app.clickInMemo(target, '置顶')
+  await app.waitFor(
+    `document.querySelector(".fl-memo")?.innerText.includes(${JSON.stringify(target)}) === true`,
+    'the pinned memo to hoist to the top',
+  )
+  check(true, 'pinning hoists a memo to the top of the feed')
+
+  await app.clickInMemo(target, '取消置顶')
+  await app.waitFor(
+    `document.querySelector(".fl-memo")?.innerText.includes(${JSON.stringify(target)}) === false`,
+    'the unpinned memo to fall back',
+  )
+  const afterUnpin = await app.memos()
+  check(
+    !String(afterUnpin[0]).includes(target),
+    'and unpinning really moves it back, rather than only relabelling the button',
+    JSON.stringify(afterUnpin[0]),
+  )
+
+  // ── the plaintext guarantee holds for rewrites, not only for the first capture ─
+  // An edit rewrites a shard that already exists, which is a different code path
+  // from appending to an empty one.
+  await app.waitFor(
+    `(window.__flomoWrites ?? []).length > ${writes.length}`,
+    'the edit to be persisted',
+  )
+  const laterWrites = await app.writes()
+  check(
+    laterWrites.length > writes.length,
+    'editing and pinning produced further writes',
+    `${writes.length} -> ${laterWrites.length}`,
+  )
+  check(
+    !laterWrites.some((write) => write.body.includes(EDITED)),
+    'no write contains the edited body in the clear',
+  )
+  check(
+    !laterWrites.some((write) => write.body.includes(target)),
+    'nor the memo that was pinned, in the clear',
+  )
 } catch (error) {
   failures += 1
   console.log(`  FAIL  the run threw: ${error instanceof Error ? error.message : String(error)}`)

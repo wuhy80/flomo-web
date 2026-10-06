@@ -347,6 +347,90 @@ export async function openApp(url, options = {}) {
     },
 
     /**
+     * Replace a field's contents.
+     *
+     * `insertText` inserts at the cursor, so the field is selected first — otherwise
+     * this would append to what is already there and the test would be editing
+     * something nobody typed.
+     * @param selector - the field.
+     * @param text - the replacement.
+     */
+    async replaceText(selector, text) {
+      await waitFor(`document.querySelector(${JSON.stringify(selector)}) !== null`, selector)
+      await evaluate(`(() => {
+        const field = document.querySelector(${JSON.stringify(selector)});
+        field.focus();
+        field.select();
+      })()`)
+      await cdp.send('Input.insertText', { text })
+    },
+
+    /**
+     * Click a button inside the memo whose text contains a phrase.
+     *
+     * The memo actions are per-memo, so clicking "编辑" globally would always reach
+     * the newest note — which is never the one a test means to change.
+     * @param contains - a phrase from the memo's body.
+     * @param label - the button's text.
+     */
+    async clickInMemo(contains, label) {
+      const clicked = await evaluate(`(() => {
+        const wanted = ${JSON.stringify(contains)};
+        const memo = [...document.querySelectorAll('.fl-memo')]
+          .find((node) => node.textContent.includes(wanted));
+        if (memo === undefined) return false;
+        const button = [...memo.querySelectorAll('button')]
+          .find((candidate) => candidate.textContent.trim() === ${JSON.stringify(label)});
+        if (button === undefined) return false;
+        button.click();
+        return true;
+      })()`)
+      if (clicked !== true) {
+        throw new Error(`no ${JSON.stringify(label)} button in the memo containing ${contains}`)
+      }
+      await new Promise((ready) => setTimeout(ready, 300))
+    },
+
+    /**
+     * Empty a field.
+     *
+     * Not `insertText('')`, which inserts nothing and leaves the value alone. The
+     * selection is deleted with a real Backspace instead, so React sees an ordinary
+     * input event.
+     * @param selector - the field.
+     */
+    async clearText(selector) {
+      await waitFor(`document.querySelector(${JSON.stringify(selector)}) !== null`, selector)
+      await evaluate(`(() => {
+        const field = document.querySelector(${JSON.stringify(selector)});
+        field.focus();
+        field.select();
+      })()`)
+      const key = {
+        key: 'Backspace',
+        code: 'Backspace',
+        windowsVirtualKeyCode: 8,
+        nativeVirtualKeyCode: 8,
+      }
+      await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...key })
+      await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+      await new Promise((ready) => setTimeout(ready, 200))
+    },
+
+    /**
+     * The bodies of the memos on screen, in the order they appear.
+     *
+     * Read from the body element rather than from the memo's `innerText`. The action
+     * buttons are first in the DOM and only *look* last, and on a narrow viewport
+     * they are visible rather than `display: none` — so taking the first line of
+     * `innerText` returns "详情" there and the body on desktop.
+     */
+    memos: () =>
+      evaluate(
+        '[...document.querySelectorAll(".fl-memo")].map((node) => node.querySelector(".fl-memo-body")?.innerText ?? "")',
+      ),
+
+    /**
      * Unlock the vault through the real form.
      * @param password - the fixture password.
      */
