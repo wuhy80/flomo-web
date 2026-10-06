@@ -37,6 +37,11 @@ export const FLOMO_CSS = `
   --flomo-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   display: flex;
+  /* The host is display:flex (to make the app fill the page height), which makes
+     this element a flex item — and a flex item with no width shrinks to its
+     content. Without this the whole app is only as wide as its widest child,
+     which is invisible in the feed and glaring on the centred gate screens. */
+  width: 100%;
   height: 100%;
   min-height: 0;
   font-family: var(--flomo-font);

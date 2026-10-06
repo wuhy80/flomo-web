@@ -88,6 +88,28 @@ async function usedClasses(): Promise<Map<string, string[]>> {
 }
 
 describe('stylesheet', () => {
+  it('has no backtick inside the stylesheet literal', async () => {
+    // The stylesheet is a template literal, so one backtick in a CSS comment
+    // terminates it and the module stops parsing. That has happened twice now,
+    // both times inside a comment nobody thought of as code.
+    const source = await readFile(join(uiRoot, 'src', 'styles.ts'), 'utf8')
+    const opener = 'export const FLOMO_CSS = `'
+    const start = source.indexOf(opener)
+    assert.ok(start >= 0, 'the stylesheet literal was not found')
+
+    const end = source.indexOf('\n`', start)
+    assert.ok(end > start, 'the stylesheet literal is not terminated on its own line')
+
+    const body = source.slice(start + opener.length, end)
+    const offender = body.indexOf('`')
+    assert.equal(
+      offender,
+      -1,
+      `a backtick at offset ${offender} would terminate the literal: ` +
+        JSON.stringify(body.slice(Math.max(0, offender - 40), offender + 40)),
+    )
+  })
+
   it('has balanced braces', () => {
     const open = (FLOMO_CSS.match(/\{/g) ?? []).length
     const close = (FLOMO_CSS.match(/\}/g) ?? []).length

@@ -7,6 +7,13 @@
 - **两套外壳，一套内核**：网页版和 DSH 面板共用同一个 `@flomo/core` 与 `@flomo/ui`
 - **Agent 可读写**：装上 DSH 插件后，对话里说「记一条」就能落库
 
+![flomo-sim 的记录流](docs/screenshot-feed.png)
+
+<sub>截图由 `scripts/screenshot.mjs` 生成：真实浏览器、真实加密保险库、真实解锁流程。
+下面那份是解锁门禁。</sub>
+
+![解锁门禁](docs/screenshot-locked.png)
+
 ---
 
 ## 已实现的功能
