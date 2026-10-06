@@ -257,6 +257,55 @@ describe('http surface', () => {
     }
   })
 
+  it('fences the vault the way the README says it does', async () => {
+    // The truth table of `isTrusted`. Every request here is already from loopback,
+    // so what is pinned is the header half — and it is worth pinning because the
+    // README makes a claim about it, and the claim is subtler than it looks.
+    const dir = await makeTempDir()
+    const { host } = await makeHost(dir, new MemoryStore())
+    const { server, base } = await serve(host)
+
+    /**
+     * Ask for the state with a given set of browser headers.
+     * @param headers - the headers to send.
+     * @returns the status code.
+     */
+    const ask = async (headers: Record<string, string>): Promise<number> => {
+      const response = await fetch(`${base}${API_PREFIX}/state`, { headers })
+      return response.status
+    }
+
+    try {
+      assert.equal(await ask({}), 403, 'no signal at all is refused')
+      assert.equal(await ask({ 'sec-fetch-site': 'cross-site' }), 403, 'another page is refused')
+      assert.equal(await ask({ 'sec-fetch-site': 'none' }), 403, 'a typed URL is refused')
+      assert.equal(
+        await ask({ origin: 'https://evil.example' }),
+        403,
+        'a foreign origin with no marker is refused',
+      )
+      assert.equal(
+        await ask({ origin: `${base}` }),
+        200,
+        'a matching origin is the fallback case, and is allowed',
+      )
+
+      assert.equal(await ask({ 'sec-fetch-site': 'same-origin' }), 200, 'the panel is allowed')
+
+      // Pinned because it is surprising: `same-origin` returns before the origin is
+      // ever compared, so a foreign Origin rides along. That is safe only because
+      // `Sec-Fetch-*` are forbidden header names — a page cannot set this itself —
+      // which is the whole reason the socket check, and not this one, is the fence.
+      assert.equal(
+        await ask({ 'sec-fetch-site': 'same-origin', origin: 'https://evil.example' }),
+        200,
+        'the marker short-circuits the origin comparison, by design',
+      )
+    } finally {
+      server.close()
+    }
+  })
+
   it('serves state and applies actions over the wire', async () => {
     const dir = await makeTempDir()
     const backing = new MemoryStore()
