@@ -324,14 +324,20 @@ export async function openApp(url, options = {}) {
     },
 
     /**
-     * Click the first button whose visible text matches exactly.
+     * Click the first button whose visible text matches.
+     *
+     * An exact match wins. Failing that, a button whose text *starts with* the
+     * label is accepted — the sidebar's nav rows carry a count badge inside them,
+     * so "全部" reads as "全部10" and an exact match finds nothing.
      * @param label - the button's text.
      */
     async clickLabel(label) {
       const clicked = await evaluate(`(() => {
         const wanted = ${JSON.stringify(label)};
-        const button = [...document.querySelectorAll('button')]
-          .find((candidate) => candidate.textContent.trim() === wanted);
+        const buttons = [...document.querySelectorAll('button')];
+        const text = (node) => node.textContent.trim();
+        const button = buttons.find((node) => text(node) === wanted)
+          ?? buttons.find((node) => text(node).startsWith(wanted));
         if (button === undefined) return false;
         button.click();
         return true;

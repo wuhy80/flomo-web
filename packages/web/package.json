@@ -10,7 +10,7 @@
     "preview": "vite preview --port 4173",
     "smoke": "node scripts/smoke.mjs",
     "shots": "node scripts/screenshot.mjs",
-    "interact": "node scripts/interact.mjs"
+    "interact": "node scripts/interact.mjs && node scripts/interact.mjs --size 420x900"
   },
   "dependencies": {
     "@flomo/core": "workspace:*",

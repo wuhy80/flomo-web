@@ -89,6 +89,7 @@ node packages/web/scripts/screenshot.mjs http://127.0.0.1:5273/ phone.png --size
 
 ```bash
 node packages/web/scripts/interact.mjs http://127.0.0.1:5273/
+node packages/web/scripts/interact.mjs http://127.0.0.1:5273/ --size 420x900
 ```
 
 截图只到"渲染出来了"为止。这个脚本**在真实的输入框里打字、点发送**，然后检查应用
@@ -96,10 +97,15 @@ node packages/web/scripts/interact.mjs http://127.0.0.1:5273/
 
 - 新记录出现在信息流里、输入框自己清空、`#标签` 从正文里解析出来
 - 内容被写进当月分片 —— 而且**所有写入里都没有明文**（正文和标签都没有）
+- **另外三个视图真的能点开**（每日回顾 / 随机漫步 / 全部），搜索真的会过滤信息流
 
 最后一条是**整个项目的核心主张**，而它是在**浏览器里**被验证的，不是靠服务层。
 mock 的 `PUT` 不再丢弃请求体，而是记到 `window.__flomoWrites` —— 这正是"能问出
 应用想存什么"的前提。
+
+**两种视口都要跑。** 窄屏下侧栏会变成横向导航条、操作按钮会换位置，那些改动
+**看截图是看不出能不能用的** —— 必须真的点一下。`pnpm --filter @flomo/web interact`
+会把两种尺寸都跑一遍。
 
 > 浏览器那部分逻辑在 `harness.mjs`，`screenshot.mjs` 与 `interact.mjs` 共用。
 > 抽取时验证过：重构前后截图的**哈希完全一致**。

@@ -8,7 +8,7 @@
  * place the browser-side of the encryption claim can be checked.
  *
  * Usage:
- *   node scripts/interact.mjs [app-url]
+ *   node scripts/interact.mjs [app-url] [--size WxH]
  *
  * Requires the dev server (`pnpm dev`) or a static host to be running, and Chrome
  * or Edge installed.
@@ -16,7 +16,37 @@
 
 import { openApp } from './harness.mjs'
 
-const url = process.argv[2] ?? 'http://127.0.0.1:5273/'
+const argv = process.argv.slice(2)
+
+/**
+ * Parse the arguments.
+ *
+ * Written as a walk rather than `find(arg => !arg.startsWith('--'))`: that
+ * shorthand reads the *value* of `--size` as the URL when no URL is given, so
+ * `interact.mjs --size 420x900` tried to navigate to "420x900". It only worked
+ * while the URL happened to come first.
+ * @param args - the raw arguments.
+ * @returns the URL and the viewport.
+ */
+function parseArgs(args) {
+  const options = { url: 'http://127.0.0.1:5273/', width: 1280, height: 1000 }
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]
+    if (arg === '--size') {
+      const [width, height] = (args[index += 1] ?? '').split('x').map(Number)
+      if (!width || !height) throw new Error('--size wants WxH, e.g. 420x900')
+      options.width = width
+      options.height = height
+    } else if (arg !== undefined && arg.startsWith('--')) {
+      throw new Error(`unknown option: ${arg}`)
+    } else if (arg !== undefined) {
+      options.url = arg
+    }
+  }
+  return options
+}
+
+const { url, width, height } = parseArgs(argv)
 
 /** A string distinctive enough that finding it anywhere is unambiguous. */
 const MARKER = '交互测试标记-Zx9'
@@ -40,7 +70,7 @@ function check(ok, label, detail = '') {
   }
 }
 
-const app = await openApp(url)
+const app = await openApp(url, { width, height })
 
 try {
   await app.unlock()
@@ -103,6 +133,47 @@ try {
 
   const total = writes.reduce((sum, write) => sum + write.body.length, 0)
   check(total > 0, 'the writes actually carried a payload', `${total} bytes across ${writes.length} writes`)
+
+  // ── the rest of the app is still reachable ─────────────────────────────────
+  // On a narrow viewport the sidebar becomes a horizontal strip. It used to be
+  // hidden outright, which left a phone with no navigation at all — so navigating
+  // is the check that matters most at that size, and it is never exercised by
+  // looking at a screenshot.
+  const title = () => app.evaluate('document.querySelector(".fl-column-title")?.textContent ?? ""')
+
+  await app.clickLabel('每日回顾')
+  await app.waitFor(
+    'document.querySelector(".fl-column-title")?.textContent?.includes("每日回顾") === true',
+    'the review view',
+  )
+  check(true, 'the review view opens by clicking its nav item')
+
+  await app.clickLabel('随机漫步')
+  await app.waitFor(
+    'document.querySelector(".fl-column-title")?.textContent?.includes("随机漫步") === true',
+    'the random view',
+  )
+  check(true, 'the random view opens by clicking its nav item')
+
+  await app.clickLabel('全部')
+  await app.waitFor(
+    'document.querySelector(".fl-column-title")?.textContent?.includes("全部") === true',
+    'the all view',
+  )
+  check(true, 'and back to everything')
+  check(
+    typeof (await title()) === 'string',
+    'the column title is readable at this size',
+  )
+
+  // ── search filters what is on screen ───────────────────────────────────────
+  await app.typeInto('.fl-search input', MARKER)
+  await app.waitFor(
+    `document.querySelectorAll(".fl-memo").length < ${before + 1}`,
+    'the feed to filter down to the search hit',
+  )
+  const hits = await app.evaluate('document.querySelectorAll(".fl-memo").length')
+  check(hits === 1, 'search narrows the feed to the one matching memo', `${hits} shown`)
 } catch (error) {
   failures += 1
   console.log(`  FAIL  the run threw: ${error instanceof Error ? error.message : String(error)}`)
