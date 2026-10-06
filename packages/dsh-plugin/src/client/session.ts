@@ -60,7 +60,19 @@ export class HostFlomoSession implements FlomoSession {
     branch: string | null
     hasToken: boolean
     hasStoredPassword: boolean
-  } = { owner: null, repo: null, branch: null, hasToken: false, hasStoredPassword: false }
+    /** Whether the agent-facing tools registered with the Harness registry. */
+    toolsRegistered: boolean
+    /** Why they did not, when they did not. */
+    toolsError: string | null
+  } = {
+    owner: null,
+    repo: null,
+    branch: null,
+    hasToken: false,
+    hasStoredPassword: false,
+    toolsRegistered: false,
+    toolsError: null,
+  }
 
   /**
    * Subscribe to snapshot changes.
@@ -98,6 +110,8 @@ export class HostFlomoSession implements FlomoSession {
       branch: state.branch,
       hasToken: state.hasToken,
       hasStoredPassword: state.hasStoredPassword,
+      toolsRegistered: state.toolsRegistered,
+      toolsError: state.toolsError,
     }
     this.update({
       status,

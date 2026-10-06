@@ -72,6 +72,8 @@ const EMPTY_CONNECTION = {
   branch: null as string | null,
   hasToken: false,
   hasStoredPassword: false,
+  toolsRegistered: false,
+  toolsError: null as string | null,
 }
 
 /**
@@ -168,7 +170,8 @@ function HostSetup({ session }: { session: HostFlomoSession }): React.ReactEleme
  * @returns the settings block.
  */
 function HostSettings({ session }: { session: HostFlomoSession }): React.ReactElement {
-  const { owner, repo, branch, hasStoredPassword } = connectionOf(session)
+  const { owner, repo, branch, hasStoredPassword, toolsRegistered, toolsError } =
+    connectionOf(session)
   return (
     <div className="fl-card-lg" style={{ marginTop: 16 }}>
       <div className="fl-recovery-title" style={{ color: 'var(--flomo-text)' }}>
@@ -181,6 +184,20 @@ function HostSettings({ session }: { session: HostFlomoSession }): React.ReactEl
         {hasStoredPassword
           ? '宿主存有密码，agent 工具无需手动解锁即可读写笔记。'
           : '宿主没有存密码：本次解锁的密钥只存在于内存中，DSH 重启后需要重新解锁。'}
+      </p>
+      {/* Shown here and not only in the state route: a tool that failed to
+          register is otherwise completely invisible, and "the agent cannot see my
+          notes" is a confusing thing to debug from the outside. */}
+      <p className="fl-recovery-hint">
+        agent 工具：
+        {toolsRegistered ? (
+          <strong>已注册</strong>
+        ) : (
+          <>
+            <strong style={{ color: 'var(--flomo-danger)' }}>未注册</strong>
+            {toolsError ? ` —— ${toolsError}` : ''}
+          </>
+        )}
       </p>
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         <button type="button" className="fl-button" onClick={() => void session.save()}>
