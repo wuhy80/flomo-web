@@ -59,14 +59,40 @@ export function FlomoPanelIcon({ size }: { size: number; active: boolean }): Rea
 }
 
 /**
+ * The connection facts, spelled out so the panel survives a session that does
+ * not carry them.
+ *
+ * {@link HostFlomoSession} always initializes this, but the panel is a boundary
+ * that a future or alternative session implementation could cross, and reading
+ * a missing field here would blank the entire sidebar page rather than degrade.
+ */
+const EMPTY_CONNECTION = {
+  owner: null as string | null,
+  repo: null as string | null,
+  branch: null as string | null,
+  hasToken: false,
+  hasStoredPassword: false,
+}
+
+/**
+ * Read a session's connection facts, tolerating their absence.
+ * @param session - the host session.
+ * @returns its connection facts, or an empty set.
+ */
+function connectionOf(session: HostFlomoSession): typeof EMPTY_CONNECTION {
+  return session.connection ?? EMPTY_CONNECTION
+}
+
+/**
  * First-run connection form, shown when the host has no repository yet.
  * @param props - the host session to configure.
  * @returns the form.
  */
 function HostSetup({ session }: { session: HostFlomoSession }): React.ReactElement {
-  const [owner, setOwner] = useState(session.connection.owner ?? '')
-  const [repo, setRepo] = useState(session.connection.repo ?? 'flomo-data')
-  const [branch, setBranch] = useState(session.connection.branch ?? '')
+  const connection = connectionOf(session)
+  const [owner, setOwner] = useState(connection.owner ?? '')
+  const [repo, setRepo] = useState(connection.repo ?? 'flomo-data')
+  const [branch, setBranch] = useState(connection.branch ?? '')
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -142,7 +168,7 @@ function HostSetup({ session }: { session: HostFlomoSession }): React.ReactEleme
  * @returns the settings block.
  */
 function HostSettings({ session }: { session: HostFlomoSession }): React.ReactElement {
-  const { owner, repo, branch, hasStoredPassword } = session.connection
+  const { owner, repo, branch, hasStoredPassword } = connectionOf(session)
   return (
     <div className="fl-card-lg" style={{ marginTop: 16 }}>
       <div className="fl-recovery-title" style={{ color: 'var(--flomo-text)' }}>

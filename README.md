@@ -191,11 +191,24 @@ packages/
 pnpm test
 ```
 
-- `packages/core/test/core.test.ts` —— 加密往返、分片持久化、**密文里不含明文**、
-  写冲突检测、标签解析、搜索与每日回顾的确定性
-- `packages/dsh-plugin/test/host.test.ts` —— 真实 host 服务 + 真实 HTTP 路由，
-  跑在内存仓库上：配置流程、保险库生命周期、请求守卫（无同源标记必须 403）、
-  action 协议、agent 工具
+**`packages/core/test/core.test.ts`** —— 加密往返、分片持久化、**密文里不含明文**、
+写冲突检测、标签解析、搜索与每日回顾的确定性。
+
+**`packages/dsh-plugin/test/host.test.ts`** —— 真实 host 服务 + 真实 HTTP 路由，
+跑在内存仓库上：配置流程、保险库生命周期、请求守卫（无同源标记必须 403）、
+action 协议、agent 工具。
+
+**`packages/dsh-plugin/test/artifacts.test.ts`** —— 针对**已构建产物**而非源码，
+因为两半各有一种源码测试看不见的失败方式：
+
+- **host 半**必须在 `@deepseek-ai/dsh-tools` 解析不到的运行时里存活。测试在
+  没有该包的环境下加载 `lib/index.js`，断言路由与六个工具都注册成功 ——
+  这正是等价实现兜底在起作用。
+- **client 半**必须以 `window.__ModuleLoader__.load` 封装到达。测试在 `node:vm`
+  里搭一个假的模块加载器与 `require`（React 由此提供），断言侧栏行与主槽页
+  的注册参数，然后用 `react-dom/server` **真正渲染面板**：
+  已解锁时出现输入框、日期分组与标签；锁定时出现密码门禁且不泄漏信息流；
+  未配置时出现连接表单。
 
 ---
 

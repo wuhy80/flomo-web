@@ -43,8 +43,15 @@ export const TOKEN_REF = 'FLOMO_GITHUB_TOKEN'
  */
 export const PASSWORD_REF = 'FLOMO_PASSWORD'
 
-/** Default location of the non-secret connection settings. */
-export const DEFAULT_CONFIG_PATH = join(homedir(), '.dsh', 'flomo.json')
+/**
+ * Default location of the non-secret connection settings.
+ *
+ * `FLOMO_CONFIG_PATH` overrides it, which lets a test point the plugin at a
+ * scratch file instead of the user's real settings, and lets anyone relocate
+ * the plugin's state deliberately.
+ */
+export const DEFAULT_CONFIG_PATH =
+  process.env['FLOMO_CONFIG_PATH'] ?? join(homedir(), '.dsh', 'flomo.json')
 
 /** The slice of the credentials service this plugin uses. */
 export interface CredentialsFace {
