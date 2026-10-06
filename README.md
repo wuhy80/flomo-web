@@ -251,16 +251,20 @@ plugin_manager install_bundle  target = link:D:\code\flomo-sim\packages\dsh-plug
 | 内容 | 位置 |
 |---|---|
 | owner / repo / branch | `~/.dsh/flomo.json`（无秘密） |
-| PAT | DSH 凭据中心的 `FLOMO_GITHUB_TOKEN` |
-| 密码（**可选**） | DSH 凭据中心的 `FLOMO_PASSWORD` |
+| PAT | DSH 凭据中心的 `FLOMO_GITHUB_TOKEN` —— **由面板自己写入**，不需要任何命令行 |
+
+（面板的 `configure` 动作会调用凭据服务的 `set(FLOMO_GITHUB_TOKEN, …)`，所以
+"填一次表单"就是完整的配置流程。）
 
 **密码默认不保存。** 面板里解锁后，密钥只存在于 host 内存中，DSH 重启后需要重新解锁 ——
-这是更安全的默认值。如果你希望 agent 工具在你没解锁时也能读写（比如定时任务），
-再设置 `FLOMO_PASSWORD`：
+这是更安全的默认值。
 
-```
-dsh credentials set FLOMO_PASSWORD
-```
+> **`FLOMO_PASSWORD`（可选，用于无人值守解锁）目前没有设置入口。**
+> 插件只**读**这个凭据、从不写；`dsh` CLI 也**没有** `credentials` 子命令
+> —— 它的用法是 `dsh [--profile] <name>`，而 `desktop` profile 明确报错
+> "managed exclusively by the Electron application"。所以这一项只能靠 DSH 自己的
+> 凭据管理界面（如果有）来设，**我没找到**。
+> 想让 agent 工具在你没解锁时也能读写，目前需要先手动解锁一次。
 
 ### Agent 工具
 
