@@ -36,14 +36,64 @@ function storageFor(remember: boolean): Storage | null {
 }
 
 /**
+ * Read a key, tolerating a storage that refuses.
+ *
+ * The guard has to wrap the operation and not just the property access: a
+ * locked-down iframe throws from `getItem`, and an unguarded throw here happens
+ * inside a `useState` initializer, so it takes the whole app down rather than
+ * merely losing a setting.
+ * @param storage - the area to read, or `null`.
+ * @param key - the key to read.
+ * @returns the stored value, or `null`.
+ */
+function read(storage: Storage | null, key: string): string | null {
+  try {
+    return storage?.getItem(key) ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Write a key, tolerating a storage that refuses.
+ * @param storage - the area to write, or `null`.
+ * @param key - the key to write.
+ * @param value - the value to store.
+ */
+function write(storage: Storage | null, key: string, value: string): void {
+  try {
+    storage?.setItem(key, value)
+  } catch {
+    // Best effort: failing to *remember* a token must never fail the action that
+    // is trying to use it.
+  }
+}
+
+/**
+ * Remove a key, tolerating a storage that refuses.
+ * @param storage - the area to clear, or `null`.
+ * @param key - the key to remove.
+ */
+function remove(storage: Storage | null, key: string): void {
+  try {
+    storage?.removeItem(key)
+  } catch {
+    // Best effort by design.
+  }
+}
+
+/**
  * Read the stored config.
+ *
+ * The area a config is found in decides `remember`, not the field inside it: the
+ * location is what actually determines persistence, so it is the fact and the
+ * field is redundant.
  * @returns the config, or `null` when absent or malformed.
  */
 export function loadConfig(): WebConfig | null {
   for (const remember of [true, false]) {
-    const storage = storageFor(remember)
-    const raw = storage?.getItem(STORAGE_KEY)
-    if (!raw) continue
+    const raw = read(storageFor(remember), STORAGE_KEY)
+    if (raw === null || raw === '') continue
     try {
       const parsed = JSON.parse(raw) as Partial<WebConfig>
       if (
@@ -77,12 +127,11 @@ export function loadConfig(): WebConfig | null {
  */
 export function saveConfig(config: WebConfig): void {
   clearConfig()
-  const storage = storageFor(config.remember)
-  storage?.setItem(STORAGE_KEY, JSON.stringify(config))
+  write(storageFor(config.remember), STORAGE_KEY, JSON.stringify(config))
 }
 
 /** Remove every stored copy of the config. */
 export function clearConfig(): void {
-  storageFor(true)?.removeItem(STORAGE_KEY)
-  storageFor(false)?.removeItem(STORAGE_KEY)
+  remove(storageFor(true), STORAGE_KEY)
+  remove(storageFor(false), STORAGE_KEY)
 }
