@@ -81,6 +81,62 @@ export function resolveShortcut(event: ShortcutEvent): ShortcutAction | null {
 }
 
 /**
+ * The part of a window this module needs.
+ *
+ * Narrower than `Window` on purpose: a test can supply one, and the narrowness
+ * documents that nothing here reads anything else off the global.
+ */
+export interface ShortcutTarget {
+  addEventListener(type: 'keydown', listener: (event: KeyboardEvent) => void): void
+  removeEventListener(type: 'keydown', listener: (event: KeyboardEvent) => void): void
+}
+
+/**
+ * Build the keydown listener.
+ *
+ * Exported so the wiring can be exercised without a renderer. The interesting
+ * behaviour is in here — which keystrokes are swallowed and which are passed
+ * through — and it used to live inside an effect, where nothing could reach it.
+ * @param handler - receives every recognised action.
+ * @returns the listener.
+ */
+export function createKeydownHandler(
+  handler: (action: ShortcutAction) => void,
+): (event: KeyboardEvent) => void {
+  return (event) => {
+    const action = resolveShortcut({
+      key: event.key,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      altKey: event.altKey,
+      target: event.target,
+    })
+    if (action === null) return
+    // Only once the key is known to be ours, so an unrecognised keystroke is
+    // never swallowed.
+    event.preventDefault()
+    handler(action)
+  }
+}
+
+/**
+ * Attach the shortcuts to a target.
+ * @param handler - receives every recognised action.
+ * @param target - where to listen; the window in practice.
+ * @returns a function that detaches the same listener.
+ */
+export function bindShortcuts(
+  handler: (action: ShortcutAction) => void,
+  target: ShortcutTarget,
+): () => void {
+  const onKeyDown = createKeydownHandler(handler)
+  target.addEventListener('keydown', onKeyDown)
+  // The same function reference, which is the whole reason it is held here: a
+  // listener removed by a freshly built equivalent is not removed at all.
+  return () => target.removeEventListener('keydown', onKeyDown)
+}
+
+/**
  * Bind the shortcuts to the window for as long as the component is mounted.
  *
  * A no-op without a DOM, so the component tree stays renderable on a server.
@@ -92,24 +148,7 @@ export function useShortcuts(
   enabled = true,
 ): void {
   useEffect(() => {
-    if (!enabled || typeof window === 'undefined') return
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      const action = resolveShortcut({
-        key: event.key,
-        metaKey: event.metaKey,
-        ctrlKey: event.ctrlKey,
-        altKey: event.altKey,
-        target: event.target,
-      })
-      if (action === null) return
-      // Only once the key is known to be ours, so an unrecognised keystroke is
-      // never swallowed.
-      event.preventDefault()
-      handler(action)
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    if (!enabled || typeof window === 'undefined') return undefined
+    return bindShortcuts(handler, window)
   }, [handler, enabled])
 }

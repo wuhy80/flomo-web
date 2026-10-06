@@ -39,8 +39,14 @@ export { useFlomoSession } from './useFlomoSession.ts'
 export { describeError } from './session.ts'
 export type { FlomoSession, SessionSnapshot, SessionStatus } from './session.ts'
 
-export { isTypingTarget, resolveShortcut, useShortcuts } from './shortcuts.ts'
-export type { ShortcutAction, ShortcutEvent } from './shortcuts.ts'
+export {
+  bindShortcuts,
+  createKeydownHandler,
+  isTypingTarget,
+  resolveShortcut,
+  useShortcuts,
+} from './shortcuts.ts'
+export type { ShortcutAction, ShortcutEvent, ShortcutTarget } from './shortcuts.ts'
 
 export { sameView, showsComposer, viewTitle } from './views.ts'
 export type { FlomoView } from './views.ts'

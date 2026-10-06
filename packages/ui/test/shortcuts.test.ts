@@ -9,8 +9,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { isTypingTarget, resolveShortcut } from '../src/shortcuts.ts'
-import type { ShortcutEvent } from '../src/shortcuts.ts'
+import { bindShortcuts, createKeydownHandler, isTypingTarget, resolveShortcut } from '../src/shortcuts.ts'
+import type { ShortcutEvent, ShortcutTarget } from '../src/shortcuts.ts'
 
 /**
  * Build a keystroke.
@@ -92,5 +92,137 @@ describe('resolveShortcut', () => {
     // Cancelling an edit is a per-field concern the field already handles; a
     // global binding would fire on top of it.
     assert.equal(resolveShortcut(key('Escape')), null)
+  })
+})
+
+/**
+ * Build a keyboard event as the listener would receive it.
+ * @param key - the key value.
+ * @param overrides - fields to override.
+ * @returns the event and whether it was defaulted.
+ */
+function keyboardEvent(
+  key: string,
+  overrides: Partial<{ metaKey: boolean; ctrlKey: boolean; altKey: boolean; target: EventTarget | null }> = {},
+): { event: KeyboardEvent; defaulted: () => boolean } {
+  let defaulted = false
+  const event = {
+    key,
+    metaKey: overrides.metaKey ?? false,
+    ctrlKey: overrides.ctrlKey ?? false,
+    altKey: overrides.altKey ?? false,
+    target: overrides.target ?? null,
+    preventDefault: () => {
+      defaulted = true
+    },
+  }
+  return { event: event as unknown as KeyboardEvent, defaulted: () => defaulted }
+}
+
+describe('keydown listener', () => {
+  // This half used to live inside a useEffect, where nothing could reach it — so
+  // the rules about what gets swallowed were untested by construction.
+
+  it('acts on a recognised key and stops the browser seeing it', () => {
+    const seen: unknown[] = []
+    const handler = createKeydownHandler((action) => seen.push(action))
+    const { event, defaulted } = keyboardEvent('/')
+
+    handler(event)
+
+    assert.deepEqual(seen, [{ kind: 'search' }])
+    assert.equal(defaulted(), true, 'a key we act on must not also reach the page')
+  })
+
+  it('leaves an unrecognised key entirely alone', () => {
+    const seen: unknown[] = []
+    const handler = createKeydownHandler((action) => seen.push(action))
+    const { event, defaulted } = keyboardEvent('a')
+
+    handler(event)
+
+    assert.deepEqual(seen, [])
+    // Swallowing keys we do not own would break typing and browser shortcuts.
+    assert.equal(defaulted(), false)
+  })
+
+  it('leaves a key alone when the user is typing', () => {
+    const seen: unknown[] = []
+    const handler = createKeydownHandler((action) => seen.push(action))
+    const { event, defaulted } = keyboardEvent('c', { target: element('INPUT') })
+
+    handler(event)
+
+    assert.deepEqual(seen, [])
+    assert.equal(defaulted(), false)
+  })
+
+  it('leaves a modified key to the browser', () => {
+    for (const modifier of ['metaKey', 'ctrlKey', 'altKey'] as const) {
+      const seen: unknown[] = []
+      const handler = createKeydownHandler((action) => seen.push(action))
+      const { event, defaulted } = keyboardEvent('c', { [modifier]: true })
+
+      handler(event)
+
+      assert.deepEqual(seen, [], `${modifier}+c must not be ours`)
+      assert.equal(defaulted(), false)
+    }
+  })
+})
+
+describe('binding shortcuts', () => {
+  /** A target that records what was attached and detached. */
+  function fakeTarget(): {
+    target: ShortcutTarget
+    fire: (event: KeyboardEvent) => void
+    attached: () => number
+    detached: () => number
+  } {
+    let listener: ((event: KeyboardEvent) => void) | null = null
+    let attached = 0
+    let detached = 0
+    return {
+      target: {
+        addEventListener: (_type, next) => {
+          listener = next
+          attached += 1
+        },
+        removeEventListener: (_type, previous) => {
+          // Identity matters: removing a freshly built equivalent would leave the
+          // original attached forever.
+          if (previous === listener) {
+            listener = null
+            detached += 1
+          }
+        },
+      },
+      fire: (event) => listener?.(event),
+      attached: () => attached,
+      detached: () => detached,
+    }
+  }
+
+  it('routes keystrokes to the handler while bound', () => {
+    const fake = fakeTarget()
+    const seen: unknown[] = []
+    bindShortcuts((action) => seen.push(action), fake.target)
+
+    assert.equal(fake.attached(), 1)
+    fake.fire(keyboardEvent('g').event)
+    assert.deepEqual(seen, [{ kind: 'view', view: 'all' }])
+  })
+
+  it('detaches the very listener it attached', () => {
+    const fake = fakeTarget()
+    const seen: unknown[] = []
+    const detach = bindShortcuts((action) => seen.push(action), fake.target)
+
+    detach()
+    assert.equal(fake.detached(), 1, 'the same reference must come back off')
+
+    // And it really is inert afterwards, rather than merely counted as removed.
+    fake.fire(keyboardEvent('g').event)
+    assert.deepEqual(seen, [])
   })
 })
