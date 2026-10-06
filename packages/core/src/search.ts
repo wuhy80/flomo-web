@@ -115,11 +115,13 @@ export function pickRandom(
  * fallback to the whole corpus: a vault with nothing old enough returns an
  * empty list, and both callers say so rather than passing off today's notes as
  * a rediscovery.
+ *
+ * The set is stable for a given day, and so is its order — newest first.
  * @param memos - the corpus.
  * @param count - how many notes to surface.
  * @param dayKey - the `YYYY-MM-DD` day to seed from.
  * @param now - reference instant, for the recency exclusion.
- * @returns the chosen memos, possibly empty.
+ * @returns the chosen memos, newest first, possibly empty.
  */
 export function dailyReview(
   memos: readonly Memo[],
@@ -129,7 +131,13 @@ export function dailyReview(
 ): Memo[] {
   const cutoff = new Date(now.getTime() - 2 * 86_400_000).toISOString()
   const eligible = memos.filter((memo) => memo.createdAt < cutoff)
-  return pickRandom(eligible, count, hashSeed(dayKey))
+  const picked = pickRandom(eligible, count, hashSeed(dayKey))
+
+  // Returned newest first. The draw is random, so without this the day headings
+  // the feed adds around these notes appear in an order that reads as a bug —
+  // 10月1日, then 9月27日, then 10月4日.
+  picked.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  return picked
 }
 
 /**

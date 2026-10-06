@@ -335,6 +335,16 @@ describe('queries', () => {
     assert.deepEqual(dailyReview(fresh, 3, '2025-06-10', new Date()), [])
   })
 
+  it('returns the review newest first, so its day headings read in order', () => {
+    const picked = dailyReview(corpus, 3, '2025-06-10', new Date('2025-06-11T00:00:00Z'))
+    assert.equal(picked.length, 3, 'the whole corpus is old enough to be eligible')
+
+    const dates = picked.map((m) => m.createdAt)
+    // The draw is random, so without an explicit sort the feed's day headings
+    // come out as 10月1日, 9月27日, 10月4日 — which reads as a bug.
+    assert.deepEqual(dates, [...dates].sort().reverse(), 'newest first')
+  })
+
   it('counts a streak that ended yesterday as still alive', () => {
     const today = new Date(2025, 5, 10)
     const two = [
