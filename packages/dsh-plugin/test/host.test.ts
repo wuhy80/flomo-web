@@ -9,12 +9,8 @@
  */
 
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { createServer } from 'node:http'
-import type { IncomingMessage, Server, ServerResponse } from 'node:http'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { after, describe, it } from 'node:test'
+import { describe, it, after } from 'node:test'
 
 import { memosToJson, monthOf } from '@flomo/core'
 import type { Memo } from '@flomo/core'
@@ -22,86 +18,15 @@ import { MemoryStore } from '@flomo/core/testing'
 
 import { FlomoHostService, PASSWORD_REF, TOKEN_REF } from '../src/host-service.ts'
 import { API_PREFIX } from '../src/protocol.ts'
-import { makeFlomoRoutes } from '../src/routes.ts'
 import { FLOMO_TOOL_NAMES, buildFlomoTools, identityDefineTool } from '../src/host/tools.ts'
 
-/**
- * A stand-in for the DSH credential store.
- * @returns a credentials face plus its backing map, for assertions.
- */
-function fakeCredentials(): {
-  store: Map<string, string>
-  resolve: (ref: string) => Promise<{ value: string } | undefined>
-  set: (ref: string, value: string) => Promise<void>
-} {
-  const store = new Map<string, string>()
-  return {
-    store,
-    async resolve(ref) {
-      const value = store.get(ref)
-      return value === undefined ? undefined : { value }
-    },
-    async set(ref, value) {
-      store.set(ref, value)
-    },
-  }
-}
+import { cleanupTempDirs, fakeCredentials, makeHost, makeTempDir, serve } from './support.ts'
 
-/**
- * Build a service wired to a fresh in-memory repository.
- * @param dir - directory for the settings file.
- * @param backing - the fake repository to write into.
- * @returns the service, its backing store, and its credential store.
- */
-async function makeHost(
-  dir: string,
-  backing: MemoryStore,
-): Promise<{
-  host: FlomoHostService
-  backing: MemoryStore
-  credentials: ReturnType<typeof fakeCredentials>
-}> {
-  const credentials = fakeCredentials()
-  const host = new FlomoHostService({
-    credentials,
-    configPath: join(dir, 'flomo.json'),
-    createStore: () => backing,
-  })
-  await host.ensureStarted()
-  return { host, backing, credentials }
-}
-
-/**
- * Serve the plugin's routes over a real loopback socket.
- * @param host - the service to expose.
- * @returns the server and its base URL.
- */
-async function serve(host: FlomoHostService): Promise<{ server: Server; base: string }> {
-  const routes = makeFlomoRoutes(host)
-  const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-    const url = req.url ?? ''
-    const route = routes.find((candidate) => url.startsWith(candidate.path))
-    if (!route) {
-      res.writeHead(404).end()
-      return
-    }
-    void Promise.resolve(route.handler(req, res))
-  })
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  if (address === null || typeof address === 'string') throw new Error('no port')
-  return { server, base: `http://127.0.0.1:${address.port}` }
-}
-
-const temporaryDirs: string[] = []
-after(async () => {
-  for (const dir of temporaryDirs) await rm(dir, { recursive: true, force: true })
-})
+after(cleanupTempDirs)
 
 describe('host lifecycle', () => {
   it('walks unconfigured → locked → unlocked, and persists the token', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const { host, credentials } = await makeHost(dir, new MemoryStore())
 
     assert.equal(host.snapshot().status, 'unconfigured')
@@ -125,8 +50,7 @@ describe('host lifecycle', () => {
   })
 
   it('locks and reopens with the recovery code', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const { host } = await makeHost(dir, new MemoryStore())
 
     await host.apply({ kind: 'configure', owner: 'me', repo: 'r', token: 't' })
@@ -142,8 +66,7 @@ describe('host lifecycle', () => {
   })
 
   it('reports a failure through state rather than throwing', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const { host } = await makeHost(dir, new MemoryStore())
 
     const state = await host.apply({ kind: 'unlock', password: 'nope' })
@@ -154,8 +77,7 @@ describe('host lifecycle', () => {
 
 describe('memos and shards', () => {
   it('adds, encrypts, saves and reloads', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const backing = new MemoryStore()
     const { host } = await makeHost(dir, backing)
 
@@ -187,8 +109,7 @@ describe('memos and shards', () => {
 
 describe('import', () => {
   it('merges an exported document, reports what it did, and persists it', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const backing = new MemoryStore()
     const { host } = await makeHost(dir, backing)
 
@@ -234,8 +155,7 @@ describe('import', () => {
   })
 
   it('refuses an unreadable file without touching the vault', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const { host } = await makeHost(dir, new MemoryStore())
     await host.apply({ kind: 'configure', owner: 'me', repo: 'r', token: 't' })
     await host.apply({ kind: 'create', password: 'pw' })
@@ -248,8 +168,7 @@ describe('import', () => {
 
 describe('agent tools', () => {
   it('registers the documented set and refuses while locked', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const { host } = await makeHost(dir, new MemoryStore())
 
     const tools = buildFlomoTools(host, identityDefineTool)
@@ -280,8 +199,7 @@ describe('agent tools', () => {
   })
 
   it('writes through flomo_add and reads back through flomo_search', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const backing = new MemoryStore()
     const { host } = await makeHost(dir, backing)
 
@@ -328,8 +246,7 @@ describe('agent tools', () => {
 
 describe('http surface', () => {
   it('refuses a request with no browser same-origin signal', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const { host } = await makeHost(dir, new MemoryStore())
     const { server, base } = await serve(host)
     try {
@@ -341,8 +258,7 @@ describe('http surface', () => {
   })
 
   it('serves state and applies actions over the wire', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const backing = new MemoryStore()
     const { host } = await makeHost(dir, backing)
     host.setToolsStatus(true, null)
@@ -383,8 +299,7 @@ describe('http surface', () => {
   })
 
   it('records which clients have read the state', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'flomo-host-'))
-    temporaryDirs.push(dir)
+    const dir = await makeTempDir()
     const { host } = await makeHost(dir, new MemoryStore())
     const { server, base } = await serve(host)
     const sameOrigin = { 'sec-fetch-site': 'same-origin' }
