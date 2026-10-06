@@ -42,36 +42,104 @@ function writeJson(res: ServerResponse, status: number, value: unknown): void {
 }
 
 /**
- * Whether an address is this machine.
- * @param address - `socket.remoteAddress`.
- * @returns true for the IPv4 and IPv6 loopback forms.
+ * Whether a dotted quad is in the IPv4 loopback range, 127/8.
+ * @param value - the address.
+ * @returns true when it is loopback.
  */
-function isLoopback(address: string | undefined): boolean {
-  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
+function isIPv4Loopback(value: string): boolean {
+  const parts = value.split('.')
+  return (
+    parts.length === 4 &&
+    parts[0] === '127' &&
+    parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)
+  )
 }
 
 /**
- * The request fence.
+ * Whether a socket address names the loopback range.
  *
- * The socket check carries the authority; the same-origin marker is a tripwire
- * that keeps a header-less local script out. A forged Origin passes the marker,
- * which is exactly why the socket check is not optional.
- * @param req - the incoming request.
- * @returns whether the request may touch the vault.
+ * The whole of 127/8, not just 127.0.0.1: a browser that connects over any other
+ * address in the range is still on this machine, and rejecting it would be a
+ * false negative on the one check that actually carries the authority.
+ * @param address - `socket.remoteAddress`.
+ * @returns true for 127/8, `::1`, and IPv4-mapped 127/8.
  */
-function isTrusted(req: IncomingMessage): boolean {
-  if (!isLoopback(req.socket.remoteAddress)) return false
+function isLoopbackAddress(address: string | undefined): boolean {
+  if (address === undefined) return false
+  const normalized = address.toLowerCase()
+  if (normalized === '::1') return true
+  if (normalized.startsWith('::ffff:')) return isIPv4Loopback(normalized.slice('::ffff:'.length))
+  return isIPv4Loopback(normalized)
+}
 
-  if (req.headers['sec-fetch-site'] === 'same-origin') return true
-  if (req.headers['sec-fetch-site'] === 'cross-site') return false
+/**
+ * Whether a hostname names the loopback authority.
+ * @param hostname - the parsed hostname.
+ * @returns true for localhost, `[::1]` and 127/8.
+ */
+function isLoopbackHostname(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '[::1]') return true
+  return isIPv4Loopback(hostname)
+}
+
+/**
+ * The request fence, and the reason it refuses.
+ *
+ * This deliberately mirrors the Harness's own shared fence
+ * (`dsh-web-shared/host/loopback`), which every other host route family uses. An
+ * earlier version here required `sec-fetch-site: same-origin` and rejected a
+ * request that carried no marker at all — which is *stricter* than the platform
+ * and refused the panel's own traffic with a bare 403.
+ *
+ * The semantics that matter: the socket address is authoritative, the Host header
+ * must also be loopback, and the browser markers may only ever *deny*. A request
+ * with no `Origin` is allowed, because no web page can produce one — the browser
+ * always attaches `sec-fetch-site`, so a page that tries is caught by the
+ * cross-site rule, and a local process was never fenced by headers anyway.
+ *
+ * @param req - the incoming request.
+ * @returns `null` when the request may touch the vault, else why not.
+ */
+function refusalReason(req: IncomingMessage): string | null {
+  const address = req.socket.remoteAddress
+  if (!isLoopbackAddress(address)) return `socket address ${address ?? 'unknown'} is not loopback`
+
+  const host = req.headers.host
+  if (typeof host !== 'string') return 'no Host header'
+  let hostname: string
+  try {
+    hostname = new URL(`http://${host}`).hostname
+  } catch {
+    return `unparseable Host ${host}`
+  }
+  if (!isLoopbackHostname(hostname)) return `Host ${host} is not a loopback authority`
+
+  if (req.headers['sec-fetch-site'] === 'cross-site') return 'sec-fetch-site is cross-site'
 
   const origin = req.headers.origin
-  const host = req.headers.host
-  if (typeof origin !== 'string' || typeof host !== 'string') return false
+  if (origin === undefined) return null
   try {
-    return new URL(origin).host === host
+    return new URL(origin).host === host ? null : `Origin ${origin} does not match Host ${host}`
   } catch {
-    return false
+    return `unparseable Origin ${origin}`
+  }
+}
+
+/**
+ * What the browser actually sent, for the refusal message.
+ *
+ * Echoing the observed headers is the point: the reason says which rule failed,
+ * and this says what to change.
+ * @param req - the incoming request.
+ * @returns the observed values.
+ */
+function observed(req: IncomingMessage): Record<string, string> {
+  return {
+    socket: req.socket.remoteAddress ?? 'unknown',
+    'sec-fetch-site': String(req.headers['sec-fetch-site'] ?? '(absent)'),
+    origin: String(req.headers.origin ?? '(absent)'),
+    host: String(req.headers.host ?? '(absent)'),
+    'user-agent': String(req.headers['user-agent'] ?? '(absent)').slice(0, 120),
   }
 }
 
@@ -106,8 +174,9 @@ export function makeFlomoRoutes(host: FlomoHostService): WebRoute[] {
    * @returns true when the caller may proceed.
    */
   const guard = (req: IncomingMessage, res: ServerResponse): boolean => {
-    if (isTrusted(req)) return true
-    writeJson(res, 403, { ok: false, error: 'forbidden' })
+    const reason = refusalReason(req)
+    if (reason === null) return true
+    writeJson(res, 403, { ok: false, error: 'forbidden', reason, observed: observed(req) })
     return false
   }
 

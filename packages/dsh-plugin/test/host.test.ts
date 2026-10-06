@@ -245,22 +245,34 @@ describe('agent tools', () => {
 })
 
 describe('http surface', () => {
-  it('refuses a request with no browser same-origin signal', async () => {
+  it('refuses a cross-site request, and says why', async () => {
+    // The socket check carries the authority, so it is pinned separately:
+    // everything else here is a header, and a header can be forged by anything
+    // already running locally.
     const dir = await makeTempDir()
     const { host } = await makeHost(dir, new MemoryStore())
     const { server, base } = await serve(host)
     try {
-      const response = await fetch(`${base}${API_PREFIX}/state`)
+      const response = await fetch(`${base}${API_PREFIX}/state`, {
+        headers: { 'sec-fetch-site': 'cross-site' },
+      })
       assert.equal(response.status, 403)
+
+      // A bare 403 is undiagnosable from outside: the panel can only show
+      // "HTTP 403", and neither the user nor a log learns which rule refused.
+      const body = (await response.json()) as { reason?: string; observed?: unknown }
+      assert.ok(body.reason, 'a refusal must say why')
+      assert.ok(body.observed, 'and what the request actually carried')
     } finally {
       server.close()
     }
   })
 
-  it('fences the vault the way the README says it does', async () => {
-    // The truth table of `isTrusted`. Every request here is already from loopback,
-    // so what is pinned is the header half — and it is worth pinning because the
-    // README makes a claim about it, and the claim is subtler than it looks.
+  it('fences the vault the way the Harness fences its own routes', async () => {
+    // The truth table, mirroring `dsh-web-shared/host/loopback`. Pinned because an
+    // earlier version of this file was *stricter* than the platform — it demanded a
+    // browser marker and so refused the panel's own traffic with a bare 403 — and
+    // nothing caught that until it was pointed at a real Harness.
     const dir = await makeTempDir()
     const { host } = await makeHost(dir, new MemoryStore())
     const { server, base } = await serve(host)
@@ -276,30 +288,32 @@ describe('http surface', () => {
     }
 
     try {
-      assert.equal(await ask({}), 403, 'no signal at all is refused')
-      assert.equal(await ask({ 'sec-fetch-site': 'cross-site' }), 403, 'another page is refused')
-      assert.equal(await ask({ 'sec-fetch-site': 'none' }), 403, 'a typed URL is refused')
+      // Every request here is already from a loopback socket with a loopback Host,
+      // so what varies is the browser half.
       assert.equal(
-        await ask({ origin: 'https://evil.example' }),
-        403,
-        'a foreign origin with no marker is refused',
-      )
-      assert.equal(
-        await ask({ origin: `${base}` }),
+        await ask({}),
         200,
-        'a matching origin is the fallback case, and is allowed',
+        'no markers at all is allowed: no page can produce that, and a local process was never fenced by headers',
       )
-
       assert.equal(await ask({ 'sec-fetch-site': 'same-origin' }), 200, 'the panel is allowed')
+      assert.equal(await ask({ 'sec-fetch-site': 'none' }), 200, 'only cross-site is denied')
+      assert.equal(await ask({ origin: base }), 200, 'a matching origin is allowed')
 
-      // Pinned because it is surprising: `same-origin` returns before the origin is
-      // ever compared, so a foreign Origin rides along. That is safe only because
-      // `Sec-Fetch-*` are forbidden header names — a page cannot set this itself —
-      // which is the whole reason the socket check, and not this one, is the fence.
+      assert.equal(await ask({ 'sec-fetch-site': 'cross-site' }), 403, 'another page is refused')
+      assert.equal(await ask({ origin: 'https://evil.example' }), 403, 'a foreign origin is refused')
+
+      // The markers may only ever deny. An earlier version returned early on
+      // `same-origin`, so a foreign Origin rode along with it; comparing whenever an
+      // Origin is present closes that.
       assert.equal(
         await ask({ 'sec-fetch-site': 'same-origin', origin: 'https://evil.example' }),
-        200,
-        'the marker short-circuits the origin comparison, by design',
+        403,
+        'a forged marker does not rescue a foreign origin',
+      )
+      assert.equal(
+        await ask({ 'sec-fetch-site': 'cross-site', origin: base }),
+        403,
+        'and a matching origin does not rescue a cross-site marker',
       )
     } finally {
       server.close()
