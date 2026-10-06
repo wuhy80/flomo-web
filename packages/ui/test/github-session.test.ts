@@ -10,7 +10,8 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 
-import { MemoryCacheArea } from '@flomo/core'
+import { FlomoVault, MemoryCacheArea } from '@flomo/core'
+import { MemoryStore } from '@flomo/core/testing'
 
 import { GitHubVaultSession } from '../src/github-session.ts'
 
@@ -188,8 +189,27 @@ class FakeGitHub {
 
     if (method === 'GET') {
       const content = this.files.get(path)
-      if (content === undefined) return new Response('not found', { status: 404 })
-      return json({ content, sha: this.shas.get(path) ?? 'sha-0', path })
+      if (content !== undefined) {
+        return json({ content, sha: this.shas.get(path) ?? 'sha-0', path })
+      }
+      // A directory answers with an array of entries, which is how the vault finds
+      // its monthly shards. Without this a reopened vault loads zero memos — and
+      // the test that caught it was about something else entirely.
+      const prefix = `${path}/`
+      const children = [...this.files.keys()].filter(
+        (key) => key.startsWith(prefix) && !key.slice(prefix.length).includes('/'),
+      )
+      if (children.length > 0) {
+        return json(
+          children.map((child) => ({
+            type: 'file',
+            name: child.slice(prefix.length),
+            path: child,
+            sha: this.shas.get(child) ?? 'sha-0',
+          })),
+        )
+      }
+      return new Response('not found', { status: 404 })
     }
 
     if (method === 'PUT') {
@@ -388,6 +408,161 @@ describe('editing through the session', () => {
   it('reports an unreadable import instead of throwing', async () => {
     const { session } = await unlockedSession()
     await assert.rejects(() => session.importJson('not json'))
+    session.dispose()
+  })
+})
+
+describe('locking, unlocking and subscriptions', () => {
+  it('names the repository it is connected to', async () => {
+    const { session } = await unlockedSession()
+    assert.equal(session.slug, 'me/flomo-data')
+    session.dispose()
+  })
+
+  it('notifies subscribers until they unsubscribe', async () => {
+    const { session } = await unlockedSession()
+    let calls = 0
+    const unsubscribe = session.subscribe(() => {
+      calls += 1
+    })
+
+    session.add('一条')
+    assert.ok(calls > 0, 'a mutation must notify')
+
+    const seen = calls
+    unsubscribe()
+    session.add('又一条')
+    assert.equal(calls, seen, 'an unsubscribed listener must stop hearing about it')
+    session.dispose()
+  })
+
+  it('does not create over an existing vault, and says which form to use', async () => {
+    const { api, session } = await unlockedSession()
+    session.dispose()
+
+    // A second session over the same repository, as another device would be.
+    const second = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+    })
+    liveSessions.push(second)
+    await second.refresh()
+    assert.equal(second.getSnapshot().status, 'locked', 'the vault is visible upstream')
+
+    // Force the create form, as a stale probe would.
+    const third = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+    })
+    liveSessions.push(third)
+    await third.create('pw')
+
+    // The state must end up describing reality. The create form is chosen from
+    // `status === 'empty'`, and the gate only offers a way to the unlock form when
+    // it believes a vault exists — so leaving this as 'empty' strands the user on a
+    // form whose own error message tells them to use the other one.
+    assert.equal(third.getSnapshot().status, 'locked', 'a failed create must re-probe')
+    assert.match(third.getSnapshot().error ?? '', /已存在/)
+    assert.ok(api.files.has('vault.json'))
+  })
+
+  it('unlocks with the right password and loads the notes', async () => {
+    const { session } = await unlockedSession()
+    session.add('要读回来的一条')
+    await session.save()
+    session.dispose()
+
+    const reopened = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+    })
+    liveSessions.push(reopened)
+    await reopened.refresh()
+    assert.equal(reopened.getSnapshot().status, 'locked')
+
+    await reopened.unlock('pw')
+
+    assert.equal(reopened.getSnapshot().status, 'unlocked')
+    assert.equal(reopened.getSnapshot().error, null)
+    assert.equal(reopened.getSnapshot().memos.length, 1)
+    assert.equal(reopened.getSnapshot().memos[0]?.content, '要读回来的一条')
+  })
+
+  it('stays locked and says so when the password is wrong', async () => {
+    const { session } = await unlockedSession()
+    session.dispose()
+
+    const reopened = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+    })
+    liveSessions.push(reopened)
+
+    await reopened.unlock('not the password')
+
+    assert.equal(reopened.getSnapshot().status, 'locked', 'a wrong password is not an error state')
+    assert.equal(reopened.getSnapshot().error, '密码不正确。')
+    assert.deepEqual(reopened.getSnapshot().memos, [], 'and nothing was decrypted')
+  })
+
+  it('unlocks with the recovery code when the password is gone', async () => {
+    const { session } = await unlockedSession()
+    const code = session.getSnapshot().recoveryCode
+    assert.ok(code, 'creating a vault must produce a recovery code')
+    session.dispose()
+
+    const reopened = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+    })
+    liveSessions.push(reopened)
+
+    await reopened.unlockWithRecovery(code)
+
+    assert.equal(reopened.getSnapshot().status, 'unlocked')
+    assert.equal(reopened.getSnapshot().error, null)
+  })
+
+  it('reports a recovery code that does not match this vault', async () => {
+    const { session } = await unlockedSession()
+    session.dispose()
+
+    const reopened = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+    })
+    liveSessions.push(reopened)
+
+    // A different vault's code is a valid code; it simply does not open this one.
+    const other = new MemoryStore()
+    const { recoveryCode } = await FlomoVault.create(other, 'other')
+    await reopened.unlockWithRecovery(recoveryCode)
+
+    assert.equal(reopened.getSnapshot().status, 'locked')
+    assert.equal(reopened.getSnapshot().error, '恢复码与该保险库不匹配。')
+  })
+
+  it('clears the recovery code once it has been acknowledged', async () => {
+    const { session } = await unlockedSession()
+    assert.ok(session.getSnapshot().recoveryCode, 'shown once, right after creation')
+
+    session.dismissRecovery()
+
+    // It is shown once and never stored, so acknowledging it must remove it from the
+    // read model rather than leave it on screen.
+    assert.equal(session.getSnapshot().recoveryCode, null)
     session.dispose()
   })
 })

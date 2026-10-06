@@ -172,7 +172,14 @@ export class GitHubVaultSession implements FlomoSession {
       this.syncFromVault({ status: 'unlocked', error: null, recoveryCode })
     } catch (error) {
       this.vault = null
-      this.update({ status: 'empty', error: describeError(error) })
+      // Re-probe rather than assuming `empty`. The likeliest failure is that a vault
+      // already exists — another device created it between the probe and the click —
+      // and the create form is chosen from `status === 'empty'` while the gate only
+      // offers a way through to the unlock form when it believes a vault exists.
+      // Assuming `empty` therefore strands the user on a form whose own error
+      // message tells them to use the other one.
+      await this.refresh()
+      this.update({ error: describeError(error) })
     }
   }
 
