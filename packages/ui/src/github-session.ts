@@ -12,6 +12,7 @@
  */
 
 import {
+  CachingTextStore,
   FlomoVault,
   GitHubContentsStore,
   describeImportResult,
@@ -19,7 +20,7 @@ import {
   tagStats,
   WrongPasswordError,
 } from '@flomo/core'
-import type { Memo, TagStat } from '@flomo/core'
+import type { CacheArea, Memo, TagStat, TextStore } from '@flomo/core'
 
 import { describeError } from './session.ts'
 import type { FlomoSession, SessionSnapshot } from './session.ts'
@@ -32,6 +33,13 @@ export interface GitHubSessionOptions {
   branch?: string
   /** Debounce window for auto-save, in milliseconds. */
   autoSaveMs?: number
+  /**
+   * Where to keep a copy of the ciphertext for offline reading.
+   *
+   * Omit to run online-only. What gets cached is never plaintext, so supplying
+   * this costs nothing in secrecy.
+   */
+  cache?: CacheArea
 }
 
 /** Default debounce: long enough to batch a burst of typing, short enough to feel safe. */
@@ -41,9 +49,11 @@ export const DEFAULT_AUTOSAVE_MS = 1500
  * A {@link FlomoSession} backed by a git repository.
  */
 export class GitHubVaultSession implements FlomoSession {
-  private readonly store: GitHubContentsStore
+  private readonly store: TextStore
+  private readonly caching: CachingTextStore | null
   private readonly autoSaveMs: number
   private readonly listeners = new Set<() => void>()
+  private readonly repository: string
 
   private vault: FlomoVault | null = null
   private snapshot: SessionSnapshot = {
@@ -52,6 +62,7 @@ export class GitHubVaultSession implements FlomoSession {
     tags: [],
     error: null,
     saving: false,
+    offline: false,
     lastSavedAt: null,
     recoveryCode: null,
   }
@@ -59,21 +70,47 @@ export class GitHubVaultSession implements FlomoSession {
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 
   /**
-   * @param options - repository coordinates, token and debounce window.
+   * @param options - repository coordinates, token, debounce window and cache.
    */
   constructor(options: GitHubSessionOptions) {
-    this.store = new GitHubContentsStore({
+    this.repository = `${options.owner}/${options.repo}`
+
+    const inner = new GitHubContentsStore({
       token: options.token,
       owner: options.owner,
       repo: options.repo,
       ...(options.branch ? { branch: options.branch } : {}),
     })
+
+    this.caching = options.cache
+      ? new CachingTextStore({
+          inner,
+          area: options.cache,
+          // Per repository and branch, so switching vaults never surfaces the
+          // previous one's blobs.
+          prefix: `flomo-sim:cache:v1:${options.owner}/${options.repo}@${options.branch ?? 'default'}`,
+          onMode: (offline) => this.update({ offline }),
+        })
+      : null
+
+    this.store = this.caching ?? inner
     this.autoSaveMs = options.autoSaveMs ?? DEFAULT_AUTOSAVE_MS
   }
 
   /** @returns the repository slug, for display in the UI. */
   get slug(): string {
-    return this.store.slug
+    return this.repository
+  }
+
+  /**
+   * Drop the cached ciphertext for this repository.
+   *
+   * Used when the user disconnects a device: the cache is harmless, but leaving
+   * it behind would be surprising for an action described as clearing local
+   * credentials.
+   */
+  clearCache(): void {
+    this.caching?.clear()
   }
 
   /**

@@ -23,6 +23,9 @@ const INITIAL: SessionSnapshot = {
   tags: [],
   error: null,
   saving: false,
+  // The host process owns the network and the ciphertext, so the panel never
+  // has an offline mode of its own to report.
+  offline: false,
   lastSavedAt: null,
   recoveryCode: null,
 }

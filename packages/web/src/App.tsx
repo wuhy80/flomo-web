@@ -7,7 +7,7 @@
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { FlomoApp, GitHubVaultSession } from '@flomo/ui'
+import { FlomoApp, GitHubVaultSession, browserCacheArea } from '@flomo/ui'
 
 import { clearConfig, loadConfig, saveConfig } from './config.ts'
 import type { WebConfig } from './config.ts'
@@ -29,6 +29,8 @@ export function App(): React.ReactElement {
             repo: config.repo,
             token: config.token,
             ...(config.branch ? { branch: config.branch } : {}),
+            // Ciphertext only, so offline reading costs nothing in secrecy.
+            cache: browserCacheArea(),
           })
         : null,
     [config],
@@ -46,10 +48,13 @@ export function App(): React.ReactElement {
   }, [])
 
   const handleDisconnect = useCallback(() => {
+    // Drop the cached ciphertext too: it is harmless, but "clear this device's
+    // credentials" leaving blobs behind would be surprising.
+    session?.clearCache()
     clearConfig()
     setConfig(null)
     setEditing(false)
-  }, [])
+  }, [session])
 
   if (!session || editing) {
     return (

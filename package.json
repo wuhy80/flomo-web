@@ -11,7 +11,7 @@
     "preview": "pnpm --filter @flomo/web preview",
     "build:plugin": "pnpm --filter dsh-flomo build",
     "watch:plugin": "pnpm --filter dsh-flomo watch",
-    "test": "node --test packages/core/test/core.test.ts packages/ui/test/shortcuts.test.ts packages/dsh-plugin/test/host.test.ts packages/dsh-plugin/test/artifacts.test.ts packages/web/test/app.test.ts",
+    "test": "node --test packages/core/test/core.test.ts packages/core/test/cache.test.ts packages/ui/test/shortcuts.test.ts packages/ui/test/github-session.test.ts packages/dsh-plugin/test/host.test.ts packages/dsh-plugin/test/artifacts.test.ts packages/web/test/app.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

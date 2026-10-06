@@ -27,6 +27,9 @@ export {
 } from './crypto.ts'
 export type { KdfParams, NewVault, Sealed } from './crypto.ts'
 
+export { CachingTextStore, MemoryCacheArea } from './cache.ts'
+export type { CacheArea, CachingStoreOptions } from './cache.ts'
+
 export {
   GitHubConflictError,
   GitHubContentsStore,

@@ -88,6 +88,15 @@ export class MemoryStore implements TextStore {
     return this.files.get(path)?.text
   }
 
+  /**
+   * Delete a file, standing in for someone removing it upstream.
+   * @param path - repository path.
+   * @returns whether anything was removed.
+   */
+  remove(path: string): boolean {
+    return this.files.delete(path)
+  }
+
   /** @returns every stored path, sorted. */
   paths(): string[] {
     return [...this.files.keys()].sort()

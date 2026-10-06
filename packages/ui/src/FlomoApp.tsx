@@ -328,6 +328,14 @@ export function FlomoApp({
             ) : null}
           </div>
 
+          {snapshot.offline ? (
+            <div className="fl-notice">
+              <span>
+                离线中：下面显示的是本机缓存的密文副本。改动要等联网后才会写进仓库。
+              </span>
+            </div>
+          ) : null}
+
           {snapshot.error ? (
             <div className="fl-notice fl-notice-error">
               <span>{snapshot.error}</span>

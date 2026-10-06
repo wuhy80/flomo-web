@@ -251,6 +251,7 @@ function fakeSession(overrides: Partial<SessionSnapshot> = {}): {
     tags: [],
     error: null,
     saving: false,
+    offline: false,
     lastSavedAt: null,
     recoveryCode: null,
     ...overrides,
@@ -452,6 +453,24 @@ describe('built client bundle', () => {
     assert.match(html, /\[\[心流\]\]/, 'the link keeps its markup in the body')
     assert.match(html, /fl-shortcut-hint/, 'the shortcuts are discoverable')
     assert.match(html, /搜索…（按 \/ 聚焦）/, 'the search box says how to reach it')
+  })
+
+  it('says so when the vault is being read from the local cache', async () => {
+    const { registrations } = await loadClientBundle()
+    const page = registrations.find((r) => r.name === 'main')
+    assert.ok(page)
+    const Panel = page.component as React.ComponentType<{ session: unknown }>
+
+    const { session } = fakeSession({
+      status: 'unlocked',
+      offline: true,
+      memos: [memo({ content: '离线也能读到这一条 #缓存', tags: ['缓存'] })],
+    })
+
+    const html = renderToString(React.createElement(Panel, { session }))
+    assert.match(html, /离线中/, 'the user must know the copy is local')
+    assert.match(html, /改动要等联网后才会写进仓库/)
+    assert.match(html, /离线也能读到这一条/, 'and the cached content still renders')
   })
 
   it('renders the password gate when the vault is locked', async () => {

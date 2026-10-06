@@ -42,6 +42,12 @@ export interface SessionSnapshot {
   error: string | null
   /** True while a save is in flight. */
   saving: boolean
+  /**
+   * True when the last read had to be served from the local ciphertext cache
+   * because the network was unreachable. Writes are never queued, so an offline
+   * session can read but not save.
+   */
+  offline: boolean
   /** ISO timestamp of the last successful save. */
   lastSavedAt: string | null
   /**
