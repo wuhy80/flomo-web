@@ -92,7 +92,7 @@ export function Feed({
   const sections = groupByDay ? group(memos) : [{ key: 'flat', label: '', memos: [...memos] }]
 
   return (
-    <div className="fl-feed">
+    <div>
       {sections.map((section) => (
         <section key={section.key}>
           {section.label ? <div className="fl-day">{section.label}</div> : null}
