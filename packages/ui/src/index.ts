@@ -20,7 +20,7 @@ export { downloadText } from './download.ts'
 export { GitHubVaultSession, DEFAULT_AUTOSAVE_MS } from './github-session.ts'
 export type { GitHubSessionOptions } from './github-session.ts'
 
-export { Heatmap } from './Heatmap.tsx'
+export { Heatmap, heatLevel } from './Heatmap.tsx'
 export type { HeatmapProps } from './Heatmap.tsx'
 
 export { MemoItem } from './MemoItem.tsx'
@@ -28,6 +28,9 @@ export type { MemoItemProps } from './MemoItem.tsx'
 
 export { Sidebar } from './Sidebar.tsx'
 export type { SidebarProps } from './Sidebar.tsx'
+
+export { StatsModal } from './StatsModal.tsx'
+export type { StatsModalProps } from './StatsModal.tsx'
 
 export { FLOMO_CSS, STYLE_ELEMENT_ID, injectFlomoStyles } from './styles.ts'
 

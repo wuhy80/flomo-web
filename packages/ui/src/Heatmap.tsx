@@ -16,6 +16,8 @@ export interface HeatmapProps {
   weeks?: number
   /** Reference instant, for tests. */
   today?: Date
+  /** Navigates to a day's notes. Provided, past cells become clickable. */
+  onSelectDay?: (day: string) => void
 }
 
 /** Square size, in pixels; must match the stylesheet. */
@@ -29,10 +31,14 @@ const PITCH = CELL + GAP
 
 /**
  * Bucket a count into one of five shading levels.
+ *
+ * Shared with the stats modal, whose month cards shade their cells by the same
+ * scale — two calendars disagreeing about what "a busy day" looks like would
+ * read as two different apps.
  * @param count - memos written that day.
  * @returns 0 through 4.
  */
-function level(count: number): number {
+export function heatLevel(count: number): number {
   if (count <= 0) return 0
   if (count === 1) return 1
   if (count <= 3) return 2
@@ -45,7 +51,12 @@ function level(count: number): number {
  * @param props - the corpus and the window size.
  * @returns the heatmap element.
  */
-export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps): React.ReactElement {
+export function Heatmap({
+  memos,
+  weeks = 26,
+  today = new Date(),
+  onSelectDay,
+}: HeatmapProps): React.ReactElement {
   const columns = useMemo(() => {
     const counts = heatmap(memos)
 
@@ -110,15 +121,33 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
       <div className="fl-heatmap" role="img" aria-label="记录热力图">
         {columns.map((column, index) => (
           <div className="fl-heatmap-week" key={column[0]?.key ?? index}>
-            {column.map((cell) => (
-              <div
-                key={cell.key}
-                className="fl-heatmap-cell"
-                data-level={cell.future ? 0 : level(cell.count)}
-                style={cell.future ? { opacity: 0.35 } : undefined}
-                title={`${absoluteDayLabel(cell.key)} · ${cell.count} 条`}
-              />
-            ))}
+            {column.map((cell) => {
+              const tip = `${absoluteDayLabel(cell.key)} · ${cell.count} 条`
+              if (onSelectDay !== undefined && !cell.future) {
+                // A day cell is a doorway: flomo opens that day's notes when a
+                // square is clicked, empty days included.
+                return (
+                  <button
+                    key={cell.key}
+                    type="button"
+                    className="fl-heatmap-cell"
+                    data-level={heatLevel(cell.count)}
+                    title={tip}
+                    aria-label={`${tip}，查看当天笔记`}
+                    onClick={() => onSelectDay(cell.key)}
+                  />
+                )
+              }
+              return (
+                <div
+                  key={cell.key}
+                  className="fl-heatmap-cell"
+                  data-level={cell.future ? 0 : heatLevel(cell.count)}
+                  style={cell.future ? { opacity: 0.35 } : undefined}
+                  title={tip}
+                />
+              )
+            })}
           </div>
         ))}
         <span className="fl-visually-hidden">{`每格 ${CELL} 像素`}</span>

@@ -15,6 +15,7 @@ import {
   backlinks,
   corpusStats,
   dailyReview,
+  dayOf,
   exportFilename,
   memosToJson,
   memosToMarkdown,
@@ -138,6 +139,10 @@ export function FlomoApp({
 
   const visible = useMemo(() => {
     if (view.kind === 'tag') return searchMemos(snapshot.memos, { tag: view.tag, text: query })
+    if (view.kind === 'day') {
+      const ofDay = snapshot.memos.filter((memo) => dayOf(memo.createdAt) === view.day)
+      return searchMemos(ofDay, { text: query })
+    }
     if (view.kind === 'all') return searchMemos(snapshot.memos, { text: query })
     return []
   }, [snapshot.memos, view, query])
@@ -379,7 +384,10 @@ export function FlomoApp({
                 </div>
               ) : null}
             </div>
-            {view.kind === 'all' || view.kind === 'tag' || view.kind === 'link' ? (
+            {view.kind === 'all' ||
+            view.kind === 'tag' ||
+            view.kind === 'day' ||
+            view.kind === 'link' ? (
               <div className="fl-search">
                 <input
                   ref={searchInput}
@@ -426,22 +434,24 @@ export function FlomoApp({
               arranges them — they describe the whole corpus, so above the feed they
               only pushed the notes down the page. What is left here is the one
               number that belongs to this list rather than to the corpus. */}
-          {view.kind === 'all' ? (
+          {view.kind === 'all' || view.kind === 'day' ? (
             <div className="fl-stats-strip fl-list-stats">
               <span>
-                共 <strong>{stats.memos}</strong> 条
+                共 <strong>{visible.length}</strong> 条
               </span>
               <span>{snapshot.saving ? '保存中…' : savedLabel(snapshot.lastSavedAt)}</span>
             </div>
           ) : null}
 
-          {view.kind === 'all' || view.kind === 'tag' ? (
+          {view.kind === 'all' || view.kind === 'tag' || view.kind === 'day' ? (
             <Feed
               memos={visible}
               emptyText={
                 searching || view.kind === 'tag'
                   ? '没有匹配的记录。'
-                  : '还没有记录，写下第一条吧。'
+                  : view.kind === 'day'
+                    ? '这一天还没有记录。'
+                    : '还没有记录，写下第一条吧。'
               }
               {...memoHandlers}
             />

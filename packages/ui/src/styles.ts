@@ -831,9 +831,15 @@ export const FLOMO_CSS = `
 .fl-heatmap-cell {
   width: 16px;
   height: 16px;
+  border: 0;
+  padding: 0;
   border-radius: 4px;
   background: var(--flomo-border);
 }
+
+/* Past days are doorways into that day's notes, so they take the pointer. */
+button.fl-heatmap-cell { cursor: pointer; }
+button.fl-heatmap-cell:hover { filter: brightness(0.9); }
 
 .fl-heatmap-cell[data-level="1"] { background: #c6e7d5; }
 .fl-heatmap-cell[data-level="2"] { background: #8ed3ae; }
@@ -860,27 +866,273 @@ export const FLOMO_CSS = `
   color: var(--flomo-text-faint);
 }
 
-/* The corpus numbers above the calendar, stacked the way flomo stacks them: the
-   figure large and the label small beneath it. */
+/* The corpus numbers above the calendar, laid out the way flomo lays them out:
+   three large quiet grey figures spread across the column, labels beneath, and
+   every one of them a button into the stats dialog. */
 .fl-corpus-stats {
   display: flex;
-  gap: 18px;
-  padding: 0 8px 14px;
-  font-size: 11.5px;
-  color: var(--flomo-text-faint);
+  justify-content: space-between;
+  padding: 0 10px 16px;
 }
 
-.fl-corpus-stats strong {
-  display: block;
-  font-size: 20px;
+.fl-stat-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fl-stat-button strong {
+  font-size: 26px;
   font-weight: 600;
-  line-height: 1.25;
-  color: var(--flomo-text);
+  line-height: 1.15;
+  color: var(--flomo-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-stat-button:hover strong { color: var(--flomo-text); }
+
+.fl-stat-button span {
+  font-size: 12px;
+  color: var(--flomo-text-faint);
 }
 
 /* The calendar lives in the column, so it is inset to line up with the rows
    above and below it rather than running to the edges. */
 .fl-sidebar .fl-heatmap-wrap { padding: 0 8px 14px; }
+
+/* ── stats modal ─────────────────────────────────────────────────────── */
+
+.fl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.fl-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(980px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  border-radius: 14px;
+  background: var(--flomo-bg);
+}
+
+.fl-modal-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.fl-modal-title { font-size: 16px; font-weight: 600; }
+
+.fl-modal-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--flomo-text-soft);
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fl-modal-close:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+
+/* The 月/年 pill: a quiet grey track with the active side lifted onto white. */
+.fl-seg {
+  align-self: center;
+  display: flex;
+  margin-bottom: 18px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--flomo-input-bg);
+}
+
+.fl-seg-option {
+  min-width: 88px;
+  padding: 5px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--flomo-text-soft);
+  cursor: pointer;
+}
+
+.fl-seg-option[data-active="true"] {
+  background: var(--flomo-bg);
+  color: var(--flomo-text);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.fl-year-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 16px;
+  color: var(--flomo-text);
+}
+
+.fl-year-select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fl-year-pick span { font-size: 12px; color: var(--flomo-text-faint); }
+
+.fl-month-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.fl-month-card {
+  padding: 18px 18px 14px;
+  border: 1px solid var(--flomo-border);
+  border-radius: 12px;
+}
+
+.fl-month-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fl-month-title { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 1px; }
+
+.fl-card-export {
+  display: flex;
+  border: 0;
+  background: transparent;
+  color: var(--flomo-text-faint);
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fl-card-export:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+
+.fl-card-export:disabled { opacity: 0.35; cursor: default; }
+.fl-card-export:disabled:hover { background: transparent; color: var(--flomo-text-faint); }
+
+.fl-month-stats {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: var(--flomo-text-faint);
+}
+
+.fl-month-stats strong { color: var(--flomo-text-soft); font-weight: 600; }
+
+.fl-cal-weekdays,
+.fl-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px 4px; }
+
+.fl-cal-weekdays { margin-bottom: 2px; }
+
+.fl-cal-weekdays span {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--flomo-text-faint);
+}
+
+.fl-cal-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.fl-cal-num {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--flomo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-cal-cell {
+  width: 100%;
+  height: 26px;
+  border: 0;
+  padding: 0;
+  border-radius: 4px;
+  background: var(--flomo-border);
+}
+
+button.fl-cal-cell { cursor: pointer; }
+button.fl-cal-cell:hover { filter: brightness(0.9); }
+
+/* The month cards shade by the same scale as the sidebar calendar. */
+.fl-cal-cell[data-level="1"] { background: #c6e7d5; }
+.fl-cal-cell[data-level="2"] { background: #8ed3ae; }
+.fl-cal-cell[data-level="3"] { background: #47b881; }
+.fl-cal-cell[data-level="4"] { background: var(--flomo-green); }
+
+.fl-year-list { display: flex; flex-direction: column; gap: 12px; }
+
+.fl-year-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid var(--flomo-border);
+  border-radius: 12px;
+  background: var(--flomo-bg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fl-year-card:hover { background: var(--flomo-hover); }
+
+.fl-year-name { min-width: 60px; font-size: 20px; font-weight: 600; }
+
+.fl-year-stats { flex: 1; font-size: 12.5px; color: var(--flomo-text-faint); }
+
+.fl-year-stats strong { color: var(--flomo-text-soft); font-weight: 600; font-size: 15px; }
+
+.fl-year-bars { display: flex; align-items: flex-end; gap: 3px; height: 28px; }
+
+.fl-year-bar {
+  width: 8px;
+  border-radius: 2px;
+  background: var(--flomo-border);
+}
+
+.fl-year-bar[data-level="1"] { background: #c6e7d5; }
+.fl-year-bar[data-level="2"] { background: #8ed3ae; }
+.fl-year-bar[data-level="3"] { background: #47b881; }
+.fl-year-bar[data-level="4"] { background: var(--flomo-green); }
 
 /* ── misc ────────────────────────────────────────────────────────────── */
 

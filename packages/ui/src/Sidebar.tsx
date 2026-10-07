@@ -5,11 +5,13 @@
  */
 
 import type * as React from 'react'
+import { useState } from 'react'
 
 import { corpusStats } from '@flomo/core'
 import type { Memo, TagStat } from '@flomo/core'
 
 import { Heatmap } from './Heatmap.tsx'
+import { StatsModal } from './StatsModal.tsx'
 import { sameView } from './views.ts'
 import type { FlomoView } from './views.ts'
 
@@ -65,6 +67,7 @@ export function Sidebar({
   showSettings = true,
 }: SidebarProps): React.ReactElement {
   const stats = corpusStats(memos, tags.length)
+  const [statsOpen, setStatsOpen] = useState(false)
 
   /**
    * Build the props for one navigation row.
@@ -85,21 +88,28 @@ export function Sidebar({
         {brand}
       </div>
 
-      {/* The headline numbers and the calendar sit at the top of the column, the way
-          flomo arranges them. They describe the whole corpus rather than the list
-          below them, so putting them above the feed only pushed the notes down. */}
+      {/* The headline numbers sit where flomo puts them, styled as flomo styles
+          them: large quiet grey figures with the label beneath, every one a
+          button into the same stats dialog. */}
       <div className="fl-corpus-stats">
-        <span>
-          <strong>{stats.memos}</strong> 笔记
-        </span>
-        <span>
-          <strong>{stats.tags}</strong> 标签
-        </span>
-        <span>
-          <strong>{stats.span}</strong> 天
-        </span>
+        <button type="button" className="fl-stat-button" onClick={() => setStatsOpen(true)}>
+          <strong>{stats.memos}</strong>
+          <span>笔记</span>
+        </button>
+        <button type="button" className="fl-stat-button" onClick={() => setStatsOpen(true)}>
+          <strong>{stats.tags}</strong>
+          <span>标签</span>
+        </button>
+        <button type="button" className="fl-stat-button" onClick={() => setStatsOpen(true)}>
+          <strong>{stats.span}</strong>
+          <span>天</span>
+        </button>
       </div>
-      <Heatmap memos={memos} weeks={SIDEBAR_WEEKS} />
+      <Heatmap
+        memos={memos}
+        weeks={SIDEBAR_WEEKS}
+        onSelectDay={(day) => onSelect({ kind: 'day', day })}
+      />
 
       <button {...rowProps({ kind: 'all' })}>
         <NavLabel icon="▦" text="全部" />
@@ -156,6 +166,17 @@ export function Sidebar({
           <kbd>/</kbd> 搜索 · <kbd>c</kbd> 记录 · <kbd>g</kbd> 全部 · <kbd>r</kbd> 回顾
         </div>
       </div>
+
+      {statsOpen ? (
+        <StatsModal
+          memos={memos}
+          onClose={() => setStatsOpen(false)}
+          onSelectDay={(day) => {
+            setStatsOpen(false)
+            onSelect({ kind: 'day', day })
+          }}
+        />
+      ) : null}
     </nav>
   )
 }

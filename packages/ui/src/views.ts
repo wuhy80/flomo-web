@@ -4,12 +4,16 @@
  * @module @flomo/ui/views
  */
 
+import { absoluteDayLabel } from '@flomo/core'
+
 /** Which panel the main column is showing. */
 export type FlomoView =
   /** The full reverse-chronological feed. */
   | { kind: 'all' }
   /** The feed filtered to one tag. */
   | { kind: 'tag'; tag: string }
+  /** The feed filtered to one calendar day. */
+  | { kind: 'day'; day: string }
   /** The memos a `[[link]]` resolves to. */
   | { kind: 'link'; target: string }
   /** One memo in full, with its outgoing links and its backlinks. */
@@ -30,6 +34,7 @@ export type FlomoView =
 export function sameView(a: FlomoView, b: FlomoView): boolean {
   if (a.kind !== b.kind) return false
   if (a.kind === 'tag' && b.kind === 'tag') return a.tag === b.tag
+  if (a.kind === 'day' && b.kind === 'day') return a.day === b.day
   if (a.kind === 'link' && b.kind === 'link') return a.target === b.target
   if (a.kind === 'focus' && b.kind === 'focus') return a.id === b.id
   return true
@@ -46,6 +51,8 @@ export function viewTitle(view: FlomoView): string {
       return '全部笔记'
     case 'tag':
       return `#${view.tag}`
+    case 'day':
+      return absoluteDayLabel(view.day)
     case 'link':
       return `[[${view.target}]]`
     case 'focus':
@@ -68,5 +75,10 @@ export function viewTitle(view: FlomoView): string {
  * @returns true when the composer belongs on this panel.
  */
 export function showsComposer(view: FlomoView): boolean {
-  return view.kind === 'all' || view.kind === 'tag' || view.kind === 'link'
+  return (
+    view.kind === 'all' ||
+    view.kind === 'tag' ||
+    view.kind === 'day' ||
+    view.kind === 'link'
+  )
 }
