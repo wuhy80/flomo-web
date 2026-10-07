@@ -26,6 +26,8 @@ export interface FeedProps {
   onTagClick: MemoItemProps['onTagClick']
   onLinkClick: MemoItemProps['onLinkClick']
   onOpen: MemoItemProps['onOpen']
+  /** Start composing an annotation referencing the memo. */
+  onAnnotate: MemoItemProps['onAnnotate']
   /** Fetches and decrypts one attached image; absent renders attachments inert. */
   readImage?: MemoItemProps['readImage']
 }
@@ -56,6 +58,7 @@ export function Feed({
   onTagClick,
   onLinkClick,
   onOpen,
+  onAnnotate,
   readImage,
 }: FeedProps): React.ReactElement {
   if (memos.length === 0) {
@@ -74,6 +77,7 @@ export function Feed({
           onTagClick={onTagClick}
           onLinkClick={onLinkClick}
           onOpen={onOpen}
+          onAnnotate={onAnnotate}
           readImage={readImage}
         />
       ))}

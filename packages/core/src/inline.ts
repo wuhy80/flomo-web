@@ -35,6 +35,7 @@ function inlinePattern(): RegExp {
   return new RegExp(
     [
       '\\[\\[([^[\\]\\n]+)\\]\\]',
+      '@\\[([^\\]@\\s]+)\\]',
       '<u>([^<\\n]+)</u>',
       '!\\[([^\\]\\n]*)\\]\\((https?://[^)\\s]+)\\)',
       '\\[([^\\]\\n]+)\\]\\((https?://[^)\\s]+)\\)',
@@ -71,6 +72,8 @@ export interface InlineToken {
     | 'tag'
     /** A `[[wikilink]]` to another note. */
     | 'link'
+    /** An `@[id]` reference to a specific memo (批注/引用). */
+    | 'memoref'
     | 'strong'
     | 'em'
     | 'strike'
@@ -137,13 +140,15 @@ export function tokenizeInline(content: string): InlineToken[] {
     const start = match.index ?? 0
     if (start < cursor) continue
 
-    const [wikilink, underline, imageAlt, imageUrl, mdText, mdUrl, strong, strike, mark, code, emUnder, emStar, url, tag] =
+    const [wikilink, memoref, underline, imageAlt, imageUrl, mdText, mdUrl, strong, strike, mark, code, emUnder, emStar, url, tag] =
       match.slice(1)
 
     let token: InlineToken | null = null
 
     if (wikilink !== undefined) {
       token = { type: 'link', value: wikilink.trim() }
+    } else if (memoref !== undefined) {
+      token = { type: 'memoref', value: memoref }
     } else if (underline !== undefined) {
       token = { type: 'underline', value: underline, ...childrenField(underline) }
     } else if (imageUrl !== undefined) {
@@ -211,6 +216,8 @@ export function markupOf(token: InlineToken): string | null {
       return `#${token.value}`
     case 'link':
       return `[[${token.value}]]`
+    case 'memoref':
+      return `@[${token.value}]`
     case 'strong':
       return `**${inner(token.value, token.children)}**`
     case 'em':

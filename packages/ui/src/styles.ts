@@ -617,6 +617,15 @@ export const FLOMO_CSS = `
   cursor: pointer;
 }
 
+.fl-suggest-memo { justify-content: space-between; }
+
+.fl-suggest-memo-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
 .fl-suggest-item[data-active="true"] {
   background: var(--flomo-green-soft);
   color: var(--flomo-green);
@@ -815,6 +824,22 @@ del { color: var(--flomo-text-faint); }
   background: #dfe9fd;
   color: var(--flomo-blue-strong);
 }
+
+/* An @-mention memo reference renders as flomo's MEMO> chip: amber, compact,
+   clickable into the referenced note's own page. */
+.fl-memo-ref {
+  display: inline-block;
+  padding: 1px 7px;
+  margin: 0 1px;
+  border-radius: 999px;
+  background: #fff3a3;
+  color: #8a6d00;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fl-memo-ref:hover { background: #ffe566; }
 
 /* A [[link]] is prose that happens to be navigable, so it reads as emphasis
    rather than as a tag: green and underlined on hover, not grey. */

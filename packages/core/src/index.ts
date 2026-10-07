@@ -62,6 +62,7 @@ export type { ImportResult } from './import.ts'
 
 export { flattenTokens, markupOf, tokenizeInline } from './inline.ts'
 export type { InlineToken } from './inline.ts'
+export { annotationsOf, memoFragmentAtCaret, parseMemoRefs } from './mentions.ts'
 
 export {
   backlinks,

@@ -23,6 +23,8 @@ export interface MarkdownBodyProps {
   onTagClick?: (tag: string) => void
   /** Navigate to a `[[link]]`; omitted renders links as inert text. */
   onLinkClick?: (target: string) => void
+  /** Open the note a `@[id]` reference points to; omitted renders inert chips. */
+  onMemoOpen?: (id: string) => void
 }
 
 /**
@@ -34,10 +36,11 @@ export function MarkdownBody({
   content,
   onTagClick = () => {},
   onLinkClick = () => {},
+  onMemoOpen = () => {},
 }: MarkdownBodyProps): React.ReactElement {
   const nodes = parseBlocks(content).map((block: Block, index) => {
     const inline = (text: string): React.ReactNode[] =>
-      renderTokens(tokenizeInline(text), onTagClick, onLinkClick)
+      renderTokens(tokenizeInline(text), onTagClick, onLinkClick, onMemoOpen)
     const key = `${index}-${block.type}`
     switch (block.type) {
       case 'code':
@@ -71,6 +74,7 @@ export function MarkdownBody({
           { ordered: block.ordered, items: block.items },
           onTagClick,
           onLinkClick,
+          onMemoOpen,
           key,
         )
       case 'table': {
@@ -183,6 +187,7 @@ function renderTokens(
   tokens: readonly InlineToken[],
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
+  onMemoOpen: (id: string) => void,
 ): React.ReactNode[] {
   return tokens.map((token, index) => {
     const key = `${index}-${token.type}`
@@ -191,16 +196,28 @@ function renderTokens(
         return <InlineMark key={key} kind="tag" value={token.value} onActivate={() => onTagClick(token.value)} />
       case 'link':
         return <InlineMark key={key} kind="link" value={token.value} onActivate={() => onLinkClick(token.value)} />
+      case 'memoref':
+        return (
+          <button
+            key={key}
+            type="button"
+            className="fl-memo-ref"
+            title="查看关联的 MEMO"
+            onClick={() => onMemoOpen(token.value)}
+          >
+            MEMO&gt;
+          </button>
+        )
       case 'strong':
-        return <strong key={key}>{containerContent(token, onTagClick, onLinkClick)}</strong>
+        return <strong key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</strong>
       case 'em':
-        return <em key={key}>{containerContent(token, onTagClick, onLinkClick)}</em>
+        return <em key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</em>
       case 'strike':
-        return <del key={key}>{containerContent(token, onTagClick, onLinkClick)}</del>
+        return <del key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</del>
       case 'underline':
-        return <u key={key} className="fl-md-u">{containerContent(token, onTagClick, onLinkClick)}</u>
+        return <u key={key} className="fl-md-u">{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</u>
       case 'mark':
-        return <mark key={key} className="fl-md-mark">{containerContent(token, onTagClick, onLinkClick)}</mark>
+        return <mark key={key} className="fl-md-mark">{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</mark>
       case 'code':
         return <code key={key}>{token.value}</code>
       case 'url':
@@ -212,11 +229,11 @@ function renderTokens(
       case 'mdlink': {
         const href = safeUrl(token.url)
         if (href === null) {
-          return <span key={key}>{containerContent(token, onTagClick, onLinkClick)}</span>
+          return <span key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</span>
         }
         return (
           <a key={key} className="fl-md-a" href={href} target="_blank" rel="noopener noreferrer">
-            {containerContent(token, onTagClick, onLinkClick)}
+            {containerContent(token, onTagClick, onLinkClick, onMemoOpen)}
           </a>
         )
       }
@@ -242,8 +259,9 @@ function renderInline(
   text: string,
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
+  onMemoOpen: (id: string) => void,
 ): React.ReactNode[] {
-  return renderTokens(tokenizeInline(text), onTagClick, onLinkClick)
+  return renderTokens(tokenizeInline(text), onTagClick, onLinkClick, onMemoOpen)
 }
 
 /**
@@ -259,9 +277,10 @@ function containerContent(
   token: InlineToken,
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
+  onMemoOpen: (id: string) => void,
 ): React.ReactNode {
   if (token.children === undefined) return token.value
-  return renderTokens(token.children, onTagClick, onLinkClick)
+  return renderTokens(token.children, onTagClick, onLinkClick, onMemoOpen)
 }
 
 /**
@@ -274,17 +293,18 @@ function renderListItem(
   item: ListItem,
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
+  onMemoOpen: (id: string) => void,
 ): React.ReactNode {
   const label =
     item.task === null ? (
-      renderInline(item.text, onTagClick, onLinkClick)
+      renderInline(item.text, onTagClick, onLinkClick, onMemoOpen)
     ) : (
       <span className="fl-task">
         <span className="fl-task-box" aria-hidden="true">
           {item.task ? '☑' : '☐'}
         </span>
         <span className={item.task ? 'fl-task-text fl-task-done' : 'fl-task-text'}>
-          {renderInline(item.text, onTagClick, onLinkClick)}
+          {renderInline(item.text, onTagClick, onLinkClick, onMemoOpen)}
         </span>
       </span>
     )
@@ -292,7 +312,7 @@ function renderListItem(
   return (
     <>
       {label}
-      {renderList(item.children, onTagClick, onLinkClick)}
+      {renderList(item.children, onTagClick, onLinkClick, onMemoOpen)}
     </>
   )
 }
@@ -306,13 +326,14 @@ function renderList(
   group: { ordered: boolean; items: readonly ListItem[] },
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
+  onMemoOpen: (id: string) => void,
   key?: string,
 ): React.ReactNode {
   const Tag = group.ordered ? 'ol' : 'ul'
   return (
     <Tag key={key} className="fl-md-list">
       {group.items.map((item, index) => (
-        <li key={index}>{renderListItem(item, onTagClick, onLinkClick)}</li>
+        <li key={index}>{renderListItem(item, onTagClick, onLinkClick, onMemoOpen)}</li>
       ))}
     </Tag>
   )

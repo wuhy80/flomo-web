@@ -33,6 +33,8 @@ export interface MemoItemProps {
   onLinkClick: (target: string) => void
   /** Open this memo's detail page. */
   onOpen: (id: string) => void
+  /** Start composing an annotation that references this memo. */
+  onAnnotate: (memo: Memo) => void
   /** Fetches and decrypts one attached image. Absent: attachments render inert. */
   readImage?: (ref: string) => Promise<{ bytes: Uint8Array; mime: string }>
 }
@@ -88,6 +90,7 @@ export function MemoItem({
   onTagClick,
   onLinkClick,
   onOpen,
+  onAnnotate,
   readImage,
 }: MemoItemProps): React.ReactElement {
   const [editing, setEditing] = useState(false)
@@ -338,6 +341,17 @@ export function MemoItem({
             role="menuitem"
             className="fl-memo-menu-item"
             onClick={() => {
+              onAnnotate(memo)
+              setMenuOpen(false)
+            }}
+          >
+            批注
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="fl-memo-menu-item"
+            onClick={() => {
               onOpen(memo.id)
               setMenuOpen(false)
             }}
@@ -394,7 +408,7 @@ export function MemoItem({
         ) : null}
       </div>
 
-      <div className="fl-memo-body" onDoubleClick={beginEdit}><MarkdownBody content={memo.content} onTagClick={onTagClick} onLinkClick={onLinkClick} /></div>
+      <div className="fl-memo-body" onDoubleClick={beginEdit}><MarkdownBody content={memo.content} onTagClick={onTagClick} onLinkClick={onLinkClick} onMemoOpen={onOpen} /></div>
 
       {memo.images !== undefined && memo.images.length > 0 ? (
         <div className="fl-memo-images">

@@ -24,6 +24,7 @@ import {
   resolveLinkTarget,
   searchMemos,
 } from '@flomo/core'
+import type { Memo } from '@flomo/core'
 
 import { Composer } from './Composer.tsx'
 import { readComposeDeepLink, readMemoDeepLink, readShareTarget } from './deep-link.ts'
@@ -287,6 +288,18 @@ export function FlomoApp({
     setQuery('')
   }, [])
 
+  // 批注: pull the user back to the capture box with the referenced memo's
+  // link already in it — flomo's flow, exactly.
+  const handleAnnotate = useCallback(
+    (memo: Memo) => {
+      setView({ kind: 'all' })
+      setQuery('')
+      setComposePreset(`@[${memo.id}] `)
+      setComposeToken((token) => token + 1)
+    },
+    [],
+  )
+
   /**
    * The mutation and navigation callbacks every feed shares.
    *
@@ -301,9 +314,10 @@ export function FlomoApp({
       onTagClick: handleTagClick,
       onLinkClick: handleLinkClick,
       onOpen: handleOpen,
+      onAnnotate: handleAnnotate,
       readImage: handleReadImage,
     }),
-    [session, handleTagClick, handleLinkClick, handleOpen, handleReadImage],
+    [session, handleTagClick, handleLinkClick, handleOpen, handleAnnotate, handleReadImage],
   )
 
   const handleShortcut = useCallback(
@@ -478,6 +492,8 @@ export function FlomoApp({
               onAddImage={handleAddImage}
               knownTags={snapshot.tags}
               initialValue={composePreset ?? undefined}
+              preset={composePreset ?? undefined}
+              recentMemos={snapshot.memos}
               focusToken={composeToken}
             />
           ) : null}

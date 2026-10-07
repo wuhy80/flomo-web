@@ -18,8 +18,8 @@ import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react'
 import { FormatToolsBar } from './FormatTools.tsx'
 import { createFormatTools } from './format-tools.ts'
 
-import { suggestTags, tagFragmentAtCaret } from '@flomo/core'
-import type { TagFragment, TagStat } from '@flomo/core'
+import { dayOf, memoFragmentAtCaret, suggestTags, tagFragmentAtCaret } from '@flomo/core'
+import type { Memo, TagFragment, TagStat } from '@flomo/core'
 
 /** Largest height the textarea grows to before it starts scrolling. */
 const MAX_HEIGHT = 320
@@ -104,6 +104,10 @@ export interface ComposerProps {
   placeholder?: string
   /** Text the box starts with — the deep-link capture preset. Read on mount only. */
   initialValue?: string
+  /** A preset injected after mount (批注 references). Applied when it changes. */
+  preset?: string
+  /** Recent memos for the @ quick-quote menu. */
+  recentMemos?: readonly Memo[]
   /** Focus the box on mount. */
   autoFocus?: boolean
   /**
@@ -129,6 +133,8 @@ export function Composer({
   disabled = false,
   placeholder = '有什么值得记录的？',
   initialValue,
+  preset,
+  recentMemos = [],
   autoFocus = true,
   focusToken,
 }: ComposerProps): React.ReactElement {
@@ -137,6 +143,8 @@ export function Composer({
   const [value, setValue] = useState(initialValue ?? '')
   const [fragment, setFragment] = useState<TagFragment | null>(null)
   const [active, setActive] = useState(0)
+  const [memoFrag, setMemoFrag] = useState<{ start: number; query: string } | null>(null)
+  const [activeMemo, setActiveMemo] = useState(0)
   const [images, setImages] = useState<PendingImage[]>([])
   const [busyImage, setBusyImage] = useState(false)
   const [imageError, setImageError] = useState<string | null>(null)
@@ -144,10 +152,20 @@ export function Composer({
   const fileInput = useRef<HTMLInputElement>(null)
 
   const suggestions = useMemo(
-    () => (fragment === null ? [] : suggestTags(fragment.query, knownTags)),
-    [fragment, knownTags],
+    () => (fragment === null || memoFrag !== null ? [] : suggestTags(fragment.query, knownTags)),
+    [fragment, memoFrag, knownTags],
   )
-  const open = suggestions.length > 0
+  const open = suggestions.length > 0 && memoFrag === null
+
+  // The @ quick-quote menu: recent memos, filtered by what follows the @.
+  const memoSuggestions = useMemo(() => {
+    if (memoFrag === null) return []
+    const query = memoFrag.query.toLowerCase()
+    return recentMemos
+      .filter((memo) => query === '' || memo.content.toLowerCase().includes(query))
+      .slice(0, 8)
+  }, [memoFrag, recentMemos])
+  const memoOpen = memoSuggestions.length > 0
 
   /**
    * Recompute the `#` fragment under the caret.
@@ -158,9 +176,14 @@ export function Composer({
   const syncFragment = useCallback(() => {
     const el = textarea.current
     if (!el) return
-    setFragment(tagFragmentAtCaret(el.value, el.selectionStart ?? el.value.length))
+    const caret = el.selectionStart ?? el.value.length
+    setFragment(tagFragmentAtCaret(el.value, caret))
+    setMemoFrag(memoFragmentAtCaret(el.value, caret))
     setActive(0)
+    setActiveMemo(0)
   }, [])
+
+
 
   const resize = useCallback(() => {
     const el = textarea.current
@@ -169,7 +192,50 @@ export function Composer({
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
   }, [])
 
+  /** Replace the open @-fragment with a reference to the chosen memo. */
+  const acceptMemo = useCallback(
+    (memo: Memo) => {
+      const el = textarea.current
+      const frag = memoFrag
+      if (!el || frag === null) return
+      const caret = el.selectionStart ?? el.value.length
+      const next = `${el.value.slice(0, frag.start)}@[${memo.id}] ${el.value.slice(caret)}`
+      const nextCaret = frag.start + memo.id.length + 4
+      setValue(next)
+      setMemoFrag(null)
+      setActiveMemo(0)
+      requestAnimationFrame(() => {
+        const node = textarea.current
+        if (node === null) return
+        node.focus()
+        node.setSelectionRange(nextCaret, nextCaret)
+        syncFragment()
+        resize()
+      })
+    },
+    [memoFrag, syncFragment, resize],
+  )
+
   useEffect(resize, [value, resize])
+
+  // A preset injected after mount (批注): replaces the draft when it is empty,
+  // appends otherwise, and pulls focus with the caret at the end.
+  useEffect(() => {
+    if (preset === undefined || preset === '') return
+    setValue((current) => {
+      const base = current.trim()
+      if (base === '') return preset
+      return `${base}${base.endsWith(' ') ? '' : ' '}${preset}`
+    })
+    requestAnimationFrame(() => {
+      const node = textarea.current
+      if (node === null) return
+      node.focus()
+      const end = node.value.length
+      node.setSelectionRange(end, end)
+      resize()
+    })
+  }, [preset, resize])
 
   useEffect(() => {
     if (autoFocus) textarea.current?.focus()
@@ -366,6 +432,28 @@ export function Composer({
         aria-label="记录一条 MEMO"
         spellCheck={false}
       />
+
+      {memoOpen ? (
+        <div className="fl-suggest" role="listbox" aria-label="快速引用">
+          {memoSuggestions.map((memo, index) => (
+            <button
+              key={memo.id}
+              type="button"
+              role="option"
+              aria-selected={index === activeMemo}
+              className="fl-suggest-item fl-suggest-memo"
+              data-active={index === activeMemo ? 'true' : 'false'}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => acceptMemo(memo)}
+            >
+              <span className="fl-suggest-memo-text">
+                {memo.content.split('\n')[0]?.slice(0, 40) || '（空）'}
+              </span>
+              <span className="fl-nav-count">{dayOf(memo.createdAt).slice(5)}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {open ? (
         // A listbox with `option` children directly: wrapping each option in an
