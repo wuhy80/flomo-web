@@ -656,6 +656,9 @@ export const FLOMO_CSS = `
 .fl-md-list li { margin: 0.15em 0; }
 .fl-md-list li::marker { color: var(--flomo-text-faint); }
 
+/* Nested outlines sit tight under their parent item, one indent step each. */
+.fl-md-list .fl-md-list { margin: 0.1em 0; }
+
 .fl-task { display: inline-flex; align-items: baseline; gap: 7px; }
 .fl-task-box { color: var(--flomo-green); font-size: 0.95em; }
 .fl-task-text { overflow-wrap: anywhere; }

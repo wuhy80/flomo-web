@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { clockOf, dayOf, parseBlocks, tokenizeInline } from '@flomo/core'
-import type { Block, InlineToken, Memo } from '@flomo/core'
+import type { Block, InlineToken, ListItem, Memo } from '@flomo/core'
 
 export interface MemoItemProps {
   memo: Memo
@@ -222,25 +222,56 @@ function containerContent(
 }
 
 /**
- * One list item's content: a box glyph ahead of the text when it is a task.
+ * One list item's content: a box glyph ahead of the text when it is a task,
+ * and any sub-list indented beneath it.
  * @param props - the item and the two navigations.
  * @returns the item's nodes.
  */
 function renderListItem(
-  item: { text: string; task: boolean | null },
+  item: ListItem,
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
 ): React.ReactNode {
-  if (item.task === null) return renderInline(item.text, onTagClick, onLinkClick)
+  const label =
+    item.task === null ? (
+      renderInline(item.text, onTagClick, onLinkClick)
+    ) : (
+      <span className="fl-task">
+        <span className="fl-task-box" aria-hidden="true">
+          {item.task ? '☑' : '☐'}
+        </span>
+        <span className={item.task ? 'fl-task-text fl-task-done' : 'fl-task-text'}>
+          {renderInline(item.text, onTagClick, onLinkClick)}
+        </span>
+      </span>
+    )
+  if (item.children === undefined) return label
   return (
-    <span className="fl-task">
-      <span className="fl-task-box" aria-hidden="true">
-        {item.task ? '☑' : '☐'}
-      </span>
-      <span className={item.task ? 'fl-task-text fl-task-done' : 'fl-task-text'}>
-        {renderInline(item.text, onTagClick, onLinkClick)}
-      </span>
-    </span>
+    <>
+      {label}
+      {renderList(item.children, onTagClick, onLinkClick)}
+    </>
+  )
+}
+
+/**
+ * A list at any nesting depth.
+ * @param props - the items, their flavour, and the two navigations.
+ * @returns the list element.
+ */
+function renderList(
+  group: { ordered: boolean; items: readonly ListItem[] },
+  onTagClick: (tag: string) => void,
+  onLinkClick: (target: string) => void,
+  key?: string,
+): React.ReactNode {
+  const Tag = group.ordered ? 'ol' : 'ul'
+  return (
+    <Tag key={key} className="fl-md-list">
+      {group.items.map((item, index) => (
+        <li key={index}>{renderListItem(item, onTagClick, onLinkClick)}</li>
+      ))}
+    </Tag>
   )
 }
 
@@ -292,16 +323,13 @@ function renderBody(
       }
       case 'hr':
         return <hr key={key} className="fl-md-hr" />
-      case 'list': {
-        const Tag = block.ordered ? 'ol' : 'ul'
-        return (
-          <Tag key={key} className="fl-md-list">
-            {block.items.map((item, itemIndex) => (
-              <li key={itemIndex}>{renderListItem(item, onTagClick, onLinkClick)}</li>
-            ))}
-          </Tag>
+      case 'list':
+        return renderList(
+          { ordered: block.ordered, items: block.items },
+          onTagClick,
+          onLinkClick,
+          key,
         )
-      }
       case 'table': {
         const align = (column: number): React.CSSProperties | undefined =>
           block.align[column] ? { textAlign: block.align[column] as React.CSSProperties['textAlign'] } : undefined

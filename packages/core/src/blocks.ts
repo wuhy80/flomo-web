@@ -28,12 +28,14 @@
 /** Cell alignment of a table column; null when the separator did not ask for one. */
 export type TableAlign = 'left' | 'center' | 'right' | null
 
-/** One entry of a list, possibly a task. */
+/** One entry of a list, possibly a task, possibly carrying sub-items. */
 export interface ListItem {
   /** The item's inline content. */
   text: string
   /** null when the item is not a task; otherwise whether its box is ticked. */
   task: boolean | null
+  /** Sub-items indented under this one; the sub-list keeps its own flavour. */
+  children?: { ordered: boolean; items: ListItem[] }
 }
 
 /** One structural run of a memo body. */
@@ -65,8 +67,8 @@ const HEADING = /^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+\s*)?$/
 /** A horizontal rule: three or more of one marker, spaces allowed. */
 const HR = /^ {0,3}(?:(?:-\s*){3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/
 
-/** One list line: the marker, then the content. */
-const LIST_ITEM = /^ {0,3}([-*+]|\d{1,9}[.)])\s+(.*)$/
+/** One list line: the indent, the marker, then the content. */
+const LIST_ITEM = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/
 
 /** A task box at the head of a list item's content. */
 const TASK = /^\[([ xX])\]\s+(.*)$/
@@ -200,24 +202,52 @@ export function parseBlocks(content: string): Block[] {
     if (listed !== null) {
       flushParagraph()
       flushQuote()
-      const ordered = /\d/.test(listed[1] ?? '')
-      const items: ListItem[] = []
-      for (; index < lines.length; index += 1) {
-        const next = LIST_ITEM.exec(lines[index] ?? '')
-        // A list ends at anything that is not another line of the same flavour:
-        // switching between bullets and numbers opens a second list.
-        if (next === null) break
-        if (items.length > 0 && /\d/.test(next[1] ?? '') !== ordered) break
-        const raw = next[2] ?? ''
+      const baseIndent = (listed[1] ?? '').length
+      const ordered = /\d/.test(listed[2] ?? '')
+      // One stack level per nesting depth: the root list, then one per indented
+      // sub-list. A deeper line becomes a sub-list of the item above it; a
+      // shallower one pops back; a flavour switch at the same depth or a dedent
+      // past the root ends the list, and the outer loop re-reads the line.
+      const stack: Array<{ indent: number; ordered: boolean; items: ListItem[] }> = [
+        { indent: baseIndent, ordered, items: [] },
+      ]
+      const taskOf = (raw: string): ListItem => {
         const task = TASK.exec(raw)
-        items.push(
-          task !== null
-            ? { text: task[2] ?? '', task: (task[1] ?? ' ').toLowerCase() === 'x' }
-            : { text: raw, task: null },
-        )
+        return task !== null
+          ? { text: task[2] ?? '', task: (task[1] ?? ' ').toLowerCase() === 'x' }
+          : { text: raw, task: null }
+      }
+      for (; index < lines.length; index += 1) {
+        const raw = lines[index] ?? ''
+        if (raw.trim() === '') break
+        const next = LIST_ITEM.exec(raw)
+        if (next === null) break
+        const indent = (next[1] ?? '').length
+        const nextOrdered = /\d/.test(next[2] ?? '')
+        if (indent < baseIndent) break
+        let top = stack[stack.length - 1]
+        while (stack.length > 1 && top !== undefined && indent < top.indent) {
+          stack.pop()
+          top = stack[stack.length - 1]
+        }
+        if (top === undefined) break
+        const item = taskOf(next[3] ?? '')
+        if (indent > top.indent) {
+          // A deeper line nests under the item just added. A flavour switch
+          // while nesting is allowed: `1.` inside a `-` item is the author's
+          // business.
+          const last = top.items[top.items.length - 1]
+          if (last === undefined) break
+          const child: NonNullable<ListItem['children']> = { ordered: nextOrdered, items: [item] }
+          last.children = child
+          stack.push({ indent, ordered: nextOrdered, items: child.items })
+          continue
+        }
+        if (nextOrdered !== top.ordered) break
+        top.items.push(item)
       }
       index -= 1
-      blocks.push({ type: 'list', ordered, items })
+      blocks.push({ type: 'list', ordered, items: stack[0]?.items ?? [] })
       continue
     }
 
@@ -256,12 +286,20 @@ export function proseText(content: string): string {
         case 'table':
           return [block.head.join(' | '), ...block.rows.map((row) => row.join(' | '))]
         case 'list':
-          return block.items.map((item) => item.text)
+          return walkItems(block.items)
         default:
           return [block.text]
       }
     })
     .join('\n')
+}
+
+/** Flatten a (possibly nested) list's items into their text lines. */
+function walkItems(items: readonly ListItem[]): string[] {
+  return items.flatMap((item) => [
+    item.text,
+    ...(item.children !== undefined ? walkItems(item.children.items) : []),
+  ])
 }
 
 /**

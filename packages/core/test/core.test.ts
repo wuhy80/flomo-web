@@ -1008,6 +1008,48 @@ describe('markdown blocks', () => {
   })
 })
 
+describe('nested lists', () => {
+  it('keeps two indented levels as a tree', () => {
+    const blocks = parseBlocks(
+      ['- 上层一', '  - 子项一', '  - 子项二', '- 上层二', '    - 更深一项'].join('\n'),
+    )
+    assert.equal(blocks.length, 1)
+    const list = blocks[0]
+    assert.ok(list !== undefined && list.type === 'list')
+    if (list === undefined || list.type !== 'list') return
+    assert.deepEqual(list.items.map((item) => item.text), ['上层一', '上层二'])
+    assert.deepEqual((list.items[0]?.children?.items ?? []).map((item) => item.text), ['子项一', '子项二'])
+    assert.equal(list.items[0]?.children?.ordered, false)
+    assert.deepEqual(
+      (list.items[1]?.children?.items ?? []).map((item) => item.text),
+      ['更深一项'],
+      'a deeper indent nests under the preceding item',
+    )
+  })
+
+  it('lets a numbered sub-list live inside a bullet item', () => {
+    const blocks = parseBlocks(['- 主题', '  1. 第一步', '  2. 第二步'].join('\n'))
+    const list = blocks[0]
+    assert.ok(list !== undefined && list.type === 'list')
+    if (list === undefined || list.type !== 'list') return
+    assert.equal(list.items[0]?.children?.ordered, true)
+    assert.deepEqual((list.items[0]?.children?.items ?? []).map((item) => item.text), ['第一步', '第二步'])
+  })
+
+  it('ends the list at a dedent past its start', () => {
+    const blocks = parseBlocks(['- 一', '  - 一一', '正文'].join('\n'))
+    assert.equal(blocks.length, 2)
+    assert.equal(blocks[0]?.type, 'list')
+    assert.equal(blocks[1]?.type, 'paragraph')
+  })
+
+  it('indexes tags inside nested items', () => {
+    assert.deepEqual(parseTags('- 外层 #外标签' ), ['外标签'])
+    const nested = ['- 外层', '    - 里层 #里标签'].join('\n')
+    assert.deepEqual(parseTags(nested), ['里标签'])
+  })
+})
+
 describe('markdown inline', () => {
   it('tokenises italic in both flavours', () => {
     assert.deepEqual(tokenizeInline('普通 *斜体* 与 _也是_'), [
