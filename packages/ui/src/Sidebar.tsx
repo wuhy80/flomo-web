@@ -11,6 +11,7 @@ import { corpusStats } from '@flomo/core'
 import type { Memo, TagStat } from '@flomo/core'
 
 import { Heatmap } from './Heatmap.tsx'
+import { loadPinnedTags, savePinnedTags } from './pinned-tags.ts'
 import { StatsModal } from './StatsModal.tsx'
 import { sameView } from './views.ts'
 import type { FlomoView } from './views.ts'
@@ -68,6 +69,18 @@ export function Sidebar({
 }: SidebarProps): React.ReactElement {
   const stats = corpusStats(memos, tags.length)
   const [statsOpen, setStatsOpen] = useState(false)
+  const [pinned, setPinned] = useState<string[]>(() => loadPinnedTags())
+
+  /**
+   * Pin or unpin a tag. Pinned tags float into their own section above the
+   * rest, and the list persists on this device.
+   * @param tag - the tag to toggle.
+   */
+  const togglePin = (tag: string): void => {
+    const next = pinned.includes(tag) ? pinned.filter((name) => name !== tag) : [...pinned, tag]
+    setPinned(next)
+    savePinnedTags(next)
+  }
 
   /**
    * Build the props for one navigation row.
@@ -80,6 +93,52 @@ export function Sidebar({
     'aria-current': sameView(view, target) ? ('true' as const) : ('false' as const),
     onClick: () => onSelect(target),
   })
+
+  /**
+   * One tag row: navigation, count, and the pin toggle.
+   * @param stat - the tag and its frequency.
+   * @returns the row element.
+   */
+  const renderTagRow = (stat: TagStat): React.ReactElement => {
+    const target: FlomoView = { kind: 'tag', tag: stat.tag }
+    const isPinned = pinned.includes(stat.tag)
+    return (
+      <button
+        key={stat.tag}
+        type="button"
+        className="fl-tag-row"
+        aria-current={sameView(view, target) ? 'true' : 'false'}
+        onClick={() => onSelect(target)}
+        title={`#${stat.tag}`}
+      >
+        <span className="fl-tag-name">#{stat.tag}</span>
+        <span className="fl-nav-count">{stat.count}</span>
+        <span
+          role="button"
+          tabIndex={0}
+          className="fl-tag-pin"
+          aria-pressed={isPinned}
+          aria-label={isPinned ? `取消置顶 #${stat.tag}` : `置顶 #${stat.tag}`}
+          title={isPinned ? '取消置顶' : '置顶'}
+          onClick={(event) => {
+            event.stopPropagation()
+            togglePin(stat.tag)
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            event.stopPropagation()
+            togglePin(stat.tag)
+          }}
+        >
+          📌
+        </span>
+      </button>
+    )
+  }
+
+  const pinnedRows = tags.filter((stat) => pinned.includes(stat.tag)).map(renderTagRow)
+  const restRows = tags.filter((stat) => !pinned.includes(stat.tag)).map(renderTagRow)
 
   return (
     <nav className="fl-sidebar" aria-label="主导航">
@@ -126,25 +185,18 @@ export function Sidebar({
 
       {tags.length > 0 ? (
         <>
-          <div className="fl-sidebar-section">标签</div>
-          <div className="fl-tag-list">
-            {tags.map((stat) => {
-              const target: FlomoView = { kind: 'tag', tag: stat.tag }
-              return (
-                <button
-                  key={stat.tag}
-                  type="button"
-                  className="fl-tag-row"
-                  aria-current={sameView(view, target) ? 'true' : 'false'}
-                  onClick={() => onSelect(target)}
-                  title={`#${stat.tag}`}
-                >
-                  <span className="fl-tag-name">#{stat.tag}</span>
-                  <span className="fl-nav-count">{stat.count}</span>
-                </button>
-              )
-            })}
-          </div>
+          {pinnedRows.length > 0 ? (
+            <>
+              <div className="fl-sidebar-section">置顶标签</div>
+              <div className="fl-tag-list">{pinnedRows}</div>
+            </>
+          ) : null}
+          {restRows.length > 0 ? (
+            <>
+              <div className="fl-sidebar-section">全部标签</div>
+              <div className="fl-tag-list">{restRows}</div>
+            </>
+          ) : null}
         </>
       ) : null}
 

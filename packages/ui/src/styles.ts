@@ -181,6 +181,31 @@ export const FLOMO_CSS = `
   white-space: nowrap;
 }
 
+/* Keep the count and the pin packed on the right when a row carries all three. */
+.fl-tag-row .fl-nav-count { margin-left: auto; }
+
+/* The pin floats in on hover and stays lit while pressed — the affordance
+   flomo uses to lift a tag into its pinned section. */
+.fl-tag-pin {
+  flex: none;
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.fl-tag-row:hover .fl-tag-pin,
+.fl-tag-pin:focus-visible,
+.fl-tag-pin[aria-pressed="true"] { opacity: 1; }
+
+.fl-tag-pin:hover { transform: scale(1.15); }
+
+.fl-tag-pin:focus-visible { outline: 1px solid var(--flomo-green); border-radius: 3px; }
+
 .fl-sidebar-foot { margin-top: auto; padding-top: 16px; }
 
 .fl-shortcut-hint {

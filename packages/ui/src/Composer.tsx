@@ -447,6 +447,30 @@ export function Composer({
               />
             </svg>
           </button>
+          <button
+            type="button"
+            className="fl-tool"
+            title="插入表格"
+            onClick={() => insertTemplate('| 列一 | 列二 |\n| --- | --- |\n|  |  |', 4)}
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <rect
+                x="2"
+                y="2"
+                width="12"
+                height="12"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+              <path
+                d="M2 6.5h12M2 10.5h12M6.5 2v12M10.5 2v12"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+            </svg>
+          </button>
         </div>
         <div className="fl-composer-side">
           {value.length > 0 ? (
