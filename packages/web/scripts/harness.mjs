@@ -346,6 +346,21 @@ export async function openApp(url, options = {}) {
   // first-run 连接数据仓库 form — what a brand-new visitor sees.
   if (options.setup !== true) {
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: bootstrap(data) })
+    // A new session starts from the pristine fixture: writes recorded by an
+    // earlier session on this profile were sealed by that session's key, and
+    // replaying them would make 'demo' unlock forever impossible.
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: `(() => {
+        try {
+          // Once per browser session: reloads must keep what the session saved.
+          if (sessionStorage.getItem('__flomoSessionBoot') === null) {
+            localStorage.removeItem('__flomoFixtureWrites')
+            sessionStorage.setItem('__flomoSessionBoot', '1')
+          }
+          window.__flomoWrites = JSON.parse(localStorage.getItem('__flomoFixtureWrites') ?? '[]')
+        } catch (e) {}
+      })()`,
+    })
   }
 
   await cdp.send('Page.navigate', { url })
