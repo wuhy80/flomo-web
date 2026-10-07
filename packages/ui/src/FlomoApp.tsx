@@ -321,9 +321,9 @@ export function FlomoApp({
         error={snapshot.error}
         recoveryCode={snapshot.recoveryCode}
         brand={brand}
-        onCreate={(password) => void session.create(password)}
-        onUnlock={(password) => void session.unlock(password)}
-        onUnlockWithRecovery={(code) => void session.unlockWithRecovery(code)}
+        onCreate={(password, options) => void session.create(password, options)}
+        onUnlock={(password, options) => void session.unlock(password, options)}
+        onUnlockWithRecovery={(code, options) => void session.unlockWithRecovery(code, options)}
         onDismissRecovery={() => session.dismissRecovery()}
       />
     )

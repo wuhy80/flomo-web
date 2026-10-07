@@ -24,6 +24,7 @@
 
 import {
   DecryptError,
+  bytesToBase64,
   createVault,
   deriveRawKey,
   importVaultKey,
@@ -135,16 +136,29 @@ export class FlomoVault {
   private readonly store: TextStore
   private readonly header: VaultHeader
   private readonly key: CryptoKey
+  private readonly rawKey: Uint8Array
   private readonly memos = new Map<string, Memo>()
   private readonly shardShas = new Map<string, string>()
   private readonly dirty = new Set<string>()
   /** Serializes writes so two saves can never interleave their round trips. */
   private writeChain: Promise<void> = Promise.resolve()
 
-  private constructor(store: TextStore, header: VaultHeader, key: CryptoKey) {
+  private constructor(store: TextStore, header: VaultHeader, key: CryptoKey, rawKey: Uint8Array) {
     this.store = store
     this.header = header
     this.key = key
+    this.rawKey = rawKey
+  }
+
+  /**
+   * The raw vault key, base64 — byte-for-byte what the recovery code encodes.
+   *
+   * Exposed so a UI can offer device trust (remember the *derived key*, never
+   * the password) without deriving all over again. An unlocked vault can
+   * already read every note, so this discloses nothing new to its holder.
+   */
+  get rawKeyBase64(): string {
+    return bytesToBase64(this.rawKey)
   }
 
   /**
@@ -174,7 +188,7 @@ export class FlomoVault {
       message: 'flomo: create vault',
     })
     return {
-      vault: new FlomoVault(store, header, minted.key),
+      vault: new FlomoVault(store, header, minted.key, minted.raw),
       recoveryCode: minted.recoveryCode,
     }
   }
@@ -199,7 +213,7 @@ export class FlomoVault {
     } catch {
       throw new WrongPasswordError()
     }
-    return new FlomoVault(store, header, key)
+    return new FlomoVault(store, header, key, rawKey)
   }
 
   /**

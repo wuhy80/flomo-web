@@ -13,7 +13,7 @@ import type * as React from 'react'
 import { useCallback, useState } from 'react'
 import type { FormEvent } from 'react'
 
-import type { SessionStatus } from './session.ts'
+import type { SessionStatus, UnlockOptions } from './session.ts'
 
 /** Which form the gate is showing. */
 type GateMode =
@@ -32,9 +32,9 @@ export interface UnlockGateProps {
   /** Set immediately after creating a vault; the user must save it. */
   recoveryCode: string | null
   brand?: string
-  onCreate: (password: string) => void
-  onUnlock: (password: string) => void
-  onUnlockWithRecovery: (code: string) => void
+  onCreate: (password: string, options: UnlockOptions) => void
+  onUnlock: (password: string, options: UnlockOptions) => void
+  onUnlockWithRecovery: (code: string, options: UnlockOptions) => void
   onDismissRecovery: () => void
 }
 
@@ -58,6 +58,7 @@ export function UnlockGate({
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [code, setCode] = useState('')
+  const [remember, setRemember] = useState(true)
 
   const busy = status === 'unlocking'
   const mismatch = mode === 'create' && confirm.length > 0 && password !== confirm
@@ -71,11 +72,12 @@ export function UnlockGate({
     (event: FormEvent) => {
       event.preventDefault()
       if (!canSubmit) return
-      if (mode === 'create') onCreate(password)
-      else if (mode === 'unlock') onUnlock(password)
-      else onUnlockWithRecovery(code.trim())
+      const options: UnlockOptions = { remember }
+      if (mode === 'create') onCreate(password, options)
+      else if (mode === 'unlock') onUnlock(password, options)
+      else onUnlockWithRecovery(code.trim(), options)
     },
-    [canSubmit, mode, password, code, onCreate, onUnlock, onUnlockWithRecovery],
+    [canSubmit, mode, password, code, remember, onCreate, onUnlock, onUnlockWithRecovery],
   )
 
   // The recovery code is shown exactly once, immediately after creation, and is
@@ -180,6 +182,17 @@ export function UnlockGate({
 
           {mismatch ? <div className="fl-gate-error">两次输入不一致。</div> : null}
           {error ? <div className="fl-gate-error">{error}</div> : null}
+
+          {mode !== 'recovery' ? (
+            <label className="fl-gate-remember" title="在本设备保存派生密钥（并非密码），72 小时内刷新不再询问">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+              />
+              <span>三天内免输密码</span>
+            </label>
+          ) : null}
 
           <button
             type="submit"

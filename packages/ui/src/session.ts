@@ -57,17 +57,27 @@ export interface SessionSnapshot {
   recoveryCode: string | null
 }
 
+/** Options shared by the three ways into a vault. */
+export interface UnlockOptions {
+  /**
+   * Remember the derived key on this device for three days, so refreshes skip
+   * the password gate. The password itself is never stored; where a host owns
+   * its secrets (the DSH panel) the option is ignored.
+   */
+  remember?: boolean
+}
+
 /** The contract {@link FlomoApp} drives. */
 export interface FlomoSession {
   subscribe(listener: () => void): () => void
   getSnapshot(): SessionSnapshot
 
   /** Create a new vault and return its recovery code via the snapshot. */
-  create(password: string): Promise<void>
+  create(password: string, options?: UnlockOptions): Promise<void>
   /** Open the existing vault with a password. */
-  unlock(password: string): Promise<void>
+  unlock(password: string, options?: UnlockOptions): Promise<void>
   /** Open the existing vault with the recovery code. */
-  unlockWithRecovery(code: string): Promise<void>
+  unlockWithRecovery(code: string, options?: UnlockOptions): Promise<void>
   /** Clear the just-created recovery code after the user has stored it. */
   dismissRecovery(): void
   /** Re-probe the remote, e.g. after fixing credentials. */

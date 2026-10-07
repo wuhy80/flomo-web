@@ -212,6 +212,8 @@ export interface NewVault {
   readonly check: Sealed
   /** Printable recovery code — the raw key, base64. Show once, store offline. */
   readonly recoveryCode: string
+  /** The raw key bytes behind {@link NewVault.recoveryCode}, for callers that persist the key. */
+  readonly raw: Uint8Array
 }
 
 /**
@@ -240,6 +242,7 @@ export async function createVault(
     key,
     check: await seal(key, CHECK_PLAINTEXT),
     recoveryCode: bytesToBase64(raw),
+    raw,
   }
 }
 

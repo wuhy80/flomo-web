@@ -13,6 +13,7 @@ import { afterEach, describe, it } from 'node:test'
 import { FlomoVault, MemoryCacheArea } from '@flomo/core'
 import { MemoryStore } from '@flomo/core/testing'
 
+import { loadTrust, saveTrust } from '../src/device-trust.ts'
 import { GitHubVaultSession } from '../src/github-session.ts'
 
 const originalFetch = globalThis.fetch
@@ -564,5 +565,89 @@ describe('locking, unlocking and subscriptions', () => {
     // read model rather than leave it on screen.
     assert.equal(session.getSnapshot().recoveryCode, null)
     session.dispose()
+  })
+})
+
+describe('device trust', () => {
+  const originalLocalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  const backing = new Map<string, string>()
+
+  afterEach(() => {
+    backing.clear()
+    if (originalLocalStorage) {
+      Object.defineProperty(globalThis, 'localStorage', originalLocalStorage)
+    } else {
+      delete (globalThis as Record<string, unknown>).localStorage
+    }
+  })
+
+  /**
+   * Put a working `localStorage` in place, so the trust store has somewhere to
+   * live in a Node test.
+   * @returns the backing map, for assertions.
+   */
+  function stubLocalStorage(): Map<string, string> {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      writable: true,
+      value: {
+        getItem: (key: string) => backing.get(key) ?? null,
+        setItem: (key: string, value: string) => void backing.set(key, value),
+        removeItem: (key: string) => void backing.delete(key),
+      },
+    })
+    return backing
+  }
+
+  it('opens a refresh without the password for three days after one entry', async () => {
+    stubLocalStorage()
+    const { session } = await unlockedSession()
+    await session.unlock('pw', { remember: true })
+    assert.equal(loadTrust()?.key.length, 44, 'the derived key is stored, not the password')
+
+    session.add('刷新之后还在 #信任')
+    await session.save()
+    session.dispose()
+
+    const reopened = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+    })
+    liveSessions.push(reopened)
+    await reopened.refresh()
+
+    assert.equal(reopened.getSnapshot().status, 'unlocked', 'no gate: the trust opened the vault')
+    assert.equal(reopened.getSnapshot().memos.length, 1, 'and the notes are all there')
+    assert.equal(reopened.getSnapshot().memos[0]?.content, '刷新之后还在 #信任')
+  })
+
+  it('stores nothing when the box is unticked', async () => {
+    stubLocalStorage()
+    await unlockedSession()
+
+    assert.equal(loadTrust(), null, 'no remembered key without the opt-in')
+  })
+
+  it('discards a remembered key that no longer opens the vault', async () => {
+    stubLocalStorage()
+    const { session } = await unlockedSession()
+    session.dispose()
+
+    // A key from some other vault: well-formed, wrong vault.
+    saveTrust('c3RvcmVuIGtleSBmcm9tIGFub3RoZXIgdmF1bHQ9PQ==')
+
+    const reopened = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+    })
+    liveSessions.push(reopened)
+    await reopened.refresh()
+
+    assert.equal(reopened.getSnapshot().status, 'locked', 'a foreign key does not open the vault')
+    assert.equal(loadTrust(), null, 'and it was cleared rather than retried forever')
   })
 })

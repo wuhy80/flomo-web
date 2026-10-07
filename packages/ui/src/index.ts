@@ -15,6 +15,9 @@ export type { FlomoAppProps } from './FlomoApp.tsx'
 
 export { browserCacheArea } from './cache-area.ts'
 
+export { clearTrust, loadTrust, saveTrust, TRUST_DAYS } from './device-trust.ts'
+export type { DeviceTrust, TrustArea } from './device-trust.ts'
+
 export { downloadText } from './download.ts'
 
 export { GitHubVaultSession, DEFAULT_AUTOSAVE_MS } from './github-session.ts'

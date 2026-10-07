@@ -743,6 +743,22 @@ export const FLOMO_CSS = `
   line-height: 1.6;
 }
 
+.fl-gate-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 12px;
+  font-size: 12.5px;
+  color: var(--flomo-text-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.fl-gate-remember input {
+  accent-color: var(--flomo-green);
+  margin: 0;
+}
+
 .fl-gate-submit { width: 100%; padding: 10px; font-size: 14px; }
 
 .fl-gate-switch {

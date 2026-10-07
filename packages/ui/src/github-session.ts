@@ -2,11 +2,13 @@
  * The browser-side session: it owns a {@link FlomoVault} and talks to GitHub
  * directly with a fine-grained PAT held in local storage.
  *
- * The PAT is the only long-lived secret in the browser. It is worth being
- * explicit about the blast radius: a stolen token yields *ciphertext only*,
- * because the vault key is derived from the password on demand and is never
- * persisted. That is what makes storing a token in `localStorage` acceptable
- * here, where it would not be for a plaintext note store.
+ * Two secrets live in the browser, at two different strengths. The PAT is the
+ * weaker one: a stolen token yields *ciphertext only*, because the vault key is
+ * derived from the password on demand. The stronger one is the derived key
+ * itself, which the device-trust store may hold for three days after a password
+ * entry the user asked to remember — whoever can read the browser's storage can
+ * then read the notes too. That is opt-in per unlock, which is what makes the
+ * PAT-in-localStorage default acceptable.
  *
  * @module @flomo/ui/github-session
  */
@@ -22,8 +24,9 @@ import {
 } from '@flomo/core'
 import type { CacheArea, Memo, TagStat, TextStore } from '@flomo/core'
 
+import { clearTrust, loadTrust, saveTrust } from './device-trust.ts'
 import { describeError } from './session.ts'
-import type { FlomoSession, SessionSnapshot } from './session.ts'
+import type { FlomoSession, SessionSnapshot, UnlockOptions } from './session.ts'
 
 /** How to reach the data repository. */
 export interface GitHubSessionOptions {
@@ -153,6 +156,26 @@ export class GitHubVaultSession implements FlomoSession {
     try {
       const exists = await FlomoVault.exists(this.store)
       this.vault = null
+
+      // Device trust: a remembered key younger than three days reopens the vault
+      // without the gate. A key that no longer matches — the password changed on
+      // another device, the repository was switched — is discarded, and the user
+      // simply sees the password form as before.
+      if (exists) {
+        const trust = loadTrust()
+        if (trust !== null) {
+          try {
+            const vault = await FlomoVault.openWithRecovery(this.store, trust.key)
+            await vault.loadAll()
+            this.vault = vault
+            this.syncFromVault({ status: 'unlocked', error: null, lastSavedAt: null })
+            return
+          } catch {
+            clearTrust()
+          }
+        }
+      }
+
       this.syncFromVault({
         status: exists ? 'locked' : 'empty',
         error: null,
@@ -164,10 +187,11 @@ export class GitHubVaultSession implements FlomoSession {
   }
 
   /** {@inheritDoc FlomoSession.create} */
-  async create(password: string): Promise<void> {
+  async create(password: string, options?: UnlockOptions): Promise<void> {
     this.update({ status: 'unlocking', error: null })
     try {
       const { vault, recoveryCode } = await FlomoVault.create(this.store, password)
+      if (options?.remember) saveTrust(vault.rawKeyBase64)
       this.vault = vault
       this.syncFromVault({ status: 'unlocked', error: null, recoveryCode })
     } catch (error) {
@@ -184,11 +208,12 @@ export class GitHubVaultSession implements FlomoSession {
   }
 
   /** {@inheritDoc FlomoSession.unlock} */
-  async unlock(password: string): Promise<void> {
+  async unlock(password: string, options?: UnlockOptions): Promise<void> {
     this.update({ status: 'unlocking', error: null })
     try {
       const vault = await FlomoVault.open(this.store, password)
       await vault.loadAll()
+      if (options?.remember) saveTrust(vault.rawKeyBase64)
       this.vault = vault
       this.syncFromVault({ status: 'unlocked', error: null })
     } catch (error) {
@@ -199,11 +224,12 @@ export class GitHubVaultSession implements FlomoSession {
   }
 
   /** {@inheritDoc FlomoSession.unlockWithRecovery} */
-  async unlockWithRecovery(code: string): Promise<void> {
+  async unlockWithRecovery(code: string, options?: UnlockOptions): Promise<void> {
     this.update({ status: 'unlocking', error: null })
     try {
       const vault = await FlomoVault.openWithRecovery(this.store, code)
       await vault.loadAll()
+      if (options?.remember) saveTrust(vault.rawKeyBase64)
       this.vault = vault
       this.syncFromVault({ status: 'unlocked', error: null })
     } catch (error) {

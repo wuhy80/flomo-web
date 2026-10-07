@@ -432,9 +432,18 @@ export async function openApp(url, options = {}) {
 
     /**
      * Unlock the vault through the real form.
+     *
+     * Device trust may have opened the vault before this ran — the gate then
+     * never shows, and waiting for it would time out on a perfectly healthy
+     * page.
      * @param password - the fixture password.
      */
     async unlock(password = 'demo') {
+      if (
+        await evaluate('document.querySelector(".fl-composer, .fl-card-lg") !== null')
+      ) {
+        return
+      }
       await waitFor('document.querySelector(".fl-gate input[type=password]") !== null', 'the gate')
       await session.typeInto('.fl-gate input[type=password]', password)
       await evaluate('document.querySelector(".fl-gate form").requestSubmit()')
