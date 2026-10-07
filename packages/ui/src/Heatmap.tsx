@@ -7,7 +7,7 @@
 import type * as React from 'react'
 import { useMemo } from 'react'
 
-import { absoluteDayLabel, heatmap } from '@flomo/core'
+import { absoluteDayLabel, dayOf, heatmap } from '@flomo/core'
 import type { Memo } from '@flomo/core'
 
 export interface HeatmapProps {
@@ -18,6 +18,8 @@ export interface HeatmapProps {
   today?: Date
   /** Navigates to a day's notes. Provided, past cells become clickable. */
   onSelectDay?: (day: string) => void
+  /** The day currently filtered in the feed, if any — its cell gets a ring. */
+  activeDay?: string
 }
 
 /** Square size, in pixels; must match the stylesheet. */
@@ -56,18 +58,20 @@ export function Heatmap({
   weeks = 26,
   today = new Date(),
   onSelectDay,
+  activeDay,
 }: HeatmapProps): React.ReactElement {
   const columns = useMemo(() => {
     const counts = heatmap(memos)
 
-    // Walk back to the Sunday that opens the *current* week, then back (weeks
+    // Walk back to the Monday that opens the *current* week, then back (weeks
     // - 1) more weeks, so the grid always runs through today. Anchoring on the
     // current week is the part that matters: subtracting the whole span from
     // today first left the last column ending a few days before `end`, which
     // could drop today — and the whole current month — off the right edge.
+    // flomo's columns run Monday → Sunday.
     const end = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     const start = new Date(end)
-    start.setDate(start.getDate() - end.getDay() - (weeks - 1) * 7)
+    start.setDate(start.getDate() - ((end.getDay() + 6) % 7) - (weeks - 1) * 7)
 
     const out: Array<Array<{ key: string; count: number; future: boolean }>> = []
     const cursor = new Date(start)
@@ -123,6 +127,17 @@ export function Heatmap({
           <div className="fl-heatmap-week" key={column[0]?.key ?? index}>
             {column.map((cell) => {
               const tip = `${absoluteDayLabel(cell.key)} · ${cell.count} 条`
+              // flomo marks today with an outlined cell and rings the day
+              // currently filtered in the feed.
+              const isToday = cell.key === dayOf(today)
+              const isActive = activeDay === cell.key
+              const cls = [
+                'fl-heatmap-cell',
+                isToday ? 'fl-heatmap-today' : '',
+                isActive ? 'fl-heatmap-active' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
               if (onSelectDay !== undefined && !cell.future) {
                 // A day cell is a doorway: flomo opens that day's notes when a
                 // square is clicked, empty days included.
@@ -130,7 +145,7 @@ export function Heatmap({
                   <button
                     key={cell.key}
                     type="button"
-                    className="fl-heatmap-cell"
+                    className={cls}
                     data-level={heatLevel(cell.count)}
                     title={tip}
                     aria-label={`${tip}，查看当天笔记`}
@@ -141,7 +156,7 @@ export function Heatmap({
               return (
                 <div
                   key={cell.key}
-                  className="fl-heatmap-cell"
+                  className={cls}
                   data-level={cell.future ? 0 : heatLevel(cell.count)}
                   style={cell.future ? { opacity: 0.35 } : undefined}
                   title={tip}

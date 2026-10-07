@@ -167,6 +167,7 @@ export function Sidebar({
       <Heatmap
         memos={memos}
         weeks={SIDEBAR_WEEKS}
+        activeDay={view.kind === 'day' ? view.day : undefined}
         onSelectDay={(day) => onSelect({ kind: 'day', day })}
       />
 

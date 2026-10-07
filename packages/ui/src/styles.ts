@@ -1196,6 +1196,15 @@ del { color: var(--flomo-text-faint); }
   background: var(--flomo-border);
 }
 
+/* flomo marks today with an outlined cell and rings the day currently
+   filtered in the feed — both sit above the colour fill. */
+.fl-heatmap-today { box-shadow: inset 0 0 0 1.5px var(--flomo-text-soft); }
+
+.fl-heatmap-active {
+  box-shadow: inset 0 0 0 1.5px var(--flomo-green);
+  border-radius: 4px;
+}
+
 /* Past days are doorways into that day's notes, so they take the pointer. */
 button.fl-heatmap-cell { cursor: pointer; }
 button.fl-heatmap-cell:hover { filter: brightness(0.9); }
