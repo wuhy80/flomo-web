@@ -31,7 +31,7 @@ import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
 import { Sidebar } from './Sidebar.tsx'
 import { InsightView } from './InsightView.tsx'
-import { loadAiConfig, saveAiConfig } from './ai-insights.ts'
+import { AI_PRESETS, loadAiConfig, saveAiConfig } from './ai-insights.ts'
 import type { AiConfig } from './ai-insights.ts'
 import { UnlockGate } from './UnlockGate.tsx'
 import { injectFlomoStyles } from './styles.ts'
@@ -700,6 +700,19 @@ export function FlomoApp({
                   洞察会把所选笔记的明文发送给你自己的 AI 服务商。任何 OpenAI 兼容端点都可以：
                   DeepSeek 官方、opencode 套餐的网关、GLM 开放平台等。密钥只存在本机。
                 </p>
+                <div className="fl-insight-presets">
+                  {AI_PRESETS.map((preset) => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      className="fl-insight-scope-option"
+                      title={preset.hint}
+                      onClick={() => setAiConfig({ ...aiConfig, baseUrl: preset.baseUrl, model: preset.model })}
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
+                </div>
                 <div className="fl-field">
                   <span className="fl-field-label">Base URL（不含 /chat/completions）</span>
                   <input

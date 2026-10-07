@@ -116,11 +116,19 @@ export function InsightView({
         setResult(insight)
         setHistory(addHistory(insight))
       } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : '洞察失败：请检查网络与 AI 服务配置后重试。',
-        )
+        if (caught instanceof TypeError && /fetch/i.test(caught.message)) {
+          // A blocked preflight surfaces as a bare TypeError: name the likely
+          // cause and the providers this page is known to work with.
+          setError(
+            '请求被浏览器跨域拦截：该服务商不允许网页直连。已验证可直连：智谱 GLM、DeepSeek 官方、Moonshot（见设置页预设）。',
+          )
+        } else {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : '洞察失败：请检查网络与 AI 服务配置后重试。',
+          )
+        }
       } finally {
         setRunning(false)
       }

@@ -147,6 +147,32 @@ export function buildCorpus(memos: readonly Memo[], limit: number | null, tag?: 
   return `以下是用户 ${span} 的笔记：\n\n${blocks.join('\n\n')}`
 }
 
+/**
+ * One-tap provider presets. Every entry is verified to answer browser
+ * preflights with CORS headers — opencode's gateway, for one, does not, so a
+ * plan key behind it cannot be used from a web page directly.
+ */
+export const AI_PRESETS: ReadonlyArray<{ name: string; baseUrl: string; model: string; hint?: string }> = [
+  {
+    name: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    model: 'glm-4.5-flash',
+    hint: 'glm-4.5-flash 免费，注册 open.bigmodel.cn 即得 API Key',
+  },
+  {
+    name: 'DeepSeek 官方',
+    baseUrl: 'https://api.deepseek.com',
+    model: 'deepseek-chat',
+    hint: 'platform.deepseek.com 充值后生成 Key，按量计费',
+  },
+  {
+    name: 'Moonshot Kimi',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    model: 'moonshot-v1-8k',
+    hint: 'platform.moonshot.cn 生成 Key',
+  },
+]
+
 /** The AI provider settings a user configures in 设置. */
 export interface AiConfig {
   /** OpenAI-compatible base URL, no trailing slash — e.g. https://api.deepseek.com */
