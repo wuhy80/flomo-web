@@ -62,9 +62,10 @@ export const FLOMO_CSS = `
 /* ── sidebar ─────────────────────────────────────────────────────────── */
 
 .fl-sidebar {
-  /* Sized to hold flomo's calendar: 430px of 24px squares (fifteen weeks at a
-     29px pitch) plus the column's own 12px padding and the grid's 8px inset. */
-  width: 470px;
+  /* Sized to hold flomo's calendar: 289px of grid (fourteen weeks of 16px
+     squares at a 21px pitch) plus the column's own 12px padding and the
+     grid's 8px inset. */
+  width: 330px;
   flex: none;
   display: flex;
   flex-direction: column;
@@ -813,7 +814,7 @@ export const FLOMO_CSS = `
    they label instead of staying behind. */
 .fl-heatmap-wrap { overflow-x: auto; padding-bottom: 4px; }
 
-.fl-heatmap-months { position: relative; height: 18px; margin-top: 4px; }
+.fl-heatmap-months { position: relative; height: 20px; margin-top: 4px; }
 
 .fl-heatmap-month {
   position: absolute;
@@ -828,9 +829,9 @@ export const FLOMO_CSS = `
 .fl-heatmap-week { display: flex; flex-direction: column; gap: 5px; }
 
 .fl-heatmap-cell {
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
   background: var(--flomo-border);
 }
 
@@ -930,10 +931,10 @@ export const FLOMO_CSS = `
   .fl-brand { padding: 0 8px 0 2px; font-size: 14px; }
   .fl-sidebar-section { display: none; }
   .fl-tag-list { flex-direction: row; gap: 2px; }
-  /* The calendar is 220px of the column it lives in on desktop; in a horizontal
-     phone strip it would be most of the screen and half of it is off-screen
-     anyway. The stacked corpus numbers read no better sideways, so the strip
-     keeps what a phone can actually use: the navigation and the tags. */
+  /* Even at 156px tall, the calendar is a third of a phone screen, and in a
+     horizontal strip half of it is clipped off-screen anyway. The stacked
+     corpus numbers read no better sideways, so the strip keeps what a phone
+     can actually use: the navigation and the tags. */
   .fl-corpus-stats,
   .fl-sidebar .fl-heatmap-wrap { display: none; }
 

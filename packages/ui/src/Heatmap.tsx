@@ -19,7 +19,7 @@ export interface HeatmapProps {
 }
 
 /** Square size, in pixels; must match the stylesheet. */
-const CELL = 24
+const CELL = 16
 
 /** Gap between squares, in pixels; must match the stylesheet. */
 const GAP = 5
@@ -49,11 +49,14 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
   const columns = useMemo(() => {
     const counts = heatmap(memos)
 
-    // Walk back to the Sunday that starts the first visible week, so the grid
-    // always aligns to weekday rows regardless of what day it is today.
+    // Walk back to the Sunday that opens the *current* week, then back (weeks
+    // - 1) more weeks, so the grid always runs through today. Anchoring on the
+    // current week is the part that matters: subtracting the whole span from
+    // today first left the last column ending a few days before `end`, which
+    // could drop today — and the whole current month — off the right edge.
     const end = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     const start = new Date(end)
-    start.setDate(start.getDate() - (weeks * 7 - 1) - end.getDay())
+    start.setDate(start.getDate() - end.getDay() - (weeks - 1) * 7)
 
     const out: Array<Array<{ key: string; count: number; future: boolean }>> = []
     const cursor = new Date(start)
@@ -73,22 +76,34 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
   }, [memos, weeks, today])
 
   /**
-   * The month label to draw at each column, or `null` where there is none.
+   * One label per month the grid touches, at the column where that month begins
+   * — detected cell by cell, so a month starting mid-week is labelled in the
+   * week it starts in rather than at the first column that opens inside it.
+   * That placement is what keeps the current month off the right edge: with the
+   * old first-column-of-the-month rule, `10月` landed on the last column and
+   * was clipped into invisibility.
    *
-   * A label appears on the first column and then only where the month changes, so
-   * the axis stays readable without a label per week.
+   * When a range that starts mid-month puts two month beginnings in one column,
+   * the later month takes the slot — the earlier one labels days that are
+   * mostly off the grid anyway. The left position is clamped so no label can
+   * run past the grid's right edge.
    */
-  const months = useMemo(
-    () =>
-      columns.map((column, index) => {
-        const key = column[0]?.key
-        if (key === undefined) return null
-        const month = key.slice(0, 7)
-        const before = index === 0 ? null : (columns[index - 1]?.[0]?.key.slice(0, 7) ?? null)
-        return month === before ? null : `${Number(month.slice(5, 7))}月`
-      }),
-    [columns],
-  )
+  const months = useMemo(() => {
+    const out: Array<{ label: string; index: number }> = []
+    let previous: string | null = null
+    for (const [index, column] of columns.entries()) {
+      for (const cell of column) {
+        const month = cell.key.slice(0, 7)
+        if (month === previous) continue
+        previous = month
+        const item = { label: `${Number(month.slice(5, 7))}月`, index }
+        const last = out[out.length - 1]
+        if (last !== undefined && last.index === index) out[out.length - 1] = item
+        else out.push(item)
+      }
+    }
+    return out
+  }, [columns])
 
   return (
     <div className="fl-heatmap-wrap">
@@ -112,13 +127,15 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
           top read as a header row for the cells beneath them, labels on the
           bottom read as the axis. */}
       <div className="fl-heatmap-months" aria-hidden="true">
-        {months.map((label, index) =>
-          label === null ? null : (
-            <span key={`${label}-${index}`} className="fl-heatmap-month" style={{ left: index * PITCH }}>
-              {label}
-            </span>
-          ),
-        )}
+        {months.map((month) => (
+          <span
+            key={month.label}
+            className="fl-heatmap-month"
+            style={{ left: Math.min(month.index * PITCH, columns.length * PITCH - GAP - 34) }}
+          >
+            {month.label}
+          </span>
+        ))}
       </div>
     </div>
   )

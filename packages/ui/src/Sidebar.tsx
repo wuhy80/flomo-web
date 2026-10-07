@@ -16,11 +16,10 @@ import type { FlomoView } from './views.ts'
 /**
  * Weeks of heatmap shown in the column.
  *
- * flomo's calendar is about 433px across of 24px squares — fifteen weeks at a
- * 29px pitch — and its column is sized to hold it, so ours matches both numbers
- * rather than squeezing fewer, smaller weeks into a narrow rail.
+ * Measured off flomo itself: its calendar is 14 weeks of 16px squares at a 21px
+ * pitch — 289px of grid — which is what the column here is sized to hold.
  */
-const SIDEBAR_WEEKS = 15
+const SIDEBAR_WEEKS = 14
 
 export interface SidebarProps {
   view: FlomoView
