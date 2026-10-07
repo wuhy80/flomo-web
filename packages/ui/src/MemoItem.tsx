@@ -393,6 +393,8 @@ export function MemoItem({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(memo.content)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuWrap = useRef<HTMLDivElement>(null)
   const editArea = useRef<HTMLTextAreaElement>(null)
 
   // The edit box grows with its draft, exactly like the capture box does: an
@@ -403,6 +405,51 @@ export function MemoItem({
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [draft, editing])
+
+  // The more-menu closes on any click outside the card and resets its delete
+  // confirmation, so abandoning the menu never leaves an armed delete behind.
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const close = (event: PointerEvent) => {
+      if (menuWrap.current && !menuWrap.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+        setConfirmingDelete(false)
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [menuOpen])
+
+  /** Clipboard with a textarea fallback for restricted contexts. */
+  const copyText = useCallback(async (value: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      const helper = document.createElement('textarea')
+      helper.value = value
+      document.body.appendChild(helper)
+      helper.select()
+      document.execCommand('copy')
+      helper.remove()
+    }
+  }, [])
+
+  /** The per-note link the more-menu's 复制链接 hands out. */
+  const shareLink =
+    typeof location === 'undefined' ? '' : `${location.origin}${location.pathname}#memo=${memo.id}`
+
+  /** Share through the system sheet when there is one, else copy. */
+  const shareMemo = useCallback(async (): Promise<void> => {
+    if (typeof navigator !== 'undefined' && navigator.share !== undefined) {
+      try {
+        await navigator.share({ text: memo.content })
+        return
+      } catch {
+        return // a dismissed share sheet is not an error
+      }
+    }
+    await copyText(memo.content)
+  }, [memo.content, copyText])
 
   // The editor shares the capture box's toolbar: same transforms, bound to the
   // edit textarea, with the draft as the value they rewrite.
@@ -481,56 +528,159 @@ export function MemoItem({
   }
 
   return (
-    <article className="fl-memo">
-      <div className="fl-memo-actions">
-        <button
-          type="button"
-          className="fl-icon-button"
-          onClick={() => onOpen(memo.id)}
-          title="打开单条笔记与反向链接"
-        >
-          详情
-        </button>
-        <button
-          type="button"
-          className="fl-icon-button"
-          onClick={() => onPin(memo.id)}
-          title={memo.pinned ? '取消置顶' : '置顶'}
-        >
-          {memo.pinned ? '取消置顶' : '置顶'}
-        </button>
-        <button type="button" className="fl-icon-button" onClick={beginEdit} title="编辑">
-          编辑
-        </button>
-        {confirmingDelete ? (
-          <>
-            <button
-              type="button"
-              className="fl-icon-button"
-              style={{ color: 'var(--flomo-danger)' }}
-              onClick={() => onRemove(memo.id)}
-            >
-              确认删除
-            </button>
-            <button
-              type="button"
-              className="fl-icon-button"
-              onClick={() => setConfirmingDelete(false)}
-            >
-              取消
-            </button>
-          </>
-        ) : (
+    <article className="fl-memo" data-memo-id={memo.id} ref={menuWrap}>
+      <button
+        type="button"
+        className="fl-more"
+        aria-label="更多操作"
+        aria-expanded={menuOpen}
+        onClick={() => {
+          setConfirmingDelete(false)
+          setMenuOpen((open) => !open)
+        }}
+      >
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <g fill="currentColor">
+            <circle cx="3.5" cy="8" r="1.4" />
+            <circle cx="8" cy="8" r="1.4" />
+            <circle cx="12.5" cy="8" r="1.4" />
+          </g>
+        </svg>
+      </button>
+
+      {menuOpen ? (
+        <div className="fl-memo-menu" role="menu" aria-label="笔记操作">
           <button
             type="button"
-            className="fl-icon-button"
-            onClick={() => setConfirmingDelete(true)}
-            title="删除"
+            role="menuitem"
+            className="fl-memo-menu-item"
+            onClick={() => {
+              void shareMemo()
+              setMenuOpen(false)
+            }}
           >
-            删除
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path
+                d="M8 10V2.5M5 5l3-3 3 3M3 10.5v2A1.5 1.5 0 0 0 4.5 14h7a1.5 1.5 0 0 0 1.5-1.5v-2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            分享
           </button>
-        )}
-      </div>
+          <button
+            type="button"
+            role="menuitem"
+            className="fl-memo-menu-item"
+            onClick={() => {
+              beginEdit()
+              setMenuOpen(false)
+              setConfirmingDelete(false)
+            }}
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path
+                d="m11.3 2.6 2.1 2.1-8 8L3 13l.3-2.4 8-8Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+              />
+            </svg>
+            编辑
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="fl-memo-menu-item"
+            onClick={() => {
+              void copyText(memo.content)
+              setMenuOpen(false)
+            }}
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <rect
+                x="5.5"
+                y="5.5"
+                width="8"
+                height="8"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+              <path
+                d="M10.5 5.5v-2A1.5 1.5 0 0 0 9 2H4.5A1.5 1.5 0 0 0 3 3.5V9a1.5 1.5 0 0 0 1.5 1.5h2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+            </svg>
+            复制
+          </button>
+          <hr className="fl-memo-menu-divider" />
+          <button
+            type="button"
+            role="menuitem"
+            className="fl-memo-menu-item"
+            onClick={() => {
+              onPin(memo.id)
+              setMenuOpen(false)
+            }}
+          >
+            {memo.pinned ? '取消置顶' : '置顶'}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="fl-memo-menu-item"
+            onClick={() => {
+              onOpen(memo.id)
+              setMenuOpen(false)
+            }}
+          >
+            相关笔记
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="fl-memo-menu-item"
+            onClick={() => {
+              void copyText(shareLink)
+              setMenuOpen(false)
+            }}
+          >
+            复制链接
+          </button>
+          <hr className="fl-memo-menu-divider" />
+          <button
+            type="button"
+            role="menuitem"
+            className={
+              confirmingDelete
+                ? 'fl-memo-menu-item fl-memo-menu-item-danger'
+                : 'fl-memo-menu-item'
+            }
+            onClick={() => {
+              if (confirmingDelete) {
+                onRemove(memo.id)
+                setMenuOpen(false)
+              } else {
+                setConfirmingDelete(true)
+              }
+            }}
+          >
+            {confirmingDelete ? '确认删除？' : '删除'}
+          </button>
+          <div className="fl-memo-menu-foot">
+            <div>字数统计：{memo.content.length}</div>
+            <div>编辑于 {dayOf(memo.updatedAt)}</div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="fl-memo-head">
         {/* The full stamp sits on the card itself, the way flomo shows it. With

@@ -381,11 +381,14 @@ export async function openApp(url, options = {}) {
      * @param label - the button's text.
      */
     async clickInMemo(contains, label) {
-      const clicked = await evaluate(`(() => {
+      const clicked = await evaluate(`(async () => {
         const wanted = ${JSON.stringify(contains)};
         const memo = [...document.querySelectorAll('.fl-memo')]
           .find((node) => node.textContent.includes(wanted));
         if (memo === undefined) return false;
+        // The actions live behind the memo's ... button; open it first.
+        memo.querySelector('.fl-more')?.click();
+        await new Promise((ready) => setTimeout(ready, 150));
         const button = [...memo.querySelectorAll('button')]
           .find((candidate) => candidate.textContent.trim() === ${JSON.stringify(label)});
         if (button === undefined) return false;

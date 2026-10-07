@@ -848,30 +848,78 @@ del { color: var(--flomo-text-faint); }
   background: var(--flomo-bg-sunken);
 }
 
-.fl-memo-actions {
+.fl-more {
   position: absolute;
   top: 10px;
   right: 10px;
-  display: none;
-  gap: 4px;
-  background: var(--flomo-bg);
-  padding-left: 10px;
-}
-
-.fl-memo:hover .fl-memo-actions { display: flex; }
-
-.fl-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--flomo-text-faint);
-  font: inherit;
-  font-size: 12px;
-  padding: 3px 7px;
-  border-radius: 5px;
   cursor: pointer;
 }
 
-.fl-icon-button:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+.fl-more:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+
+/* flomo's more-menu: a card dropped under the ... button, grouped actions, a
+   red delete, and the counts in a footer. */
+.fl-memo-menu {
+  position: absolute;
+  top: 40px;
+  right: 10px;
+  z-index: 30;
+  width: 200px;
+  padding: 6px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 10px;
+  background: var(--flomo-bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.fl-memo-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--flomo-text);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fl-memo-menu-item:hover { background: var(--flomo-hover); }
+
+.fl-memo-menu-item svg { flex: none; color: var(--flomo-text-soft); }
+
+.fl-memo-menu-item-danger,
+.fl-memo-menu-item-danger:hover { color: var(--flomo-danger); background: transparent; }
+
+.fl-memo-menu-item-danger:hover { background: #fdf0f3; }
+
+.fl-memo-menu-divider {
+  border: 0;
+  border-top: 1px solid var(--flomo-border);
+  margin: 6px 4px;
+}
+
+.fl-memo-menu-foot {
+  padding: 8px 10px 2px;
+  border-top: 1px solid var(--flomo-border);
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.9;
+  color: var(--flomo-text-faint);
+}
 
 .fl-memo-edit { display: flex; flex-direction: column; gap: 8px; }
 
@@ -1523,17 +1571,7 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
   /* No physical keyboard on this size, so the hint is only noise. */
   .fl-search-kbd { display: none; }
 
-  /* Actions go below the memo they act on. They were rendering above it, which
-     reads as acting on the note that follows. */
   .fl-memo { display: flex; flex-direction: column; }
-  .fl-memo-body { order: 1; }
-  .fl-memo-actions {
-    order: 3;
-    position: static;
-    display: flex;
-    margin-top: 8px;
-    padding: 0;
-  }
 }
 `
 

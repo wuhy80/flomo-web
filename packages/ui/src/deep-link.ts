@@ -50,3 +50,19 @@ export function readShareTarget(search: string): string | null {
   const joined = parts.join('\n\n')
   return joined === '' ? null : joined
 }
+
+/**
+ * Read a single-memo deep link from a location hash.
+ *
+ * `#memo=<id>` opens the note's own page — the target of the more-menu's
+ * 复制链接. Like the compose preset it is consumed on arrival, so a shared
+ * bookmark starts clean.
+ * @param hash - the raw `location.hash`, leading `#` included.
+ * @returns the memo id, or null when absent.
+ */
+export function readMemoDeepLink(hash: string): string | null {
+  if (!hash.startsWith('#')) return null
+  const value = new URLSearchParams(hash.slice(1)).get('memo')
+  if (value === null || value.trim() === '') return null
+  return value
+}

@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { readComposeDeepLink, readShareTarget } from '../src/deep-link.ts'
+import { readComposeDeepLink, readMemoDeepLink, readShareTarget } from '../src/deep-link.ts'
 
 describe('compose deep link', () => {
   it('reads a plain preset', () => {
@@ -62,5 +62,17 @@ describe('share target', () => {
   it('reads as no preset for an empty or unrelated query', () => {
     assert.equal(readShareTarget(''), null)
     assert.equal(readShareTarget('?utm_source=x'), null)
+  })
+})
+
+describe('memo deep link', () => {
+  it('reads a memo id', () => {
+    assert.equal(readMemoDeepLink('#memo=abc-123'), 'abc-123')
+  })
+
+  it('reads as no memo for anything else', () => {
+    assert.equal(readMemoDeepLink('#compose=x'), null)
+    assert.equal(readMemoDeepLink('#memo='), null)
+    assert.equal(readMemoDeepLink(''), null)
   })
 })

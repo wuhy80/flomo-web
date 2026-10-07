@@ -26,7 +26,7 @@ import {
 } from '@flomo/core'
 
 import { Composer } from './Composer.tsx'
-import { readComposeDeepLink, readShareTarget } from './deep-link.ts'
+import { readComposeDeepLink, readMemoDeepLink, readShareTarget } from './deep-link.ts'
 import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
 import { Sidebar } from './Sidebar.tsx'
@@ -95,7 +95,10 @@ export function FlomoApp({
   injectStyles = true,
 }: FlomoAppProps): React.ReactElement {
   const snapshot = useFlomoSession(session)
-  const [view, setView] = useState<FlomoView>({ kind: 'all' })
+  const [view, setView] = useState<FlomoView>(() => {
+    const memoId = typeof location === 'undefined' ? null : readMemoDeepLink(location.hash)
+    return memoId ? { kind: 'focus', id: memoId } : { kind: 'all' }
+  })
   const [query, setQuery] = useState('')
   const [randomTick, setRandomTick] = useState(0)
   const [composeToken, setComposeToken] = useState(0)
@@ -119,9 +122,13 @@ export function FlomoApp({
   // The address bar should not keep the note: strip the fragment as soon as the
   // app has read it, so a refresh or a shared bookmark starts clean.
   useEffect(() => {
-    if (composePreset === null) return
-    if (typeof location !== 'undefined' && (location.hash !== '' || location.search !== '')) {
-      // The app keeps no URL state, so a consumed preset leaves nothing behind.
+    if (typeof location === 'undefined') return
+    if (
+      location.hash.startsWith('#compose=') ||
+      location.hash.startsWith('#memo=') ||
+      location.search !== ''
+    ) {
+      // The app keeps no URL state, so a consumed deep link leaves nothing behind.
       history.replaceState(null, '', location.pathname)
     }
   }, [])
