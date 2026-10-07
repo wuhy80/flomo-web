@@ -1,0 +1,11 @@
+{
+  "name": "@flomo/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Model Context Protocol server for flomo-sim: let a model add and read memos from the encrypted GitHub vault, over stdio.",
+  "main": "server.ts",
+  "dependencies": {
+    "@flomo/core": "workspace:*"
+  }
+}

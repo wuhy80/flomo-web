@@ -12,6 +12,7 @@
     "build:plugin": "pnpm --filter dsh-flomo build",
     "watch:plugin": "pnpm --filter dsh-flomo watch",
     "smoke": "pnpm --filter @flomo/web smoke",
+    "mcp": "node packages/mcp/server.ts",
     "test": "node --test \"packages/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -5,7 +5,7 @@
 - **零服务器**：站点是纯静态的，部署到 GitHub Pages 免费
 - **真加密**：密码即密钥（PBKDF2-SHA256 60 万次 → AES-256-GCM），仓库里只有密文
 - **两套外壳，一套内核**：网页版和 DSH 面板共用同一个 `@flomo/core` 与 `@flomo/ui`
-- **Agent 可读写**：装上 DSH 插件后，对话里说「记一条」就能落库
+- **Agent 可读写**：装上 DSH 插件后，对话里说「记一条」就能落库；也有 [MCP 服务器](packages/mcp/README.md)，任何 MCP 客户端都能接
 
 ![flomo-sim 的记录流](docs/screenshot-feed.png)
 
@@ -398,7 +398,8 @@ plugin_manager install_bundle  target = link:D:\code\flomo-sim\packages\dsh-plug
 | `pnpm smoke` | **部署冒烟测试**：像 GitHub Pages 那样静态服务 `dist/`，逐项检查 |
 | `pnpm build:plugin` | 构建 DSH 插件两半 |
 | `pnpm watch:plugin` | 监听模式重建插件 |
-| `pnpm test` | 跑 core / ui / 插件 / web 的测试 |
+| `pnpm mcp` | 启动 MCP 服务器（stdio，凭据走环境变量，见 [packages/mcp](packages/mcp/README.md)） |
+| `pnpm test` | 跑 core / ui / mcp / 插件 / web 的测试 |
 | `pnpm typecheck` | 全仓类型检查 |
 | `pnpm --filter @flomo/web shots` | 截图（需要 dev server，见上） |
 | `pnpm --filter @flomo/web interact` | 真实浏览器交互检查（需要 dev server，见上） |
@@ -414,11 +415,13 @@ packages/
 │                      四个包的测试都用它，不跨包去够别人的测试目录
 ├─ ui/          flomo 风格 React 组件与样式，网页版和面板共用
 ├─ web/         Vite 应用 + Pages 部署
-└─ dsh-plugin/  dsh-flomo 双面插件
-   ├─ src/index.ts      host 入口：注册路由与 agent 工具
-   ├─ src/routes.ts     两个路由 + 一道守卫
-   ├─ src/client/       侧栏图标 + 中央面板
-   └─ build.mjs         两半的打包（含模块加载器封装）
+├─ dsh-plugin/  dsh-flomo 双面插件
+│  ├─ src/index.ts      host 入口：注册路由与 agent 工具
+│  ├─ src/routes.ts     两个路由 + 一道守卫
+│  ├─ src/client/       侧栏图标 + 中央面板
+│  └─ build.mjs         两半的打包（含模块加载器封装）
+└─ mcp/         MCP 服务器：stdio 上暴露 flomo_add / 查看类工具，
+                任何 MCP 客户端的大模型都能读写同一个加密保险库
 ```
 
 ### 一个刻意的设计
