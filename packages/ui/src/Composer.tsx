@@ -482,39 +482,41 @@ export function Composer({
         </div>
       ) : null}
 
-      <div className="fl-composer-attach">
-        {images.map((image) => (
-          <span key={image.localId} className="fl-attach-thumb">
-            <img src={image.preview} alt="待发送的图片" />
-            <button
-              type="button"
-              className="fl-attach-remove"
-              aria-label="移除这张图片"
-              onClick={() => removeImage(image.localId)}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-        <button
-          type="button"
-          className="fl-attach-add"
-          title="添加图片"
-          aria-label="添加图片"
-          disabled={busyImage}
-          onClick={() => fileInput.current?.click()}
-        >
-          {busyImage ? <span className="fl-spinner" /> : '+'}
-        </button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/*"
-          multiple
-          className="fl-visually-hidden"
-          onChange={onPickFiles}
-        />
-      </div>
+      {images.length > 0 ? (
+        <div className="fl-composer-attach">
+          {images.map((image) => (
+            <span key={image.localId} className="fl-attach-thumb">
+              <img src={image.preview} alt="待发送的图片" />
+              <button
+                type="button"
+                className="fl-attach-remove"
+                aria-label="移除这张图片"
+                onClick={() => removeImage(image.localId)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            className="fl-attach-add"
+            title="添加图片"
+            aria-label="添加图片"
+            disabled={busyImage}
+            onClick={() => fileInput.current?.click()}
+          >
+            {busyImage ? <span className="fl-spinner" /> : '+'}
+          </button>
+        </div>
+      ) : null}
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        multiple
+        className="fl-visually-hidden"
+        onChange={onPickFiles}
+      />
 
       <div className="fl-composer-bar">
         <div className="fl-composer-tools">

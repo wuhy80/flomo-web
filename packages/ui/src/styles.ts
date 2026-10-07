@@ -369,7 +369,9 @@ export const FLOMO_CSS = `
 .fl-composer textarea {
   display: block;
   width: 100%;
-  min-height: 58px;
+  /* flomo's box is a comfortable paragraph tall before you type; the component
+     grows it further with content up to its own cap. */
+  min-height: 150px;
   border: 0;
   outline: 0;
   resize: none;
@@ -818,14 +820,19 @@ del { color: var(--flomo-text-faint); }
 
 .fl-memo-edit textarea {
   width: 100%;
-  min-height: 72px;
+  /* Matches the capture box: a paragraph tall at rest, grown to fit the draft
+     by the component (capped there), so long notes edit without scrolling a
+     postage stamp. */
+  min-height: 150px;
+  max-height: 480px;
   border: 1px solid var(--flomo-border-strong);
   border-radius: var(--flomo-radius-sm);
   padding: 8px 10px;
   font: inherit;
   font-size: 15px;
   line-height: 1.75;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
   color: inherit;
   background: var(--flomo-bg);
   outline: 0;

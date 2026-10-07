@@ -8,7 +8,7 @@
  */
 
 import type * as React from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { clockOf, dayOf, parseBlocks, tokenizeInline } from '@flomo/core'
@@ -358,6 +358,16 @@ export function MemoItem({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(memo.content)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const editArea = useRef<HTMLTextAreaElement>(null)
+
+  // The edit box grows with its draft, exactly like the capture box does: an
+  // auto-height pass on every draft change, capped by the stylesheet.
+  useEffect(() => {
+    const el = editArea.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [draft, editing])
 
   const beginEdit = useCallback(() => {
     setDraft(memo.content)
@@ -389,6 +399,7 @@ export function MemoItem({
       <article className="fl-memo">
         <div className="fl-memo-edit">
           <textarea
+            ref={editArea}
             value={draft}
             autoFocus
             onChange={(event) => setDraft(event.target.value)}
