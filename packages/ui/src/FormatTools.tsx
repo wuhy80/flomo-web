@@ -135,6 +135,14 @@ export function FormatToolsBar({ tools, imageSlot }: FormatToolsBarProps): React
       <button
         type="button"
         className="fl-tool"
+        title="引用 MEMO"
+        onClick={() => tools.insertTemplate('@', 1)}
+      >
+        @
+      </button>
+      <button
+        type="button"
+        className="fl-tool"
         title="插入表格"
         onClick={() => tools.insertTemplate('| 列一 | 列二 |\n| --- | --- |\n|  |  |', 4)}
       >
