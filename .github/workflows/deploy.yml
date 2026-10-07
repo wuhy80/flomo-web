@@ -37,9 +37,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version` input: pnpm/action-setup reads packageManager from
+      # package.json, the one place that can not drift against the lockfile.
+      # Pinning "11" here as well failed the step with "Multiple versions of
+      # pnpm specified".
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       # Node 24, matching development and ci.yml: the test runner executes `.ts`
       # files via type stripping, which Node 22 only enabled by default from
