@@ -36,8 +36,13 @@ declare module '@deepseek-ai/dsh-tools' {
     text: string
   }
 
-  /** A tool as the registry stores it. */
-  export interface ToolDefinition {
+  /**
+   * A tool as it is *written*: parameters as a name-to-declaration map.
+   *
+   * This is the input shape. `defineTool` normalizes it, and that normalization is
+   * not optional — see {@link ToolDefinition.parameters}.
+   */
+  export interface ToolDeclaration {
     name: string
     description: string
     parameters: Record<string, ToolParameter>
@@ -45,12 +50,9 @@ declare module '@deepseek-ai/dsh-tools' {
       /**
        * A JSON Schema for the tool's return value.
        *
-       * Typed loosely on purpose. The Harness's own `defineTool` also accepts a
-       * `{ type: 'json' }` shorthand and expands it, but the registry validates
-       * what it is finally given — so a plugin that supplies its own helper must
-       * hand over a schema that stands on its own. This shim originally declared
-       * the shorthand as the contract, which is what made that mistake look
-       * correct at compile time.
+       * Typed loosely on purpose. `defineTool` also accepts a `{ type: 'json' }`
+       * shorthand and expands it; a plugin that supplies its own helper must expand
+       * it too, because the registry validates what it is finally given.
        */
       schema: Record<string, unknown>
       render: (args: unknown, value: unknown) => ToolContentBlock[]
@@ -59,13 +61,29 @@ declare module '@deepseek-ai/dsh-tools' {
     execute: (args: Record<string, unknown>, exec: unknown) => Promise<unknown>
   }
 
+  /** A tool as the registry stores it. */
+  export interface ToolDefinition extends Omit<ToolDeclaration, 'parameters'> {
+    /**
+     * A JSON Schema of `type: "object"` describing the arguments.
+     *
+     * Not the declaration map it was written as, and the difference matters more
+     * than it looks. The registry accepts either — it only validates
+     * `output.schema` — so a declaration map passes registration and then fails
+     * much later, when the model is handed the tool list:
+     *
+     *   Invalid schema for function 'flomo_add':
+     *   schema must be a JSON Schema of 'type: "object"', got 'type: null'.
+     */
+    parameters: Record<string, unknown>
+  }
+
   /**
-   * Declare a tool. The real implementation adds validation and defaulting
-   * around the definition.
-   * @param definition - the tool definition.
+   * Declare a tool. The real implementation adds validation, defaulting and the
+   * parameter normalization described on {@link ToolDefinition}.
+   * @param declaration - the tool as written.
    * @returns the definition the registry accepts.
    */
-  export function defineTool(definition: ToolDefinition): ToolDefinition
+  export function defineTool(declaration: ToolDeclaration): ToolDefinition
 }
 
 declare module '@deepseek-ai/dsh-host-webserver' {

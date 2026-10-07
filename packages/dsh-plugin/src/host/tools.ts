@@ -47,12 +47,51 @@ export const JSON_OUTPUT_SCHEMA = {
  *
  * The tool package is delivered by the Harness rather than by npm, and a
  * hot-pluggable install (a `link:` into the profile) can end up somewhere that
- * cannot resolve it. `defineTool` is not quite an identity function — it also
- * expands the `{ type: 'json' }` output shorthand — so this fallback is only
- * safe because every definition below already carries a schema the registry
- * accepts on its own.
+ * cannot resolve it.
+ *
+ * This is **not** an identity function. The Harness's `defineTool` does two
+ * things the definitions below rely on: it expands the `{ type: 'json' }`
+ * output shorthand, and it expands the `parameters` property-map shorthand
+ * (`{ content: { type: 'string', required: true } }`) into a real JSON Schema
+ * (`{ type: 'object', properties: {…}, required: ['content'] }`).
+ *
+ * The output side is spelled out in full below, so it survives an identity
+ * fallback. The input side cannot be: the Harness reads `parameters` as a
+ * property map, so a full schema's `type`/`properties`/`required` keys would be
+ * taken for parameter names (the Harness rejects exactly that with
+ * `parameters.type must be a value schema object`). The expansion is therefore
+ * reproduced here — without it the registered tools carry a schema with no
+ * top-level `type`, and a strict provider rejects the whole request with
+ * `schema must be a JSON Schema of 'type: "object"', got 'type: null'`.
  */
-export const identityDefineTool: DefineTool = (definition) => definition
+export const identityDefineTool: DefineTool = (definition) => {
+  const spec = (definition.parameters ?? {}) as Record<string, unknown>
+  // Already a full schema (defensive): leave it alone.
+  if (typeof spec.type === 'string' && spec.properties !== undefined) return definition
+
+  const properties: Record<string, unknown> = {}
+  const required: string[] = []
+  for (const [key, value] of Object.entries(spec)) {
+    if (value === null || typeof value !== 'object') {
+      properties[key] = value
+      continue
+    }
+    const { required: isRequired, ...rest } = value as Record<string, unknown>
+    properties[key] = rest
+    if (isRequired === true) required.push(key)
+  }
+
+  return {
+    ...definition,
+    // The expanded shape is structurally a parameter map whose entries happen to
+    // carry `type: 'object'`; the cast keeps the shim independent of dsh.d.ts.
+    parameters: {
+      type: 'object',
+      properties,
+      ...(required.length > 0 ? { required } : {}),
+    } as unknown as typeof definition.parameters,
+  }
+}
 
 /** Tool names this module registers, in registration order. */
 export const FLOMO_TOOL_NAMES = [

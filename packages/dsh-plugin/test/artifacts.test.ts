@@ -345,6 +345,39 @@ describe('built host bundle', () => {
       tools.map((tool) => tool.name),
       [...FLOMO_TOOL_NAMES],
     )
+
+    // Every tool's arguments must be a JSON Schema of `type: "object"`, not the
+    // property map they are written as. `defineTool` converts it and the fallback
+    // has to as well: the registry accepts either — it only validates
+    // `output.schema` — so a raw property map registers fine and then fails at the
+    // model API, which is where this was finally caught:
+    //
+    //   Invalid schema for function 'flomo_add':
+    //   schema must be a JSON Schema of 'type: "object"', got 'type: null'.
+    //
+    // The tool is unusable in that state, and nothing before this point notices.
+    for (const tool of tools) {
+      const parameters = tool.parameters as { type?: unknown; properties?: unknown }
+      assert.equal(
+        parameters.type,
+        'object',
+        `${tool.name} must declare an object schema, or the model API rejects it`,
+      )
+      assert.ok(
+        parameters.properties !== undefined,
+        `${tool.name} must declare its properties as a JSON Schema`,
+      )
+    }
+
+    // And the declared arguments survive the conversion: a converter that dropped
+    // `required` would pass the check above and lose the one thing the model needs.
+    const add = tools.find((tool) => tool.name === 'flomo_add')
+    const addSchema = add?.parameters as {
+      properties?: Record<string, { type?: string }>
+      required?: string[]
+    }
+    assert.equal(addSchema.properties?.content?.type, 'string')
+    assert.deepEqual(addSchema.required, ['content'])
   })
 
   it('serves state, reports the tool status, and drives actions over HTTP', async () => {
