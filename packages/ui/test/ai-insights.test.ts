@@ -17,6 +17,7 @@ import {
   buildCorpus,
   loadAiConfig,
   loadHistory,
+  markInsightSaved,
   removeHistory,
   saveAiConfig,
 } from '../src/ai-insights.ts'
@@ -155,3 +156,23 @@ describe('insight history', () => {
     assert.deepEqual(loadHistory(undefined), [])
   })
 })
+
+  it('marks a run as saved and keeps the flag', () => {
+    const { area } = fakeArea()
+    const run = (id: number) => ({
+      id,
+      perspectiveId: 'default',
+      perspectiveName: '默认洞察',
+      scopeLabel: '最近 50 条',
+      content: `结果 ${id}`,
+    })
+    addHistory(run(1), area)
+    addHistory(run(2), area)
+    markInsightSaved(1, area)
+    const history = loadHistory(area)
+    assert.equal(history[0]?.savedAt, undefined, 'run 2 untouched')
+    assert.ok(history[1]?.savedAt !== undefined, 'run 1 marked')
+    // Marking again must not change anything.
+    markInsightSaved(1, area)
+    assert.equal(loadHistory(area).length, 2)
+  })

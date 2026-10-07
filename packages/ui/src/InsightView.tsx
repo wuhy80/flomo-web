@@ -19,6 +19,7 @@ import {
   buildCorpus,
   loadAiConfig,
   loadHistory,
+  markInsightSaved,
   removeHistory,
 } from './ai-insights.ts'
 import type { StoredInsight } from './ai-insights.ts'
@@ -62,6 +63,11 @@ export function InsightView({
   const [result, setResult] = useState<StoredInsight | null>(null)
   const [history, setHistory] = useState<StoredInsight[]>(() => loadHistory())
   const [showHistory, setShowHistory] = useState(false)
+  // Insight runs already saved as memos — seeded from the persisted history so
+  // the state survives reloads, extended the moment a run is saved.
+  const [savedIds, setSavedIds] = useState<Set<number>>(
+    () => new Set(loadHistory().filter((item) => item.savedAt !== undefined).map((item) => item.id)),
+  )
 
   const configured = config.apiKey.trim() !== ''
 
@@ -236,17 +242,28 @@ export function InsightView({
               >
                 复制
               </button>
-              <button
-                type="button"
-                className="fl-button"
-                onClick={() => onSaveNote(result.content)}
-              >
-                存为笔记
-              </button>
             </span>
           </div>
           <div className="fl-insight-result-body">
             <MarkdownBody content={result.content} />
+          </div>
+          <div className="fl-insight-save-row">
+            {savedIds.has(result.id) || result.savedAt !== undefined ? (
+              <span className="fl-insight-saved">已存为笔记 ✓ 可在「全部笔记」中查看</span>
+            ) : (
+              <button
+                type="button"
+                className="fl-button"
+                onClick={() => {
+                  onSaveNote(result.content)
+                  markInsightSaved(result.id)
+                  setSavedIds((ids) => new Set(ids).add(result.id))
+                  setResult({ ...result, savedAt: Date.now() })
+                }}
+              >
+                存为笔记
+              </button>
+            )}
           </div>
         </div>
       ) : null}
@@ -275,6 +292,9 @@ export function InsightView({
                 >
                   <span>
                     {item.perspectiveName} · {item.scopeLabel}
+                    {item.savedAt !== undefined ? (
+                      <span className="fl-insight-saved"> ✓已存</span>
+                    ) : null}
                   </span>
                   <span className="fl-insight-history-time">
                     {new Date(item.id).toLocaleString()}

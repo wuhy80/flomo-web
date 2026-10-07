@@ -128,7 +128,9 @@ function bootstrap(data) {
     owner: OWNER, repo: REPO, token: 'demo-token', remember: true,
   }));
 
-  window.__flomoWrites = [];
+  // Recorded writes persist in localStorage, so a reload sees what the app just
+  // saved — the way real GitHub would.
+  window.__flomoWrites = JSON.parse(localStorage.getItem('__flomoFixtureWrites') ?? '[]');
 
   const reply = (body, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -156,6 +158,7 @@ function bootstrap(data) {
 
     if (method === 'PUT') {
       window.__flomoWrites.push({ path, body: init && init.body ? String(init.body) : '' });
+      localStorage.setItem('__flomoFixtureWrites', JSON.stringify(window.__flomoWrites));
       return reply({ content: { sha: 'sha-written' } });
     }
 
@@ -171,6 +174,12 @@ function bootstrap(data) {
       return reply(SHARDS.map((s) => ({
         type: 'file', name: s.name, path: s.path, sha: s.sha,
       })));
+    }
+    // A shard that was PUT earlier replays the recorded content, so reloads see
+    // what the app just saved — the way real GitHub would.
+    const written = (window.__flomoWrites ?? []).filter((w) => w.path === path).at(-1);
+    if (written !== undefined) {
+      return reply({ content: String(JSON.parse(written.body).content), sha: 'sha-written' });
     }
     const shard = SHARDS.find((s) => s.path === path);
     if (shard) return reply({ content: shard.content, sha: shard.sha });
