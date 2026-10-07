@@ -553,12 +553,14 @@ describe('tokenizeInline', () => {
     assert.deepEqual(tokenizeInline('`码`'), [{ type: 'code', value: '码' }])
   })
 
-  it('does not let markup inside a mark leak out of it', () => {
+  it('keeps code spans opaque but indexes marks nested in emphasis', () => {
     // A position earlier in the string wins over an alternative earlier in the
-    // pattern, so a code span swallows the link brackets inside it.
+    // pattern, so a code span swallows the link brackets inside it. Emphasis is
+    // styling rather than an opaque span, though: a tag the user bolded is
+    // still a tag, so the index walks into container marks.
     assert.deepEqual(parseLinks('`[[不是链接]]`'), [])
-    assert.deepEqual(parseTags('**#不是标签**'), [])
-    assert.deepEqual(parseLinks('**[[也不是]]**'), [])
+    assert.deepEqual(parseTags('**#不是标签**'), ['不是标签'])
+    assert.deepEqual(parseLinks('**[[也不是]]**'), ['也不是'])
   })
 
   it('treats a # inside a link as part of the link, not as a tag', () => {
@@ -925,5 +927,147 @@ describe('vault.merge', () => {
     await reopened.loadAll()
     assert.equal(reopened.all()[0]?.content, '从备份恢复 #备份')
     assert.deepEqual(reopened.all()[0]?.tags, ['备份'])
+  })
+})
+
+describe('markdown blocks', () => {
+  it('parses headings with their level and strips closing hashes', () => {
+    assert.deepEqual(parseBlocks('# 一级\n## 二级 ##\n###### 六级'), [
+      { type: 'heading', level: 1, text: '一级' },
+      { type: 'heading', level: 2, text: '二级' },
+      { type: 'heading', level: 6, text: '六级' },
+    ])
+  })
+
+  it('does not read a tag as a heading', () => {
+    // `#tag` has no space after the hash — the tag grammar keeps it.
+    assert.deepEqual(parseBlocks('#深度工作 值得读'), [
+      { type: 'paragraph', text: '#深度工作 值得读' },
+    ])
+  })
+
+  it('parses rules and keeps them out of prose', () => {
+    assert.deepEqual(parseBlocks('上\n\n---\n\n下'), [
+      { type: 'paragraph', text: '上' },
+      { type: 'hr' },
+      { type: 'paragraph', text: '下' },
+    ])
+    assert.equal(proseText('上\n\n---\n\n下'), '上\n下')
+  })
+
+  it('groups list lines of one flavour and switches at a flavour change', () => {
+    assert.deepEqual(
+      parseBlocks(['- 第一', '* 第二', '', '1. 甲', '2) 乙'].join('\n')),
+      [
+        { type: 'list', ordered: false, items: [{ text: '第一', task: null }, { text: '第二', task: null }] },
+        { type: 'list', ordered: true, items: [{ text: '甲', task: null }, { text: '乙', task: null }] },
+      ],
+    )
+  })
+
+  it('reads task boxes on list items', () => {
+    assert.deepEqual(parseBlocks('- [ ] 未完成\n- [x] 已完成\n- 普通条目'), [
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          { text: '未完成', task: false },
+          { text: '已完成', task: true },
+          { text: '普通条目', task: null },
+        ],
+      },
+    ])
+  })
+
+  it('parses a table with alignment and pads short rows', () => {
+    const blocks = parseBlocks(
+      ['| 左 | 中 | 右 |', '| :-- | :-: | --: |', '| 一 | 二 |', '| 三 | 四 | 五 | 六 |'].join('\n'),
+    )
+    assert.equal(blocks.length, 1)
+    const table = blocks[0]
+    assert.ok(table !== undefined && table.type === 'table', 'a single table block')
+    if (table === undefined || table.type !== 'table') return
+    assert.deepEqual(table.head, ['左', '中', '右'])
+    assert.deepEqual(table.align, ['left', 'center', 'right'])
+    assert.deepEqual(table.rows, [
+      ['一', '二', ''],
+      ['三', '四', '五'],
+    ])
+  })
+
+  it('keeps table text in the prose view', () => {
+    const prose = proseText('| 标签 | 含义 |\n| --- | --- |\n| #读书 | 读书笔记 |')
+    assert.ok(prose.includes('#读书'), 'a tag in a table cell still indexes')
+  })
+
+  it('a list item keeps its tags in the prose view', () => {
+    assert.deepEqual(parseTags('- 一条 #列表标签\n- [x] 完成 #完成'), ['列表标签', '完成'])
+  })
+})
+
+describe('markdown inline', () => {
+  it('tokenises italic in both flavours', () => {
+    assert.deepEqual(tokenizeInline('普通 *斜体* 与 _也是_'), [
+      { type: 'text', value: '普通 ' },
+      { type: 'em', value: '斜体' },
+      { type: 'text', value: ' 与 ' },
+      { type: 'em', value: '也是' },
+    ])
+  })
+
+  it('does not italicise the underscores of an identifier', () => {
+    assert.deepEqual(tokenizeInline('const raw_key_base64 = 1'), [
+      { type: 'text', value: 'const raw_key_base64 = 1' },
+    ])
+  })
+
+  it('tokenises strikethrough and nests marks', () => {
+    const strike = tokenizeInline('~~删除 *斜体*~~')[0]
+    assert.equal(strike?.type, 'strike', 'the outer strike is found')
+    assert.deepEqual((strike?.children ?? []).map((token) => token.type), ['text', 'em'])
+
+    const bold = tokenizeInline('**加粗 #书**')[0]
+    assert.deepEqual((bold?.children ?? []).map((token) => token.type), ['text', 'tag'])
+  })
+
+  it('tokenises links, images and keeps the round trip', () => {
+    assert.deepEqual(tokenizeInline('看 [官方](https://flomo.app) 与 ![截图](https://a/b.png)'), [
+      { type: 'text', value: '看 ' },
+      { type: 'mdlink', value: '官方', url: 'https://flomo.app' },
+      { type: 'text', value: ' 与 ' },
+      { type: 'image', value: '截图', url: 'https://a/b.png' },
+    ])
+    assert.equal(markupOf({ type: 'mdlink', value: '官方', url: 'https://flomo.app' }), '[官方](https://flomo.app)')
+  })
+
+  it('autolinks a bare URL and leaves trailing punctuation in the text', () => {
+    assert.deepEqual(tokenizeInline('来源 https://dedao.cn/书。下一句'), [
+      { type: 'text', value: '来源 ' },
+      { type: 'url', value: 'https://dedao.cn/书' },
+      { type: 'text', value: '。下一句' },
+    ])
+  })
+
+  it('a URL fragment is not a tag', () => {
+    assert.deepEqual(
+      tokenizeInline('https://x.com/#start').map((token) => token.type),
+      ['url'],
+    )
+  })
+
+  it('a tag inside bold still indexes, and nesting round-trips', () => {
+    assert.deepEqual(parseTags('**加粗 #书** 和 *斜体 [[心流]]*'), ['书'])
+    const tokens = tokenizeInline('**加粗 #书**')
+    assert.equal(markupOf(tokens[0] ?? { type: 'text', value: '' }), '**加粗 #书**')
+  })
+
+  it('existing flomo marks keep their tokens', () => {
+    assert.deepEqual(tokenizeInline('#读书 与 [[心流]] 与 `代码`'), [
+      { type: 'tag', value: '读书' },
+      { type: 'text', value: ' 与 ' },
+      { type: 'link', value: '心流' },
+      { type: 'text', value: ' 与 ' },
+      { type: 'code', value: '代码' },
+    ])
   })
 })

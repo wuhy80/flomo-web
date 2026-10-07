@@ -51,7 +51,9 @@ export const FLOMO_CSS = `
   font-family: var(--flomo-font);
   font-size: 15px;
   color: var(--flomo-text);
-  background: var(--flomo-bg);
+  /* flomo's page is a quiet grey with white cards floating on it; the cards set
+     their own background back to --flomo-bg. */
+  background: var(--flomo-bg-sunken);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -208,7 +210,7 @@ export const FLOMO_CSS = `
 }
 
 .fl-column {
-  max-width: 720px;
+  max-width: 70vw;
   margin: 0 auto;
   padding: 28px 28px 120px;
 }
@@ -279,7 +281,8 @@ export const FLOMO_CSS = `
 .fl-title-menu-item[data-current="true"] { color: var(--flomo-green); font-weight: 600; }
 
 /* A grey pill, not a bordered box: flomo's search reads as part of the page
-   until it is used, and the Ctrl K hint lives inside the pill at its end. */
+   until it is used, and the Ctrl K hint lives inside the pill at its end. The
+   pill itself is white now — the page behind it is the grey. */
 .fl-search {
   display: flex;
   align-items: center;
@@ -288,7 +291,7 @@ export const FLOMO_CSS = `
   border-radius: 999px;
   padding: 6px 14px;
   min-width: 220px;
-  background: var(--flomo-input-bg);
+  background: var(--flomo-bg);
 }
 
 .fl-search:focus-within {
@@ -364,6 +367,15 @@ export const FLOMO_CSS = `
 }
 
 .fl-composer-tools { display: flex; align-items: center; gap: 2px; }
+
+.fl-tool-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--flomo-border-strong);
+}
+
+.fl-tool-text { font-size: 13px; font-weight: 600; letter-spacing: 0.2px; }
 
 .fl-tool {
   display: flex;
@@ -481,11 +493,11 @@ export const FLOMO_CSS = `
 
 .fl-memo {
   position: relative;
-  padding: 14px 2px 12px;
-  border-bottom: 1px solid var(--flomo-border);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: var(--flomo-bg);
 }
-
-.fl-memo:last-child { border-bottom: 0; }
 
 .fl-memo-body {
   font-size: 15px;
@@ -504,6 +516,63 @@ export const FLOMO_CSS = `
 
 .fl-memo-body .fl-para { margin: 0; }
 .fl-memo-body .fl-para + .fl-para { margin-top: 0.75em; }
+
+/* ── markdown ────────────────────────────────────────────────────────── */
+
+.fl-md-h { font-weight: 600; line-height: 1.4; margin: 0.8em 0 0.3em; }
+.fl-md-h:first-child { margin-top: 0; }
+
+.fl-md-h[data-level="1"] { font-size: 21px; }
+.fl-md-h[data-level="2"] { font-size: 19px; }
+.fl-md-h[data-level="3"] { font-size: 17px; }
+.fl-md-h[data-level="4"],
+.fl-md-h[data-level="5"],
+.fl-md-h[data-level="6"] { font-size: 15.5px; color: var(--flomo-text-soft); }
+
+.fl-md-list { margin: 0.4em 0; padding-left: 1.6em; }
+.fl-md-list li { margin: 0.15em 0; }
+.fl-md-list li::marker { color: var(--flomo-text-faint); }
+
+.fl-task { display: inline-flex; align-items: baseline; gap: 7px; }
+.fl-task-box { color: var(--flomo-green); font-size: 0.95em; }
+.fl-task-text { overflow-wrap: anywhere; }
+.fl-task-done { color: var(--flomo-text-faint); text-decoration: line-through; }
+
+.fl-md-hr {
+  border: 0;
+  border-top: 1px solid var(--flomo-border-strong);
+  margin: 1em 0;
+}
+
+.fl-md-a { color: var(--flomo-blue); text-decoration: none; overflow-wrap: anywhere; }
+.fl-md-a:hover { text-decoration: underline; }
+
+.fl-md-img {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  border-radius: 8px;
+  margin: 0.4em 0;
+}
+
+.fl-md-table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0.6em 0;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.fl-md-table th,
+.fl-md-table td {
+  border: 1px solid var(--flomo-border-strong);
+  padding: 5px 12px;
+}
+
+.fl-md-table th { background: var(--flomo-bg-sunken); font-weight: 600; }
+
+del { color: var(--flomo-text-faint); }
 
 .fl-quote {
   margin: 0.6em 0;
@@ -606,8 +675,8 @@ export const FLOMO_CSS = `
 
 .fl-memo-actions {
   position: absolute;
-  top: 12px;
-  right: 0;
+  top: 10px;
+  right: 10px;
   display: none;
   gap: 4px;
   background: var(--flomo-bg);
@@ -666,8 +735,9 @@ export const FLOMO_CSS = `
   gap: 12px;
   padding: 8px 12px;
   margin-bottom: 16px;
+  border: 1px solid var(--flomo-border);
   border-radius: var(--flomo-radius-sm);
-  background: var(--flomo-bg-sunken);
+  background: var(--flomo-bg);
   font-size: 12.5px;
   color: var(--flomo-text-soft);
 }

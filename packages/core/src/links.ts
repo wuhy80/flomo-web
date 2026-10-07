@@ -24,7 +24,7 @@
  */
 
 import { proseText } from './blocks.ts'
-import { markupOf, tokenizeInline } from './inline.ts'
+import { flattenTokens, markupOf, tokenizeInline } from './inline.ts'
 import { hasTag } from './tags.ts'
 import type { Memo } from './types.ts'
 
@@ -32,13 +32,14 @@ import type { Memo } from './types.ts'
  * The distinct link targets in a memo body, in first-appearance order.
  *
  * Runs over the body's prose only: `[[x]]` inside a fenced block is bracket
- * syntax in someone's snippet, not a link to a note.
+ * syntax in someone's snippet, not a link to a note. The walk is depth-first
+ * over container marks, so a `[[link]]` inside bold resolves like a flat one.
  * @param content - the raw body.
  * @returns the targets, trimmed and without brackets.
  */
 export function parseLinks(content: string): string[] {
   const seen = new Set<string>()
-  for (const token of tokenizeInline(proseText(content))) {
+  for (const token of flattenTokens(tokenizeInline(proseText(content)))) {
     if (token.type === 'link') seen.add(token.value)
   }
   return [...seen]

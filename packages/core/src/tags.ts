@@ -9,19 +9,21 @@
  */
 
 import { isInsideFence, proseText } from './blocks.ts'
-import { markupOf, tokenizeInline } from './inline.ts'
+import { flattenTokens, markupOf, tokenizeInline } from './inline.ts'
 
 /**
  * Extract the distinct tags from a memo body, in first-appearance order.
  *
  * Runs over the body's prose only: a `#` inside a fenced block is code, and
- * indexing `#include` as a tag is how a tag list becomes useless.
+ * indexing `#include` as a tag is how a tag list becomes useless. The walk is
+ * depth-first over container marks, so a `#tag` inside bold or italic indexes
+ * exactly like a flat one.
  * @param content - the raw memo text.
  * @returns tag names without the leading `#`.
  */
 export function parseTags(content: string): string[] {
   const seen = new Set<string>()
-  for (const token of tokenizeInline(proseText(content))) {
+  for (const token of flattenTokens(tokenizeInline(proseText(content)))) {
     if (token.type === 'tag') seen.add(token.value)
   }
   return [...seen]

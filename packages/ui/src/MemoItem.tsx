@@ -12,7 +12,7 @@ import { useCallback, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { clockOf, dayOf, parseBlocks, tokenizeInline } from '@flomo/core'
-import type { Memo } from '@flomo/core'
+import type { Block, InlineToken, Memo } from '@flomo/core'
 
 export interface MemoItemProps {
   memo: Memo
@@ -75,6 +75,75 @@ function InlineMark({
 }
 
 /**
+ * The URL a Markdown link or image may actually point at.
+ *
+ * The renderer builds real elements rather than HTML strings, so there is no
+ * injection path — but `javascript:` in a hand-typed document would still be a
+ * self-inflicted hole, so anything that is not http(s) renders as plain text.
+ * @param url - the URL from the document.
+ * @returns the URL when it is a web address, else null.
+ */
+function safeUrl(url: string | undefined): string | null {
+  if (url === undefined || !/^https?:\/\//i.test(url)) return null
+  return url
+}
+
+/**
+ * Render a run of prose with its tags, links and Markdown marks interactive.
+ * @param tokens - the token stream to render.
+ * @param onTagClick - tag navigation.
+ * @param onLinkClick - link navigation.
+ * @returns the nodes.
+ */
+function renderTokens(
+  tokens: readonly InlineToken[],
+  onTagClick: (tag: string) => void,
+  onLinkClick: (target: string) => void,
+): React.ReactNode[] {
+  return tokens.map((token, index) => {
+    const key = `${index}-${token.type}`
+    switch (token.type) {
+      case 'tag':
+        return <InlineMark key={key} kind="tag" value={token.value} onActivate={() => onTagClick(token.value)} />
+      case 'link':
+        return <InlineMark key={key} kind="link" value={token.value} onActivate={() => onLinkClick(token.value)} />
+      case 'strong':
+        return <strong key={key}>{containerContent(token, onTagClick, onLinkClick)}</strong>
+      case 'em':
+        return <em key={key}>{containerContent(token, onTagClick, onLinkClick)}</em>
+      case 'strike':
+        return <del key={key}>{containerContent(token, onTagClick, onLinkClick)}</del>
+      case 'code':
+        return <code key={key}>{token.value}</code>
+      case 'url':
+        return (
+          <a key={key} className="fl-md-a" href={token.value} target="_blank" rel="noopener noreferrer">
+            {token.value}
+          </a>
+        )
+      case 'mdlink': {
+        const href = safeUrl(token.url)
+        if (href === null) {
+          return <span key={key}>{containerContent(token, onTagClick, onLinkClick)}</span>
+        }
+        return (
+          <a key={key} className="fl-md-a" href={href} target="_blank" rel="noopener noreferrer">
+            {containerContent(token, onTagClick, onLinkClick)}
+          </a>
+        )
+      }
+      case 'image': {
+        const href = safeUrl(token.url)
+        if (href === null) return null
+        return <img key={key} className="fl-md-img" src={href} alt={token.value} loading="lazy" />
+      }
+      default:
+        return <span key={key}>{token.value}</span>
+    }
+  })
+}
+
+/**
  * Render a run of prose with its tags and links interactive.
  * @param text - the prose.
  * @param onTagClick - tag navigation.
@@ -86,43 +155,57 @@ function renderInline(
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
 ): React.ReactNode[] {
-  return tokenizeInline(text).map((token, index) => {
-    if (token.type === 'tag') {
-      return (
-        <InlineMark
-          key={`${index}-tag`}
-          kind="tag"
-          value={token.value}
-          onActivate={() => onTagClick(token.value)}
-        />
-      )
-    }
-    if (token.type === 'link') {
-      return (
-        <InlineMark
-          key={`${index}-link`}
-          kind="link"
-          value={token.value}
-          onActivate={() => onLinkClick(token.value)}
-        />
-      )
-    }
-    if (token.type === 'strong') {
-      return <strong key={`${index}-strong`}>{token.value}</strong>
-    }
-    if (token.type === 'code') {
-      return <code key={`${index}-code`}>{token.value}</code>
-    }
-    return <span key={`${index}-text`}>{token.value}</span>
-  })
+  return renderTokens(tokenizeInline(text), onTagClick, onLinkClick)
+}
+
+/**
+ * A container mark's content: its inner tokens when nesting is present, the
+ * literal text otherwise — never an extra wrapper element, so `**粗**` renders
+ * as `<strong>粗</strong>` exactly as it always did.
+ * @param token - the container token.
+ * @param onTagClick - tag navigation.
+ * @param onLinkClick - link navigation.
+ * @returns the content nodes.
+ */
+function containerContent(
+  token: InlineToken,
+  onTagClick: (tag: string) => void,
+  onLinkClick: (target: string) => void,
+): React.ReactNode {
+  if (token.children === undefined) return token.value
+  return renderTokens(token.children, onTagClick, onLinkClick)
+}
+
+/**
+ * One list item's content: a box glyph ahead of the text when it is a task.
+ * @param props - the item and the two navigations.
+ * @returns the item's nodes.
+ */
+function renderListItem(
+  item: { text: string; task: boolean | null },
+  onTagClick: (tag: string) => void,
+  onLinkClick: (target: string) => void,
+): React.ReactNode {
+  if (item.task === null) return renderInline(item.text, onTagClick, onLinkClick)
+  return (
+    <span className="fl-task">
+      <span className="fl-task-box" aria-hidden="true">
+        {item.task ? '☑' : '☐'}
+      </span>
+      <span className={item.task ? 'fl-task-text fl-task-done' : 'fl-task-text'}>
+        {renderInline(item.text, onTagClick, onLinkClick)}
+      </span>
+    </span>
+  )
 }
 
 /**
  * Render a memo body from its block structure.
  *
- * Only paragraphs and quotes go through the inline renderer. A fenced block is
- * emitted verbatim, which is both what the user means and what keeps the display
- * consistent with the tag index — neither treats `#include` as a tag.
+ * Only paragraphs, quotes, headings, lists and tables go through the inline
+ * renderer. A fenced block is emitted verbatim, which is both what the user
+ * means and what keeps the display consistent with the tag index — neither
+ * treats `#include` as a tag.
  * @param memo - the memo to render.
  * @param onTagClick - tag navigation.
  * @param onLinkClick - link navigation.
@@ -133,30 +216,82 @@ function renderBody(
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
 ): React.ReactNode[] {
-  return parseBlocks(memo.content).map((block, index) => {
-    if (block.type === 'code') {
-      return (
-        <pre
-          key={`${index}-code`}
-          className="fl-code"
-          {...(block.language ? { 'data-language': block.language } : {})}
-        >
-          <code>{block.code}</code>
-        </pre>
-      )
+  const inline = (text: string): React.ReactNode[] => renderInline(text, onTagClick, onLinkClick)
+
+  return parseBlocks(memo.content).map((block: Block, index) => {
+    const key = `${index}-${block.type}`
+    switch (block.type) {
+      case 'code':
+        return (
+          <pre
+            key={key}
+            className="fl-code"
+            {...(block.language ? { 'data-language': block.language } : {})}
+          >
+            <code>{block.code}</code>
+          </pre>
+        )
+      case 'quote':
+        return (
+          <blockquote key={key} className="fl-quote">
+            {inline(block.text)}
+          </blockquote>
+        )
+      case 'heading': {
+        const Tag = `h${block.level}` as 'h1'
+        return (
+          <Tag key={key} className="fl-md-h" data-level={block.level}>
+            {inline(block.text)}
+          </Tag>
+        )
+      }
+      case 'hr':
+        return <hr key={key} className="fl-md-hr" />
+      case 'list': {
+        const Tag = block.ordered ? 'ol' : 'ul'
+        return (
+          <Tag key={key} className="fl-md-list">
+            {block.items.map((item, itemIndex) => (
+              <li key={itemIndex}>{renderListItem(item, onTagClick, onLinkClick)}</li>
+            ))}
+          </Tag>
+        )
+      }
+      case 'table': {
+        const align = (column: number): React.CSSProperties | undefined =>
+          block.align[column] ? { textAlign: block.align[column] as React.CSSProperties['textAlign'] } : undefined
+        return (
+          <table key={key} className="fl-md-table">
+            <thead>
+              <tr>
+                {block.head.map((cell, column) => (
+                  <th key={column} style={align(column)}>
+                    {inline(cell)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {block.head.map((_, column) => (
+                    <td key={column} style={align(column)}>
+                      {inline(row[column] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
+      default:
+        return (
+          <p key={key} className="fl-para">
+            {inline(block.text)}
+          </p>
+        )
     }
-    if (block.type === 'quote') {
-      return (
-        <blockquote key={`${index}-quote`} className="fl-quote">
-          {renderInline(block.text, onTagClick, onLinkClick)}
-        </blockquote>
-      )
-    }
-    return (
-      <p key={`${index}-para`} className="fl-para">
-        {renderInline(block.text, onTagClick, onLinkClick)}
-      </p>
-    )
   })
 }
 

@@ -58,7 +58,7 @@ export type { ExportPayload } from './export.ts'
 export { ImportError, describeImportResult, parseMemosJson } from './import.ts'
 export type { ImportResult } from './import.ts'
 
-export { markupOf, tokenizeInline } from './inline.ts'
+export { flattenTokens, markupOf, tokenizeInline } from './inline.ts'
 export type { InlineToken } from './inline.ts'
 
 export {

@@ -2,7 +2,10 @@
  * The capture box — the single most-used control in flomo, so it gets the most
  * care: it auto-grows, submits on Cmd/Ctrl+Enter from the round button or the
  * keyboard, completes `#tags` from what the user has already written (the
- * toolbar's `#` opens the same menu), and never loses a draft to a stray click.
+ * toolbar's `#` opens the same menu), and its toolbar writes the Markdown the
+ * renderer understands — image skeleton, heading, the two lists, task boxes —
+ * as line-level toggles rather than modal dialogs. No draft is lost to a stray
+ * click.
  *
  * @module @flomo/ui/Composer
  */
@@ -157,6 +160,103 @@ export function Composer({
     })
   }, [value, syncFragment, resize])
 
+  /**
+   * Replace the selection with `text` and park the caret at `caretOffset` into
+   * it — an image is inserted as a Markdown skeleton the URL is typed into.
+   */
+  const insertTemplate = useCallback(
+    (text: string, caretOffset: number) => {
+      const el = textarea.current
+      if (!el) return
+      const { selectionStart, selectionEnd } = el
+      const next = `${value.slice(0, selectionStart)}${text}${value.slice(selectionEnd ?? selectionStart)}`
+      const caret = selectionStart + caretOffset
+      setValue(next)
+      requestAnimationFrame(() => {
+        const node = textarea.current
+        if (node === null) return
+        node.focus()
+        node.setSelectionRange(caret, caret)
+        syncFragment()
+        resize()
+      })
+    },
+    [value, syncFragment, resize],
+  )
+
+  /**
+   * Rewrite the lines the selection touches, then leave the caret at the end of
+   * the rewritten run.
+   *
+   * Every toolbar toggle below is this one transform: the decision of *what* a
+   * line becomes lives in the caller, the mechanics of splicing the value and
+   * restoring the caret live here, once.
+   */
+  const editLines = useCallback(
+    (transform: (line: string, index: number, all: string[]) => string) => {
+      const el = textarea.current
+      if (!el) return
+      const { value: current, selectionStart, selectionEnd } = el
+      const start = current.lastIndexOf('\n', Math.max(0, selectionStart - 1)) + 1
+      const after = current.indexOf('\n', selectionEnd)
+      const end = after === -1 ? current.length : after
+      const lines = current.slice(start, end).split('\n')
+      const rewritten = lines.map(transform).join('\n')
+      if (rewritten === current.slice(start, end)) return
+      setValue(current.slice(0, start) + rewritten + current.slice(end))
+      requestAnimationFrame(() => {
+        const node = textarea.current
+        if (node === null) return
+        node.focus()
+        const caret = start + rewritten.length
+        node.setSelectionRange(caret, caret)
+        syncFragment()
+        resize()
+      })
+    },
+    [syncFragment, resize],
+  )
+
+  /** Toggle a `## ` heading on the first selected line. */
+  const toggleHeading = useCallback((): void => {
+    editLines((line, index) => {
+      if (index > 0) return line
+      if (/^ {0,3}#{1,6}\s/.test(line)) return line.replace(/^ {0,3}#{1,6}\s+/, '')
+      return `## ${line}`
+    })
+  }, [editLines])
+
+  /**
+   * Toggle a list marker over the selected lines.
+   *
+   * When every non-blank line already carries the marker the toggle strips it;
+   * otherwise it is added. Tasks convert an existing bullet in place instead of
+   * stacking a second one.
+   */
+  const toggleList = useCallback(
+    (kind: 'ul' | 'ol' | 'task'): void => {
+      editLines((line, index, all) => {
+        const marker =
+          kind === 'ul'
+            ? /^ {0,3}[-*+]\s+/
+            : kind === 'ol'
+              ? /^ {0,3}\d{1,9}[.)]\s+/
+              : /^ {0,3}[-*+]\s+\[[ xX]\]\s+/
+        const marked = all.filter((candidate) => candidate.trim() !== '')
+        if (marked.length > 0 && marked.every((candidate) => marker.test(candidate))) {
+          const stripped = line.replace(marker, '')
+          return kind === 'ul' ? stripped.replace(/^\[[ xX]\]\s+/, '') : stripped
+        }
+        if (line.trim() === '') return line
+        if (kind === 'ul') return `- ${line.replace(/^ {0,3}[-*+]\s+\[[ xX]\]\s+/, '')}`
+        if (kind === 'ol') return `${index + 1}. ${line}`
+        const bullet = /^ {0,3}[-*+]\s+/.exec(line)
+        return bullet === null ? `- [ ] ${line}` : `- [ ] ${line.slice(bullet[0].length)}`
+      })
+    },
+    [editLines],
+  )
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       // The completion menu owns the navigation keys only while it is open, so
@@ -245,7 +345,12 @@ export function Composer({
           <button type="button" className="fl-tool" title="插入标签" onClick={insertTagStart}>
             #
           </button>
-          <button type="button" className="fl-tool" title="插入图片（尚未支持）" disabled>
+          <button
+            type="button"
+            className="fl-tool"
+            title="插入图片（填入图片链接）"
+            onClick={() => insertTemplate('![](https://)', 4)}
+          >
             <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
               <rect
                 x="2"
@@ -263,6 +368,81 @@ export function Composer({
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.4"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <span className="fl-tool-divider" aria-hidden="true" />
+          <button type="button" className="fl-tool fl-tool-text" title="标题" onClick={toggleHeading}>
+            Aa
+          </button>
+          <button
+            type="button"
+            className="fl-tool"
+            title="无序列表"
+            onClick={() => toggleList('ul')}
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <g fill="currentColor">
+                <circle cx="3" cy="4" r="1.1" />
+                <circle cx="3" cy="8" r="1.1" />
+                <circle cx="3" cy="12" r="1.1" />
+              </g>
+              <path
+                d="M6.5 4h7M6.5 8h7M6.5 12h7"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="fl-tool"
+            title="有序列表"
+            onClick={() => toggleList('ol')}
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <text x="1" y="5.6" fontSize="5.4" fill="currentColor" fontFamily="inherit">
+                1.
+              </text>
+              <text x="1" y="10.6" fontSize="5.4" fill="currentColor" fontFamily="inherit">
+                2.
+              </text>
+              <text x="1" y="15.6" fontSize="5.4" fill="currentColor" fontFamily="inherit">
+                3.
+              </text>
+              <path
+                d="M7.5 4h7M7.5 8.5h7M7.5 13h7"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="fl-tool"
+            title="任务清单"
+            onClick={() => toggleList('task')}
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <rect
+                x="2.5"
+                y="2.5"
+                width="11"
+                height="11"
+                rx="2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+              <path
+                d="m5.2 8.2 2 2 3.6-4.4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </svg>

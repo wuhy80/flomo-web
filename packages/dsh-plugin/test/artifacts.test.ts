@@ -19,6 +19,7 @@
 
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:http'
@@ -477,6 +478,7 @@ describe('built client bundle', () => {
 
     const html = renderToString(React.createElement(Panel, { session }))
     assert.match(html, /fl-root/)
+    writeFileSync(new URL('../../../.shots/dump.html', import.meta.url), html, 'utf8')
     assert.match(html, /fl-sidebar/)
     assert.match(html, /fl-composer/, 'the capture box is the point of the app')
     assert.match(html, /读完《深度工作》很有收获/)
@@ -552,6 +554,36 @@ describe('built client bundle', () => {
       ['#真标签'],
       'only the prose tag is a tag; the C directive is not',
     )
+  })
+
+  it('renders markdown blocks, links, tasks and vetoes unsafe URLs', async () => {
+    const { registrations } = await loadClientBundle()
+    const page = registrations.find((r) => r.name === 'main')
+    assert.ok(page)
+    const Panel = page.component as React.ComponentType<{ session: unknown }>
+
+    const body = [
+      '## 计划',
+      '- [ ] 未完成的一项',
+      '- [x] 已完成的一项',
+      '',
+      '[官网](https://flomo.app) 与 [坏](javascript:alert(1))',
+      '',
+      '~~过期了~~',
+    ].join('\n')
+
+    const { session } = fakeSession({
+      status: 'unlocked',
+      memos: [memo({ content: body, tags: [] })],
+    })
+
+    const html = renderToString(React.createElement(Panel, { session }))
+    writeFileSync(new URL('../../../.shots/md-dump.html', import.meta.url), html, 'utf8')
+    assert.match(html, /<h2 class="fl-md-h" data-level="2"><span>计划<\/span><\/h2>/)
+    assert.match(html, /fl-task-done/, 'the ticked task renders done')
+    assert.match(html, /<a class="fl-md-a" href="https:\/\/flomo\.app" target="_blank"/, 'links open out')
+    assert.match(html, /<del>过期了<\/del>/)
+    assert.ok(!/href="javascript:/i.test(html) && !/src="javascript:/i.test(html), 'a non-http URL must not become a link target')
   })
 
   it('renders the password gate when the vault is locked', async () => {
