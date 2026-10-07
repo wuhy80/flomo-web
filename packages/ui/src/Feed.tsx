@@ -26,6 +26,8 @@ export interface FeedProps {
   onTagClick: MemoItemProps['onTagClick']
   onLinkClick: MemoItemProps['onLinkClick']
   onOpen: MemoItemProps['onOpen']
+  /** Fetches and decrypts one attached image; absent renders attachments inert. */
+  readImage?: MemoItemProps['readImage']
 }
 
 /**
@@ -54,6 +56,7 @@ export function Feed({
   onTagClick,
   onLinkClick,
   onOpen,
+  readImage,
 }: FeedProps): React.ReactElement {
   if (memos.length === 0) {
     return <div className="fl-empty">{emptyText}</div>
@@ -71,6 +74,7 @@ export function Feed({
           onTagClick={onTagClick}
           onLinkClick={onLinkClick}
           onOpen={onOpen}
+          readImage={readImage}
         />
       ))}
     </div>

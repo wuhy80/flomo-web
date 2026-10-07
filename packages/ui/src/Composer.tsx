@@ -3,16 +3,17 @@
  * care: it auto-grows, submits on Cmd/Ctrl+Enter from the round button or the
  * keyboard, completes `#tags` from what the user has already written (the
  * toolbar's `#` opens the same menu), and its toolbar writes the Markdown the
- * renderer understands — image skeleton, heading, the two lists, task boxes —
- * as line-level toggles rather than modal dialogs. No draft is lost to a stray
- * click.
+ * renderer understands — heading, the two lists, task boxes, a table — as
+ * line-level toggles rather than modal dialogs. Pasted or picked images ride
+ * along as encrypted attachments, shown as removable thumbnails. No draft is
+ * lost to a stray click.
  *
  * @module @flomo/ui/Composer
  */
 
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
+import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react'
 
 import { suggestTags, tagFragmentAtCaret } from '@flomo/core'
 import type { TagFragment, TagStat } from '@flomo/core'
@@ -20,9 +21,79 @@ import type { TagFragment, TagStat } from '@flomo/core'
 /** Largest height the textarea grows to before it starts scrolling. */
 const MAX_HEIGHT = 320
 
+/** Longest image edge kept from a paste or pick; larger ones are scaled down. */
+const MAX_EDGE = 2048
+
+/** Largest raw image accepted, in bytes; pastes beyond it are refused. */
+const MAX_BYTES = 8 * 1024 * 1024
+
+/** One image waiting to ride along with the next memo. */
+interface PendingImage {
+  /** Local unique id, for the list key and the remove button. */
+  localId: string
+  /** Object URL for the thumbnail; revoked when the image leaves the list. */
+  preview: string
+  bytes: Uint8Array
+  mime: string
+}
+
+/**
+ * Downscale an image through a canvas so a phone photo does not become a
+ * multi-megabyte upload.
+ * @param bitmap - the decoded image.
+ * @param mime - the output MIME type.
+ * @returns the re-encoded bytes, and whether anything was downscaled.
+ */
+async function downscale(bitmap: ImageBitmap, mime: string): Promise<Uint8Array | null> {
+  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+  if (scale >= 1) return null
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  const context = canvas.getContext('2d')
+  if (context === null) return null
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, mime === 'image/png' ? 'image/png' : 'image/jpeg', 0.85),
+  )
+  if (blob === null) return null
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+/**
+ * Turn a picked or pasted file into a pending attachment.
+ * @param file - the image file.
+ * @returns the attachment, or a human-readable refusal.
+ */
+async function readImageFile(file: File): Promise<PendingImage | string> {
+  if (!file.type.startsWith('image/')) return '只能添加图片文件。'
+  if (file.size > MAX_BYTES) return '图片超过 8MB，请压缩后再试。'
+  let bytes = new Uint8Array(await file.arrayBuffer())
+  let mime = file.type
+  try {
+    const bitmap = await createImageBitmap(file)
+    const smaller = await downscale(bitmap, mime)
+    if (smaller !== null) {
+      bytes = smaller
+      mime = mime === 'image/png' ? 'image/png' : 'image/jpeg'
+    }
+    bitmap.close()
+  } catch {
+    // Undecodable or no canvas: the raw bytes are still worth a try.
+  }
+  return {
+    localId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    preview: URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: mime })),
+    bytes,
+    mime,
+  }
+}
+
 export interface ComposerProps {
-  /** Called with the trimmed body when the user commits. */
-  onSubmit: (content: string) => void
+  /** Called with the trimmed body and the uploaded image refs on commit. */
+  onSubmit: (content: string, images: string[]) => void
+  /** Uploads one image and resolves to its media ref. */
+  onAddImage: (bytes: Uint8Array, mime: string) => Promise<string>
   /** Tags already in the corpus, for completion. */
   knownTags?: readonly TagStat[]
   /** Disables submission while a save is in flight, when desired. */
@@ -48,6 +119,7 @@ export interface ComposerProps {
  */
 export function Composer({
   onSubmit,
+  onAddImage,
   knownTags = [],
   disabled = false,
   placeholder = '有什么值得记录的？',
@@ -57,7 +129,11 @@ export function Composer({
   const [value, setValue] = useState('')
   const [fragment, setFragment] = useState<TagFragment | null>(null)
   const [active, setActive] = useState(0)
+  const [images, setImages] = useState<PendingImage[]>([])
+  const [busyImage, setBusyImage] = useState(false)
+  const [imageError, setImageError] = useState<string | null>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
 
   const suggestions = useMemo(
     () => (fragment === null ? [] : suggestTags(fragment.query, knownTags)),
@@ -125,10 +201,27 @@ export function Composer({
     [fragment, value, resize],
   )
 
-  const submit = useCallback(() => {
+  const submit = useCallback(async () => {
     const text = value.trim()
-    if (text.length === 0 || disabled) return
-    onSubmit(text)
+    if ((text.length === 0 && images.length === 0) || disabled) return
+    // Images upload before the memo: a ref the repository does not hold yet
+    // would render as a broken tile everywhere the memo does.
+    const refs: string[] = []
+    try {
+      setBusyImage(true)
+      for (const image of images) {
+        refs.push(await onAddImage(image.bytes, image.mime))
+      }
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : '图片上传失败，请重试。')
+      return
+    } finally {
+      setBusyImage(false)
+    }
+    onSubmit(text, refs)
+    for (const image of images) URL.revokeObjectURL(image.preview)
+    setImages([])
+    setImageError(null)
     setValue('')
     setFragment(null)
     setActive(0)
@@ -137,7 +230,55 @@ export function Composer({
       textarea.current?.focus()
       resize()
     })
-  }, [value, disabled, onSubmit, resize])
+  }, [value, images, disabled, onSubmit, onAddImage, resize])
+
+  /** Add picked or pasted files as pending attachments. */
+  const addFiles = useCallback(
+    async (files: Iterable<File>): Promise<void> => {
+      const added: PendingImage[] = []
+      let refusal: string | null = null
+      for (const file of files) {
+        const result = await readImageFile(file)
+        if (typeof result === 'string') refusal = result
+        else added.push(result)
+      }
+      if (refusal !== null) setImageError(refusal)
+      else setImageError(null)
+      if (added.length > 0) setImages((current) => [...current, ...added])
+    },
+    [],
+  )
+
+  /** Remove one pending attachment and free its preview URL. */
+  const removeImage = useCallback((localId: string): void => {
+    setImages((current) => {
+      const target = current.find((image) => image.localId === localId)
+      if (target !== undefined) URL.revokeObjectURL(target.preview)
+      return current.filter((image) => image.localId !== localId)
+    })
+  }, [])
+
+  const onPaste = useCallback(
+    (event: ClipboardEvent<HTMLTextAreaElement>): void => {
+      const files = [...(event.clipboardData?.files ?? [])].filter((file) =>
+        file.type.startsWith('image/'),
+      )
+      if (files.length === 0) return
+      // The paste must not also drop the image's filename into the text.
+      event.preventDefault()
+      void addFiles(files)
+    },
+    [addFiles],
+  )
+
+  const onPickFiles = useCallback(
+    (event: ChangeEvent<HTMLInputElement>): void => {
+      void addFiles(event.target.files ?? [])
+      // Cleared so picking the same file twice still fires a change event.
+      event.target.value = ''
+    },
+    [addFiles],
+  )
 
   /**
    * Drop a `#` at the caret from the toolbar, which opens tag completion.
@@ -276,7 +417,7 @@ export function Composer({
           const chosen = suggestions[active]
           if (chosen !== undefined) {
             event.preventDefault()
-            accept(chosen.tag)
+            void accept(chosen.tag)
             return
           }
         }
@@ -289,13 +430,13 @@ export function Composer({
 
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
         event.preventDefault()
-        submit()
+        void submit()
       }
     },
     [open, suggestions, active, accept, submit],
   )
 
-  const canSend = value.trim().length > 0 && !disabled
+  const canSend = (value.trim().length > 0 || images.length > 0) && !disabled
 
   return (
     <div className="fl-composer">
@@ -311,6 +452,7 @@ export function Composer({
         onClick={syncFragment}
         onSelect={syncFragment}
         onBlur={() => setFragment(null)}
+        onPaste={onPaste}
         placeholder={placeholder}
         aria-label="记录一条 MEMO"
         spellCheck={false}
@@ -340,6 +482,40 @@ export function Composer({
         </div>
       ) : null}
 
+      <div className="fl-composer-attach">
+        {images.map((image) => (
+          <span key={image.localId} className="fl-attach-thumb">
+            <img src={image.preview} alt="待发送的图片" />
+            <button
+              type="button"
+              className="fl-attach-remove"
+              aria-label="移除这张图片"
+              onClick={() => removeImage(image.localId)}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <button
+          type="button"
+          className="fl-attach-add"
+          title="添加图片"
+          aria-label="添加图片"
+          disabled={busyImage}
+          onClick={() => fileInput.current?.click()}
+        >
+          {busyImage ? <span className="fl-spinner" /> : '+'}
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          multiple
+          className="fl-visually-hidden"
+          onChange={onPickFiles}
+        />
+      </div>
+
       <div className="fl-composer-bar">
         <div className="fl-composer-tools">
           <button type="button" className="fl-tool" title="插入标签" onClick={insertTagStart}>
@@ -348,8 +524,8 @@ export function Composer({
           <button
             type="button"
             className="fl-tool"
-            title="插入图片（填入图片链接）"
-            onClick={() => insertTemplate('![](https://)', 4)}
+            title="添加图片"
+            onClick={() => fileInput.current?.click()}
           >
             <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
               <rect
@@ -473,6 +649,11 @@ export function Composer({
           </button>
         </div>
         <div className="fl-composer-side">
+          {imageError !== null ? (
+            <span className="fl-attach-error" role="alert">
+              {imageError}
+            </span>
+          ) : null}
           {value.length > 0 ? (
             <span className="fl-composer-count" aria-hidden="true">
               {value.length} 字
@@ -481,8 +662,8 @@ export function Composer({
           <button
             type="button"
             className="fl-send"
-            onClick={submit}
-            disabled={!canSend}
+            onClick={() => void submit()}
+            disabled={!canSend && !busyImage}
             title={canSend ? '发送（Ctrl/Cmd + Enter）' : '先写点什么'}
             aria-label="发送"
           >

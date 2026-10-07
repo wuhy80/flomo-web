@@ -8,7 +8,7 @@
  */
 
 import type * as React from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { clockOf, dayOf, parseBlocks, tokenizeInline } from '@flomo/core'
@@ -28,6 +28,51 @@ export interface MemoItemProps {
   onLinkClick: (target: string) => void
   /** Open this memo's detail page. */
   onOpen: (id: string) => void
+  /** Fetches and decrypts one attached image. Absent: attachments render inert. */
+  readImage?: (ref: string) => Promise<{ bytes: Uint8Array; mime: string }>
+}
+
+/**
+ * One attached image, decrypted on demand.
+ *
+ * The ref alone carries no pixels — the bytes come out of the vault's media
+ * directory through the session, and the object URL is revoked the moment this
+ * tile leaves the feed, so a long session does not accumulate blobs.
+ * @param props - the media ref and the decrypting loader.
+ * @returns the image tile.
+ */
+function AttachedImage({
+  mediaRef,
+  readImage,
+}: {
+  /** The media reference; named mediaRef because `ref` belongs to React. */
+  mediaRef: string
+  readImage: (ref: string) => Promise<{ bytes: Uint8Array; mime: string }>
+}): React.ReactElement {
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let revoked: string | null = null
+    let live = true
+    readImage(mediaRef)
+      .then(({ bytes, mime }) => {
+        if (!live) return
+        revoked = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: mime }))
+        setSrc(revoked)
+      })
+      .catch(() => {
+        if (live) setFailed(true)
+      })
+    return () => {
+      live = false
+      if (revoked !== null) URL.revokeObjectURL(revoked)
+    }
+  }, [mediaRef, readImage])
+
+  if (failed) return <span className="fl-memo-image fl-memo-image-failed">图片加载失败</span>
+  if (src === null) return <span className="fl-memo-image fl-memo-image-loading" />
+  return <img className="fl-memo-image" src={src} alt="笔记附件" loading="lazy" />
 }
 
 /**
@@ -308,6 +353,7 @@ export function MemoItem({
   onTagClick,
   onLinkClick,
   onOpen,
+  readImage,
 }: MemoItemProps): React.ReactElement {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(memo.content)
@@ -431,6 +477,18 @@ export function MemoItem({
       </div>
 
       <div className="fl-memo-body">{renderBody(memo, onTagClick, onLinkClick)}</div>
+
+      {memo.images !== undefined && memo.images.length > 0 ? (
+        <div className="fl-memo-images">
+          {memo.images.map((ref) =>
+            readImage !== undefined ? (
+              <AttachedImage key={ref} mediaRef={ref} readImage={readImage} />
+            ) : (
+              <span key={ref} className="fl-memo-image fl-memo-image-loading" />
+            ),
+          )}
+        </div>
+      ) : null}
     </article>
   )
 }

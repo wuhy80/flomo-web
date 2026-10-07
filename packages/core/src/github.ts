@@ -63,6 +63,12 @@ export interface GitHubFile {
   sha: string
 }
 
+/** A binary blob's bytes and blob sha, the media analogue of {@link GitHubFile}. */
+export interface GitHubBlob {
+  bytes: Uint8Array
+  sha: string
+}
+
 /** Connection settings for one repository. */
 export interface GitHubContentsOptions {
   /** Fine-grained PAT. */
@@ -106,11 +112,34 @@ function encodeContent(text: string): string {
  * @returns the decoded UTF-8 text.
  */
 function decodeContent(base64: string): string {
+  return new TextDecoder().decode(decodeBytes(base64))
+}
+
+/**
+ * Encode raw bytes as GitHub wants it: base64 with no line breaks.
+ * @param bytes - the bytes to encode.
+ * @returns padded base64.
+ */
+function encodeBytes(bytes: Uint8Array): string {
+  let binary = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return btoa(binary)
+}
+
+/**
+ * Decode base64 into raw bytes.
+ * @param base64 - the API payload, newlines allowed.
+ * @returns the bytes.
+ */
+function decodeBytes(base64: string): Uint8Array {
   const clean = base64.replace(/\s+/g, '')
   const binary = atob(clean)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-  return new TextDecoder().decode(bytes)
+  return bytes
 }
 
 /** Text in and out of one GitHub repository. */
@@ -238,6 +267,65 @@ export class GitHubContentsStore {
         response.status,
         path,
       )
+    }
+    if (!response.ok) {
+      throw new GitHubError(await this.describe(response), response.status, path)
+    }
+    const body = (await response.json()) as { content?: { sha?: string } }
+    const sha = body.content?.sha
+    if (!sha) throw new GitHubError('写入成功但响应缺少 sha。', response.status, path)
+    return sha
+  }
+
+  /**
+   * Read a binary blob, for media.
+   * @param path - repository path.
+   * @returns the bytes and blob sha, or `null` when absent.
+   * @throws {GitHubError} on any non-404 failure.
+   */
+  async readBlob(path: string): Promise<GitHubBlob | null> {
+    const response = await this.doFetch(
+      this.url(`/repos/${this.owner}/${this.repo}/contents/${path}`),
+      { headers: { ...this.headers(), Accept: 'application/vnd.github+json' } },
+    )
+    if (response.status === 404) return null
+    if (!response.ok) {
+      throw new GitHubError(await this.describe(response), response.status, path)
+    }
+    const body = (await response.json()) as { content?: string; sha?: string }
+    if (typeof body.content !== 'string' || typeof body.sha !== 'string') {
+      throw new GitHubError('响应缺少 content/sha 字段。', response.status, path)
+    }
+    return { bytes: decodeBytes(body.content), sha: body.sha }
+  }
+
+  /**
+   * Create or overwrite a binary blob, for media.
+   * @param path - repository path.
+   * @param bytes - the raw bytes to store.
+   * @param options - `sha` of the blob being replaced (omit when creating), and
+   * the commit message.
+   * @returns the new blob sha.
+   * @throws {GitHubConflictError} when the blob changed under us.
+   */
+  async writeBlob(
+    path: string,
+    bytes: Uint8Array,
+    options: { sha?: string; message: string },
+  ): Promise<string> {
+    const payload: Record<string, unknown> = {
+      message: options.message,
+      content: encodeBytes(bytes),
+    }
+    if (options.sha) payload.sha = options.sha
+    if (this.branch) payload.branch = this.branch
+
+    const response = await this.doFetch(
+      `${this.apiBase}/repos/${this.owner}/${this.repo}/contents/${path}`,
+      { method: 'PUT', headers: this.headers(), body: JSON.stringify(payload) },
+    )
+    if (response.status === 409 || response.status === 422) {
+      throw new GitHubConflictError('写入冲突：远端文件已被其他设备修改。', response.status, path)
     }
     if (!response.ok) {
       throw new GitHubError(await this.describe(response), response.status, path)

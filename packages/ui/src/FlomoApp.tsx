@@ -200,13 +200,23 @@ export function FlomoApp({
   }, [])
 
   const handleAdd = useCallback(
-    (content: string) => {
-      session.add(content)
+    (content: string, images: string[]) => {
+      session.add(content, images.length > 0 ? images : undefined)
       // Writing is the common case, so pull the user back to the live feed if
       // they were browsing a tag or a review panel.
       if (view.kind !== 'all') setView({ kind: 'all' })
     },
     [session, view.kind],
+  )
+
+  const handleAddImage = useCallback(
+    (bytes: Uint8Array, mime: string) => session.addImage(bytes, mime),
+    [session],
+  )
+
+  const handleReadImage = useCallback(
+    (ref: string) => session.readImage(ref),
+    [session],
   )
 
   const handleImport = useCallback(
@@ -252,8 +262,9 @@ export function FlomoApp({
       onTagClick: handleTagClick,
       onLinkClick: handleLinkClick,
       onOpen: handleOpen,
+      readImage: handleReadImage,
     }),
-    [session, handleTagClick, handleLinkClick, handleOpen],
+    [session, handleTagClick, handleLinkClick, handleOpen, handleReadImage],
   )
 
   const handleShortcut = useCallback(
@@ -425,6 +436,7 @@ export function FlomoApp({
           {showsComposer(view) ? (
             <Composer
               onSubmit={handleAdd}
+              onAddImage={handleAddImage}
               knownTags={snapshot.tags}
               focusToken={composeToken}
             />

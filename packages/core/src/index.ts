@@ -21,9 +21,11 @@ export {
   isKdfParams,
   isSealed,
   open,
+  openBytes,
   randomBytes,
   rawKeyFromRecoveryCode,
   seal,
+  sealBytes,
 } from './crypto.ts'
 export type { KdfParams, NewVault, Sealed } from './crypto.ts'
 

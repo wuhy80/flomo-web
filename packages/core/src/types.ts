@@ -20,6 +20,12 @@ export interface Memo {
   tags: string[]
   /** Pinned memos sort to the top of the feed. */
   pinned?: boolean
+  /**
+   * Attached images as media refs (`YYYY-MM-DD/name`), in attachment order.
+   * The bytes live encrypted under `media/<day>/<name>`; the ref is the path
+   * fragment both systems agree on.
+   */
+  images?: string[]
 }
 
 /** Everything the browser needs to open a vault, minus the secret itself. */

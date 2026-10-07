@@ -233,8 +233,22 @@ export class HostFlomoSession implements FlomoSession {
   }
 
   /** {@inheritDoc FlomoSession.add} */
-  add(content: string): void {
-    void this.act({ kind: 'add', content })
+  add(content: string, images?: string[]): void {
+    // The host protocol carries text only for now; image refs ride along so a
+    // future host half can pick them up without another interface change.
+    void this.act({ kind: 'add', content, ...(images ? { images } : {}) })
+  }
+
+  /** {@inheritDoc FlomoSession.addImage} */
+  async addImage(): Promise<string> {
+    // Media bytes belong to the host process — a page never holds the vault
+    // key here — and the host protocol does not carry them yet.
+    throw new Error('面板暂不支持图片，请在网页版使用。')
+  }
+
+  /** {@inheritDoc FlomoSession.readImage} */
+  async readImage(): Promise<{ bytes: Uint8Array; mime: string }> {
+    throw new Error('面板暂不支持图片，请在网页版使用。')
   }
 
   /** {@inheritDoc FlomoSession.edit} */

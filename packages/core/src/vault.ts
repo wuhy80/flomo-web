@@ -30,18 +30,27 @@ import {
   importVaultKey,
   isKdfParams,
   isSealed,
+  openBytes,
+  randomBytes,
   rawKeyFromRecoveryCode,
+  sealBytes,
   open as openSealed,
   seal,
   CHECK_PLAINTEXT,
 } from './crypto.ts'
 import type { GitHubDirEntry } from './github.ts'
-import { monthOf } from './time.ts'
+import { dayOf, monthOf } from './time.ts'
 import { parseTags } from './tags.ts'
 import type { Memo, Shard, ShardIndex, VaultHeader } from './types.ts'
 
 /** Default directory holding the monthly shards. */
 export const DATA_DIR = 'data'
+
+/** Directory holding encrypted media, sharded one day per subdirectory. */
+export const MEDIA_DIR = 'media'
+
+/** Longest image side accepted from paste or file pick, in pixels. */
+export const MEDIA_MAX_EDGE = 2048
 
 /** Filename of the vault header. */
 export const HEADER_FILE = 'vault.json'
@@ -58,6 +67,9 @@ export interface TextStore {
     options: { sha?: string; message: string },
   ): Promise<string>
   listDir(dir: string): Promise<GitHubDirEntry[]>
+  /** Media support. Omitted by simple stores; the vault reads media only when asked. */
+  readBlob?(path: string): Promise<{ bytes: Uint8Array; sha: string } | null>
+  writeBlob?(path: string, bytes: Uint8Array, options: { sha?: string; message: string }): Promise<string>
 }
 
 /** Raised when a vault already exists where one was about to be created. */
@@ -321,9 +333,10 @@ export class FlomoVault {
   /**
    * Record a new memo.
    * @param content - the raw body, tags included.
+   * @param images - media refs from {@link FlomoVault.addImage}, in order.
    * @returns the stored memo.
    */
-  add(content: string): Memo {
+  add(content: string, images?: string[]): Memo {
     const now = new Date().toISOString()
     const memo: Memo = {
       id: this.newId(),
@@ -331,10 +344,68 @@ export class FlomoVault {
       createdAt: now,
       updatedAt: now,
       tags: parseTags(content),
+      ...(images !== undefined && images.length > 0 ? { images } : {}),
     }
     this.memos.set(memo.id, memo)
     this.dirty.add(monthOf(now))
     return memo
+  }
+
+  /**
+   * Encrypt an image and file it under `media/YYYY-MM-DD/`.
+   *
+   * The bytes never touch the repository in the clear — media sits in the same
+   * private repository as the shards, so it gets the same AES-GCM treatment.
+   * The name is random: the path carries the date, the name carries nothing.
+   * @param bytes - the image bytes (already downscaled by the caller).
+   * @param mime - the image's MIME type, stored beside the ciphertext.
+   * @param day - the `YYYY-MM-DD` directory to file it under; defaults to today.
+   * @returns the media ref to attach to a memo.
+   * @throws when the backing store cannot hold blobs.
+   */
+  async addImage(bytes: Uint8Array, mime: string, day?: string): Promise<string> {
+    if (this.store.writeBlob === undefined) {
+      throw new Error('当前存储不支持图片。')
+    }
+    const sealed = await sealBytes(this.key, bytes)
+    const name = `${bytesToBase64(randomBytes(6)).replace(/[+/=]/g, '').slice(0, 10)}.jpg`
+    const dayKey = day ?? dayOf(new Date().toISOString())
+    await this.store.writeBlob(`${MEDIA_DIR}/${dayKey}/${name}`, new TextEncoder().encode(JSON.stringify({
+      v: 1,
+      mime,
+      iv: sealed.iv,
+      ct: sealed.ct,
+    })), { message: `flomo: media ${dayKey}/${name}` })
+    return `${dayKey}/${name}`
+  }
+
+  /**
+   * Fetch and decrypt one attached image.
+   * @param ref - the media ref a memo carries.
+   * @returns the image bytes and their MIME type.
+   * @throws {VaultHeaderError} when the blob is missing or malformed.
+   * @throws {DecryptError} when the ciphertext does not authenticate.
+   */
+  async readImage(ref: string): Promise<{ bytes: Uint8Array; mime: string }> {
+    if (this.store.readBlob === undefined) {
+      throw new Error('当前存储不支持图片。')
+    }
+    if (!/^[\d-]+\/[\w.-]+$/.test(ref) || ref.includes('..')) {
+      throw new VaultHeaderError(`图片引用不合法：${ref}`)
+    }
+    const file = await this.store.readBlob(`${MEDIA_DIR}/${ref}`)
+    if (file === null) throw new VaultHeaderError('图片不存在，可能已被删除。')
+    let parsed: { v?: number; mime?: string; iv?: string; ct?: string }
+    try {
+      parsed = JSON.parse(new TextDecoder().decode(file.bytes)) as typeof parsed
+    } catch {
+      throw new VaultHeaderError('图片数据无法识别。')
+    }
+    if (parsed.v !== 1 || typeof parsed.iv !== 'string' || typeof parsed.ct !== 'string') {
+      throw new VaultHeaderError('图片数据结构无法识别。')
+    }
+    const bytes = await openBytes(this.key, { iv: parsed.iv, ct: parsed.ct })
+    return { bytes, mime: typeof parsed.mime === 'string' ? parsed.mime : 'image/jpeg' }
   }
 
   /**

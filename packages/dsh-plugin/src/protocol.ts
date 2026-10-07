@@ -77,7 +77,7 @@ export type FlomoAction =
   | { kind: 'create'; password: string }
   | { kind: 'recovery'; code: string }
   | { kind: 'lock' }
-  | { kind: 'add'; content: string }
+  | { kind: 'add'; content: string; images?: string[] }
   | { kind: 'edit'; id: string; content: string }
   | { kind: 'remove'; id: string }
   | { kind: 'pin'; id: string; pinned?: boolean }

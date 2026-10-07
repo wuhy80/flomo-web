@@ -226,6 +226,28 @@ export class CachingTextStore implements TextStore {
     return sha
   }
 
+  /**
+   * Media passes straight through, never cached: the ciphertext of a photo is
+   * far past what `localStorage` can hold, and an `CachingTextStore` that
+   * silently dropped images to satisfy a quota would be worse than one that
+   * simply does not pretend to serve them offline.
+   */
+  async readBlob(path: string): Promise<{ bytes: Uint8Array; sha: string } | null> {
+    if (this.inner.readBlob === undefined) return null
+    return this.inner.readBlob(path)
+  }
+
+  async writeBlob(
+    path: string,
+    bytes: Uint8Array,
+    options: { sha?: string; message: string },
+  ): Promise<string> {
+    if (this.inner.writeBlob === undefined) {
+      throw new Error('该存储不支持二进制文件。')
+    }
+    return this.inner.writeBlob(path, bytes, options)
+  }
+
   /** {@inheritDoc TextStore.listDir} */
   async listDir(dir: string): Promise<GitHubDirEntry[]> {
     try {

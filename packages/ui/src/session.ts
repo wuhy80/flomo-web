@@ -90,13 +90,27 @@ export interface FlomoSession {
    * round trip (the DSH panel's) satisfies the same contract as the in-process
    * one. Consumers read the new memo back through the snapshot.
    */
-  add(content: string): void
+  add(content: string, images?: string[]): void
   /** Replace a memo's body. */
   edit(id: string, content: string): void
   /** Delete a memo. */
   remove(id: string): void
   /** Toggle or set a memo's pinned flag. */
   pin(id: string, pinned?: boolean): void
+
+  /**
+   * Encrypt and upload one image, filing it under its day's media directory.
+   * @param bytes - the image bytes, already downscaled by the caller.
+   * @param mime - the image's MIME type.
+   * @returns the media ref to hand to {@link FlomoSession.add}.
+   */
+  addImage(bytes: Uint8Array, mime: string): Promise<string>
+  /**
+   * Fetch and decrypt one attached image.
+   * @param ref - the media ref a memo carries.
+   * @returns the image bytes and MIME type.
+   */
+  readImage(ref: string): Promise<{ bytes: Uint8Array; mime: string }>
 
   /**
    * Merge an exported document into the vault.

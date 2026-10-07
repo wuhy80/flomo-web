@@ -258,8 +258,23 @@ export class GitHubVaultSession implements FlomoSession {
   }
 
   /** {@inheritDoc FlomoSession.add} */
-  add(content: string): Memo {
-    return this.mutate((vault) => vault.add(content))
+  add(content: string, images?: string[]): Memo {
+    return this.mutate((vault) => vault.add(content, images))
+  }
+
+  /** {@inheritDoc FlomoSession.addImage} */
+  async addImage(bytes: Uint8Array, mime: string): Promise<string> {
+    if (!this.vault) throw new Error('保险库尚未解锁。')
+    // Uploaded eagerly rather than through the dirty-shard path: media lives in
+    // its own day directory, and a paste should be in the repository before the
+    // memo that references it can be saved.
+    return this.vault.addImage(bytes, mime)
+  }
+
+  /** {@inheritDoc FlomoSession.readImage} */
+  async readImage(ref: string): Promise<{ bytes: Uint8Array; mime: string }> {
+    if (!this.vault) throw new Error('保险库尚未解锁。')
+    return this.vault.readImage(ref)
   }
 
   /** {@inheritDoc FlomoSession.edit} */

@@ -63,6 +63,37 @@ export class MemoryStore implements TextStore {
   }
 
   /**
+   * Read a binary blob. Media is stored base64 in the same map as text.
+   * @param path - repository path.
+   * @returns the bytes, or `null`.
+   */
+  async readBlob(path: string): Promise<{ bytes: Uint8Array; sha: string } | null> {
+    const file = this.files.get(path)
+    if (!file) return null
+    const binary = atob(file.text.replace(/\s+/g, ''))
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+    return { bytes, sha: file.sha }
+  }
+
+  /**
+   * Write a binary blob, same concurrency contract as text.
+   * @param path - repository path.
+   * @param bytes - the bytes to store.
+   * @param options - expected blob sha and commit message.
+   * @returns the new blob sha.
+   */
+  async writeBlob(
+    path: string,
+    bytes: Uint8Array,
+    options: { sha?: string; message: string },
+  ): Promise<string> {
+    let binary = ''
+    for (const byte of bytes) binary += String.fromCharCode(byte)
+    return this.writeText(path, btoa(binary), options)
+  }
+
+  /**
    * List the immediate children of a directory.
    * @param dir - directory path.
    * @returns matching entries.

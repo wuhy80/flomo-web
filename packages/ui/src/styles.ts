@@ -431,6 +431,97 @@ export const FLOMO_CSS = `
   font-variant-numeric: tabular-nums;
 }
 
+/* Pending attachments: flomo shows removable thumbnails with a dashed tile
+   that adds the next one, always present so the row reads as a drop zone. */
+.fl-composer-attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.fl-attach-thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: visible;
+}
+
+.fl-attach-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+  border: 1px solid var(--flomo-border);
+}
+
+.fl-attach-remove {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.fl-attach-remove:hover { background: rgba(0, 0, 0, 0.75); }
+
+.fl-attach-add {
+  width: 72px;
+  height: 72px;
+  border: 1px dashed var(--flomo-border-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--flomo-text-faint);
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.fl-attach-add:hover { border-color: var(--flomo-green); color: var(--flomo-green); }
+.fl-attach-add:disabled { cursor: default; opacity: 0.6; }
+
+.fl-attach-error { font-size: 12px; color: var(--flomo-danger); }
+
+/* Attached images on a memo: square tiles under the body, like flomo's. */
+.fl-memo-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fl-memo-image {
+  width: 104px;
+  height: 104px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--flomo-border);
+  display: block;
+}
+
+.fl-memo-image-loading,
+.fl-memo-image-failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--flomo-bg-sunken);
+  font-size: 11px;
+  color: var(--flomo-text-faint);
+}
+
 /* The round send button flomo parks in the composer's bottom-right corner:
    green while there is something to send, quiet grey while there is not. */
 .fl-send {

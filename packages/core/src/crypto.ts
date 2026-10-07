@@ -202,6 +202,42 @@ export async function open(key: CryptoKey, sealed: Sealed): Promise<string> {
   }
 }
 
+/**
+ * Encrypt raw bytes under the vault key — the media analogue of {@link seal}.
+ * @param key - the AES-GCM vault key.
+ * @param bytes - the bytes to protect.
+ * @returns the IV and ciphertext, both base64.
+ */
+export async function sealBytes(key: CryptoKey, bytes: Uint8Array): Promise<Sealed> {
+  const iv = randomBytes(IV_BYTES)
+  const ct = await webcrypto().subtle.encrypt(
+    { name: 'AES-GCM', iv: iv as unknown as BufferSource },
+    key,
+    bytes as unknown as BufferSource,
+  )
+  return { iv: bytesToBase64(iv), ct: bytesToBase64(new Uint8Array(ct)) }
+}
+
+/**
+ * Decrypt sealed bytes, authenticating them in the process.
+ * @param key - the AES-GCM vault key.
+ * @param sealed - the IV and ciphertext to open.
+ * @returns the recovered bytes.
+ * @throws {DecryptError} when the tag does not authenticate.
+ */
+export async function openBytes(key: CryptoKey, sealed: Sealed): Promise<Uint8Array> {
+  try {
+    const plain = await webcrypto().subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToBytes(sealed.iv) as unknown as BufferSource },
+      key,
+      base64ToBytes(sealed.ct) as unknown as BufferSource,
+    )
+    return new Uint8Array(plain)
+  } catch {
+    throw new DecryptError()
+  }
+}
+
 /** A freshly minted vault: its header parameters and the key to use with them. */
 export interface NewVault {
   /** KDF parameters to publish in `vault.json`. */

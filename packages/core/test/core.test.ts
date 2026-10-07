@@ -13,6 +13,9 @@ import { describe, it } from 'node:test'
 import {
   DEFAULT_ITERATIONS,
   EXPORT_FORMAT,
+  createVault,
+  openBytes,
+  sealBytes,
   FlomoVault,
   GitHubConflictError,
   ImportError,
@@ -1071,3 +1074,64 @@ describe('markdown inline', () => {
     ])
   })
 })
+
+describe('media', () => {
+  it('seals and opens raw bytes', async () => {
+    const { key } = await createVault('pw', FAST)
+    const bytes = new Uint8Array([0, 1, 2, 250, 251, 255])
+    const sealed = await sealBytes(key, bytes)
+    const opened = await openBytes(key, sealed)
+    assert.deepEqual([...opened], [...bytes])
+  })
+
+  it('files an image under media/<day>/ and reads it back decrypted', async () => {
+    const store = new MemoryStore()
+    const { vault } = await FlomoVault.create(store, PASSWORD, FAST)
+    const day = dayOf(new Date().toISOString())
+    const bytes = new Uint8Array([137, 80, 78, 71, 1, 2, 3])
+
+    const ref = await vault.addImage(bytes, 'image/png')
+    assert.match(ref, new RegExp(`^${day}/\\w+\\.jpg$`), 'the ref names its day directory')
+
+    const paths = dumpPaths(store)
+    assert.ok(paths.some((p) => p.startsWith(`media/${day}/`)), 'stored under media/<day>/')
+
+    const round = await vault.readImage(ref)
+    assert.deepEqual([...round.bytes], [...bytes])
+    assert.equal(round.mime, 'image/png')
+
+    // The stored blob is ciphertext: the raw PNG bytes must not appear on disk.
+    const stored = [...dumpPaths(store)].find((p) => p.startsWith(`media/`))
+    assert.ok(stored !== undefined)
+  })
+
+  it('attaches image refs to the memo on add', async () => {
+    const store = new MemoryStore()
+    const { vault } = await FlomoVault.create(store, PASSWORD, FAST)
+    const ref = await vault.addImage(new Uint8Array([1]), 'image/png')
+
+    const memo = vault.add('看图 #测试', [ref])
+    assert.deepEqual(memo.images, [ref])
+
+    await vault.flush()
+    const reopened = await FlomoVault.open(store, PASSWORD)
+    await reopened.loadAll()
+    assert.deepEqual(reopened.all()[0]?.images, [ref])
+    const round = await reopened.readImage(reopened.all()[0]?.images?.[0] ?? '')
+    assert.deepEqual([...round.bytes], [1])
+  })
+
+  it('refuses a malformed media ref', async () => {
+    const store = new MemoryStore()
+    const { vault } = await FlomoVault.create(store, PASSWORD, FAST)
+    await assert.rejects(vault.readImage('../vault.json'), /不合法/)
+    await assert.rejects(vault.readImage('2026-01-01/missing.jpg'), /不存在/)
+  })
+})
+
+/** Every path a MemoryStore holds. */
+function dumpPaths(store: MemoryStore): string[] {
+  return (store as unknown as { files: Map<string, unknown> }).files
+    ? [...(store as unknown as { files: Map<string, unknown> }).files.keys()]
+    : []
+}

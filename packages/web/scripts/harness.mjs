@@ -139,6 +139,13 @@ function bootstrap(data) {
       return reply({ content: { sha: 'sha-written' } });
     }
 
+    // Media round-trips: a GET under media/ answers the bytes the test PUT.
+    if (path.startsWith('media/')) {
+      const written = window.__flomoWrites.find((w) => w.path === path);
+      if (written === undefined) return new Response('not found', { status: 404 });
+      return reply({ content: String(JSON.parse(written.body).content), sha: 'sha-written' });
+    }
+
     if (path === 'vault.json') return reply(VAULT);
     if (path === 'data') {
       return reply(SHARDS.map((s) => ({
