@@ -1201,26 +1201,19 @@ button.fl-heatmap-cell:hover { filter: brightness(0.9); }
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
-.fl-year-pick {
+.fl-year-block { margin-bottom: 28px; }
+.fl-year-block:last-child { margin-bottom: 0; }
+
+.fl-year-title { margin: 0 0 14px; font-size: 22px; font-weight: 600; }
+
+.fl-year-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 0 16px;
-  color: var(--flomo-text);
+  justify-content: space-between;
+  margin: 0 0 14px;
 }
 
-.fl-year-select {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 22px;
-  font-weight: 600;
-  color: inherit;
-  cursor: pointer;
-}
-
-.fl-year-pick span { font-size: 12px; color: var(--flomo-text-faint); }
+.fl-year-head .fl-year-title { margin: 0; }
 
 .fl-month-grid {
   display: grid;
@@ -1311,42 +1304,72 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
 .fl-cal-cell[data-level="3"] { background: #47b881; }
 .fl-cal-cell[data-level="4"] { background: var(--flomo-green); }
 
-.fl-year-list { display: flex; flex-direction: column; gap: 12px; }
-
-.fl-year-card {
-  display: flex;
-  align-items: center;
+/* The three per-year charts: notes blue, characters green, days red — each
+   twelve monthly bars over a right-hand tick rail, flomo's 年 view. */
+.fl-chart-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px;
-  width: 100%;
-  padding: 16px 18px;
-  border: 1px solid var(--flomo-border);
-  border-radius: 12px;
-  background: var(--flomo-bg);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.fl-year-card:hover { background: var(--flomo-hover); }
+.fl-chart-card {
+  padding: 18px 18px 12px;
+  border: 1px solid var(--flomo-border);
+  border-radius: 12px;
+}
 
-.fl-year-name { min-width: 60px; font-size: 20px; font-weight: 600; }
+.fl-chart-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 12px; }
 
-.fl-year-stats { flex: 1; font-size: 12.5px; color: var(--flomo-text-faint); }
+.fl-chart-num { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-.fl-year-stats strong { color: var(--flomo-text-soft); font-weight: 600; font-size: 15px; }
+.fl-chart-unit { font-size: 12.5px; color: var(--flomo-text-faint); }
 
-.fl-year-bars { display: flex; align-items: flex-end; gap: 3px; height: 28px; }
+.fl-chart-body { display: flex; gap: 10px; }
 
-.fl-year-bar {
-  width: 8px;
-  border-radius: 2px;
+.fl-chart-plot { flex: 1; min-width: 0; }
+
+.fl-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 230px;
+  padding: 0 6px;
+}
+
+.fl-chart-bar {
+  width: 14px;
+  border-radius: 4px 4px 0 0;
   background: var(--flomo-border);
 }
 
-.fl-year-bar[data-level="1"] { background: #c6e7d5; }
-.fl-year-bar[data-level="2"] { background: #8ed3ae; }
-.fl-year-bar[data-level="3"] { background: #47b881; }
-.fl-year-bar[data-level="4"] { background: var(--flomo-green); }
+.fl-chart-bar[data-tone="blue"] { background: #6f86ff; }
+.fl-chart-bar[data-tone="green"] { background: #3ec57a; }
+.fl-chart-bar[data-tone="red"] { background: #f2857d; }
+
+.fl-chart-months {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 6px 0;
+}
+
+.fl-chart-months span { font-size: 10.5px; color: var(--flomo-text-faint); }
+
+.fl-chart-ticks {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 230px;
+  padding: 0 0 26px 6px;
+  border-left: 1px dashed var(--flomo-border-strong);
+  text-align: right;
+}
+
+.fl-chart-ticks span {
+  font-size: 10.5px;
+  line-height: 1;
+  color: var(--flomo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── misc ────────────────────────────────────────────────────────────── */
 
