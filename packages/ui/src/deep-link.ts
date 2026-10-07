@@ -25,3 +25,28 @@ export function readComposeDeepLink(hash: string): string | null {
   if (value === null || value.trim() === '') return null
   return value
 }
+
+/**
+ * Read a Web Share Target payload from the query string.
+ *
+ * An installed PWA registered as a system share target receives
+ * `?title=&text=&url=` when the user shares into it — WeChat articles arrive as
+ * title plus link, plain chat text as text alone. The parts assemble into one
+ * preset, newest-context first; a title the text already begins with is not
+ * repeated.
+ * @param search - the raw `location.search`, leading `?` included.
+ * @returns the preset text, or null when the query carries nothing usable.
+ */
+export function readShareTarget(search: string): string | null {
+  if (!search.startsWith('?')) return null
+  const params = new URLSearchParams(search.slice(1))
+  const text = params.get('text')?.trim() ?? ''
+  const title = params.get('title')?.trim() ?? ''
+  const url = params.get('url')?.trim() ?? ''
+  const parts: string[] = []
+  if (title !== '' && (text === '' || !text.startsWith(title))) parts.push(title)
+  if (text !== '') parts.push(text)
+  if (url !== '') parts.push(url)
+  const joined = parts.join('\n\n')
+  return joined === '' ? null : joined
+}

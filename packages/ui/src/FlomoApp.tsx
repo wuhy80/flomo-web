@@ -26,7 +26,7 @@ import {
 } from '@flomo/core'
 
 import { Composer } from './Composer.tsx'
-import { readComposeDeepLink } from './deep-link.ts'
+import { readComposeDeepLink, readShareTarget } from './deep-link.ts'
 import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
 import { Sidebar } from './Sidebar.tsx'
@@ -104,9 +104,10 @@ export function FlomoApp({
   // The #compose= deep link: parsed once at startup, held until the capture box
   // has actually mounted with it, then dropped — so a later remount of the
   // composer never resurrects text the user may already have sent or edited.
-  const [composePreset, setComposePreset] = useState<string | null>(() =>
-    readComposeDeepLink(typeof location === 'undefined' ? '' : location.hash),
-  )
+  const [composePreset, setComposePreset] = useState<string | null>(() => {
+    if (typeof location === 'undefined') return null
+    return readComposeDeepLink(location.hash) ?? readShareTarget(location.search)
+  })
   const probed = useRef(false)
   const searchInput = useRef<HTMLInputElement>(null)
   const titleMenu = useRef<HTMLDivElement>(null)
@@ -119,8 +120,9 @@ export function FlomoApp({
   // app has read it, so a refresh or a shared bookmark starts clean.
   useEffect(() => {
     if (composePreset === null) return
-    if (typeof location !== 'undefined' && location.hash.startsWith('#compose=')) {
-      history.replaceState(null, '', location.pathname + location.search)
+    if (typeof location !== 'undefined' && (location.hash !== '' || location.search !== '')) {
+      // The app keeps no URL state, so a consumed preset leaves nothing behind.
+      history.replaceState(null, '', location.pathname)
     }
   }, [])
 

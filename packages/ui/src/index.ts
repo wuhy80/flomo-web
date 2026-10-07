@@ -20,7 +20,7 @@ export type { DeviceTrust, TrustArea } from './device-trust.ts'
 
 export { downloadText } from './download.ts'
 
-export { readComposeDeepLink } from './deep-link.ts'
+export { readComposeDeepLink, readShareTarget } from './deep-link.ts'
 
 export { GitHubVaultSession, DEFAULT_AUTOSAVE_MS } from './github-session.ts'
 export type { GitHubSessionOptions } from './github-session.ts'

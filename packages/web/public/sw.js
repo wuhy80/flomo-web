@@ -25,7 +25,7 @@
  */
 
 /** Bump this when the caching strategy changes, not on every build. */
-const CACHE_NAME = 'flomo-shell-v1'
+const CACHE_NAME = 'flomo-shell-v2'
 
 /**
  * Fetched at install so a cold offline start has something to serve.

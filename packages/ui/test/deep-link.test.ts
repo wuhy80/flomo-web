@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { readComposeDeepLink } from '../src/deep-link.ts'
+import { readComposeDeepLink, readShareTarget } from '../src/deep-link.ts'
 
 describe('compose deep link', () => {
   it('reads a plain preset', () => {
@@ -41,5 +41,26 @@ describe('compose deep link', () => {
   it('reads an empty or blank compose value as no preset', () => {
     assert.equal(readComposeDeepLink('#compose='), null)
     assert.equal(readComposeDeepLink('#compose=%20'), null)
+  })
+})
+describe('share target', () => {
+  it('assembles title, text and url into one preset', () => {
+    assert.equal(
+      readShareTarget('?title=%E6%A0%87%E9%A2%98&text=%E6%AD%A3%E6%96%87&url=https%3A%2F%2Fmp.weixin.qq.com%2Fs%2Fabc'),
+      ['标题', '正文', 'https://mp.weixin.qq.com/s/abc'].join('\n\n'),
+    )
+  })
+
+  it('does not repeat a title the text already starts with', () => {
+    assert.equal(readShareTarget('?title=%E6%A0%87%E9%A2%98&text=%E6%A0%87%E9%A2%98%E6%AD%A3%E6%96%87'), '标题正文')
+  })
+
+  it('handles a text-only share', () => {
+    assert.equal(readShareTarget('?text=%E4%B8%80%E5%8F%A5%E8%AF%9D'), '一句话')
+  })
+
+  it('reads as no preset for an empty or unrelated query', () => {
+    assert.equal(readShareTarget(''), null)
+    assert.equal(readShareTarget('?utm_source=x'), null)
   })
 })

@@ -231,7 +231,7 @@ describe('service worker', () => {
     await lifecycle(worker, 'install')
 
     assert.equal(worker.skippedWaiting(), true, 'a fix must be able to reach a stuck user')
-    const cache = worker.stores.get('flomo-shell-v1')
+    const cache = worker.stores.get('flomo-shell-v2')
     assert.ok(cache)
     assert.deepEqual(
       [...cache.entries.keys()].sort(),
@@ -252,7 +252,7 @@ describe('service worker', () => {
     assert.equal(worker.claimed(), true)
     assert.deepEqual(
       [...worker.stores.keys()],
-      ['flomo-shell-v1'],
+      ['flomo-shell-v2'],
       'the current shell survives and everything else is gone',
     )
   })
