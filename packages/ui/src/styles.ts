@@ -1639,6 +1639,58 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
 
 .fl-insight-saved { font-size: 12.5px; color: var(--flomo-green); }
 
+/* 每日回顾 scope settings: rows of label + segmented options. */
+.fl-review-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--flomo-border);
+  border-radius: 12px;
+  background: var(--flomo-bg);
+}
+
+.fl-review-setting { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+.fl-review-label {
+  flex: none;
+  width: 60px;
+  font-size: 12px;
+  color: var(--flomo-text-faint);
+}
+
+.fl-review-options { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.fl-review-option {
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--flomo-text-soft);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.fl-review-option:hover { background: var(--flomo-hover); }
+
+.fl-review-option[data-active="true"] {
+  background: var(--flomo-green);
+  border-color: var(--flomo-green);
+  color: #fff;
+}
+
+.fl-review-tag {
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 6px;
+  background: var(--flomo-bg);
+  color: var(--flomo-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 8px;
+}
+
 .fl-insight-history { margin-top: 18px; }
 
 .fl-insight-history-toggle {

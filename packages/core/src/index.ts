@@ -73,7 +73,8 @@ export {
 } from './links.ts'
 export type { Backlink, OutgoingLink } from './links.ts'
 
-export { dailyReview, pickRandom, randomWalk, searchMemos } from './search.ts'
+export { dailyReview, DEFAULT_REVIEW_SCOPE, pickRandom, randomWalk, searchMemos } from './search.ts'
+export type { ReviewScope } from './search.ts'
 export type { SearchQuery } from './search.ts'
 
 export { corpusStats, heatmap, streak } from './stats.ts'

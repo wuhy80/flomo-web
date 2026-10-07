@@ -576,7 +576,12 @@ export class FlomoHostService {
    * @returns the memos.
    */
   review(count = 3): Memo[] {
-    return dailyReview(this.memos(), count)
+    return dailyReview(this.memos(), {
+      tagMode: 'all',
+      tag: '',
+      months: null,
+      count,
+    })
   }
 
   /**

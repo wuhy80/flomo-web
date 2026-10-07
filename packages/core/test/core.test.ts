@@ -328,18 +328,18 @@ describe('queries', () => {
   })
 
   it('gives the same daily review all day and a different one tomorrow', () => {
-    const today = dailyReview(corpus, 2, '2025-06-10', new Date('2025-06-11T00:00:00Z'))
-    const again = dailyReview(corpus, 2, '2025-06-10', new Date('2025-06-11T12:00:00Z'))
+    const today = dailyReview(corpus, { tagMode: 'all', tag: '', months: null, count: 2 }, '2025-06-10', new Date('2025-06-11T00:00:00Z'))
+    const again = dailyReview(corpus, { tagMode: 'all', tag: '', months: null, count: 2 }, '2025-06-10', new Date('2025-06-11T12:00:00Z'))
     assert.deepEqual(today.map((m) => m.id), again.map((m) => m.id))
   })
 
   it('excludes recent memos from the review instead of falling back to them', () => {
     const fresh = [memo({ id: 'fresh', createdAt: new Date().toISOString() })]
-    assert.deepEqual(dailyReview(fresh, 3, '2025-06-10', new Date()), [])
+    assert.deepEqual(dailyReview(fresh, { tagMode: 'all', tag: '', months: null, count: 3 }, '2025-06-10', new Date()), [])
   })
 
   it('returns the review newest first, so its day headings read in order', () => {
-    const picked = dailyReview(corpus, 3, '2025-06-10', new Date('2025-06-11T00:00:00Z'))
+    const picked = dailyReview(corpus, { tagMode: 'all', tag: '', months: null, count: 3 }, '2025-06-10', new Date('2025-06-11T00:00:00Z'))
     assert.equal(picked.length, 3, 'the whole corpus is old enough to be eligible')
 
     const dates = picked.map((m) => m.createdAt)

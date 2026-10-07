@@ -107,6 +107,26 @@ export function pickRandom(
   return taken
 }
 
+/** What the 每日回顾 draws from: a content filter, a time range and a count. */
+export interface ReviewScope {
+  /** `all` = 全部内容; `include` = 包含指定标签; `exclude` = 排除指定标签; `untagged` = 无标签. */
+  tagMode: 'all' | 'include' | 'exclude' | 'untagged'
+  /** The tag for include/exclude modes. */
+  tag: string
+  /** Time range in months; `null` = 全部时间. flomo offers 1/3/6/12. */
+  months: number | null
+  /** Notes per day. flomo offers 4/8/12/16/20/24. */
+  count: number
+}
+
+/** flomo's default: 全部内容 + 全部时间 + 8 条/天. */
+export const DEFAULT_REVIEW_SCOPE: ReviewScope = {
+  tagMode: 'all',
+  tag: '',
+  months: null,
+  count: 8,
+}
+
 /**
  * The daily review: a stable set of older notes for a given day.
  *
@@ -117,21 +137,41 @@ export function pickRandom(
  * a rediscovery.
  *
  * The set is stable for a given day, and so is its order — newest first.
+ *
  * @param memos - the corpus.
- * @param count - how many notes to surface.
+ * @param scope - what the review draws from: content filter, time range, count.
  * @param dayKey - the `YYYY-MM-DD` day to seed from.
  * @param now - reference instant, for the recency exclusion.
  * @returns the chosen memos, newest first, possibly empty.
  */
 export function dailyReview(
   memos: readonly Memo[],
-  count = 3,
+  scope: ReviewScope = DEFAULT_REVIEW_SCOPE,
   dayKey: string = dayOf(new Date()),
   now: Date = new Date(),
 ): Memo[] {
-  const cutoff = new Date(now.getTime() - 2 * 86_400_000).toISOString()
-  const eligible = memos.filter((memo) => memo.createdAt < cutoff)
-  const picked = pickRandom(eligible, count, hashSeed(dayKey))
+  // 回顾过往: notes from the last two days are not worth resurfacing yet.
+  const recencyCutoff = new Date(now.getTime() - 2 * 86_400_000).toISOString()
+  let eligible = memos.filter((memo) => memo.createdAt < recencyCutoff)
+
+  if (scope.tagMode === 'include' && scope.tag !== '') {
+    eligible = eligible.filter((memo) => memo.tags.includes(scope.tag))
+  } else if (scope.tagMode === 'exclude' && scope.tag !== '') {
+    eligible = eligible.filter((memo) => !memo.tags.includes(scope.tag))
+  } else if (scope.tagMode === 'untagged') {
+    eligible = eligible.filter((memo) => memo.tags.length === 0)
+  }
+
+  if (scope.months !== null && scope.months > 0) {
+    const timeCutoff = new Date(
+      now.getFullYear(),
+      now.getMonth() - scope.months,
+      now.getDate(),
+    ).toISOString()
+    eligible = eligible.filter((memo) => memo.createdAt >= timeCutoff)
+  }
+
+  const picked = pickRandom(eligible, scope.count, hashSeed(dayKey + scope.tagMode + scope.tag + String(scope.months)))
 
   // Returned newest first. The draw is random, so without this the day headings
   // the feed adds around these notes appear in an order that reads as a bug —

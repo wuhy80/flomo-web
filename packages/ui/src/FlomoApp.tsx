@@ -28,6 +28,8 @@ import type { Memo } from '@flomo/core'
 
 import { Composer } from './Composer.tsx'
 import { readComposeDeepLink, readMemoDeepLink, readShareTarget } from './deep-link.ts'
+import { loadReviewScope, saveReviewScope } from './review-scope.ts'
+import type { ReviewScope } from '@flomo/core'
 import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
 import { Sidebar } from './Sidebar.tsx'
@@ -113,6 +115,7 @@ export function FlomoApp({
   // composer never resurrects text the user may already have sent or edited.
   const [aiConfig, setAiConfig] = useState<AiConfig>(() => loadAiConfig())
   const [aiSaved, setAiSaved] = useState(false)
+  const [reviewScope, setReviewScope] = useState<ReviewScope>(() => loadReviewScope())
   const [composePreset, setComposePreset] = useState<string | null>(() => {
     if (typeof location === 'undefined') return null
     return readComposeDeepLink(location.hash) ?? readShareTarget(location.search)
@@ -188,8 +191,8 @@ export function FlomoApp({
   }, [snapshot.memos, view, query])
 
   const reviewMemos = useMemo(
-    () => (view.kind === 'review' ? dailyReview(snapshot.memos, 3) : []),
-    [snapshot.memos, view.kind],
+    () => (view.kind === 'review' ? dailyReview(snapshot.memos, reviewScope) : []),
+    [snapshot.memos, view.kind, reviewScope],
   )
 
   const randomMemo = useMemo(
@@ -588,8 +591,88 @@ export function FlomoApp({
           {view.kind === 'review' ? (
             <>
               <p className="fl-review-note">
-                从旧记录里抽出的三条，今天固定不变。每天来看一次，等于和过去的自己碰个面。
+                每天固定抽出一批旧笔记。每天来看一次，等于和过去的自己碰个面。范围设置只影响明天的抽取。
               </p>
+              <div className="fl-review-settings">
+                <div className="fl-review-setting">
+                  <span className="fl-review-label">内容范围</span>
+                  <div className="fl-review-options">
+                    {([['all', '全部内容'], ['include', '包含标签'], ['exclude', '排除标签'], ['untagged', '无标签']] as const).map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className="fl-review-option"
+                        data-active={reviewScope.tagMode === mode}
+                        onClick={() => {
+                          const next = { ...reviewScope, tagMode: mode }
+                          setReviewScope(next)
+                          saveReviewScope(next)
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {reviewScope.tagMode === 'include' || reviewScope.tagMode === 'exclude' ? (
+                    <select
+                      className="fl-review-tag"
+                      value={reviewScope.tag}
+                      onChange={(event) => {
+                        const next = { ...reviewScope, tag: event.target.value }
+                        setReviewScope(next)
+                        saveReviewScope(next)
+                      }}
+                    >
+                      <option value="">选择标签…</option>
+                      {snapshot.tags.map((tag) => (
+                        <option key={tag.tag} value={tag.tag}>
+                          #{tag.tag}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
+                <div className="fl-review-setting">
+                  <span className="fl-review-label">时间范围</span>
+                  <div className="fl-review-options">
+                    {([['全部时间', null], ['1 年内', 12], ['6 个月内', 6], ['3 个月内', 3], ['1 个月内', 1]] as const).map(([label, months]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        className="fl-review-option"
+                        data-active={reviewScope.months === months}
+                        onClick={() => {
+                          const next = { ...reviewScope, months }
+                          setReviewScope(next)
+                          saveReviewScope(next)
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="fl-review-setting">
+                  <span className="fl-review-label">回顾数量</span>
+                  <div className="fl-review-options">
+                    {[4, 8, 12, 16, 20, 24].map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        className="fl-review-option"
+                        data-active={reviewScope.count === count}
+                        onClick={() => {
+                          const next = { ...reviewScope, count }
+                          setReviewScope(next)
+                          saveReviewScope(next)
+                        }}
+                      >
+                        {count} 条/天
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
               <Feed
                 memos={reviewMemos}
                 emptyText="还没有足够的旧记录可供回顾。"
