@@ -99,6 +99,8 @@ export interface ComposerProps {
   /** Disables submission while a save is in flight, when desired. */
   disabled?: boolean
   placeholder?: string
+  /** Text the box starts with — the deep-link capture preset. Read on mount only. */
+  initialValue?: string
   /** Focus the box on mount. */
   autoFocus?: boolean
   /**
@@ -123,10 +125,13 @@ export function Composer({
   knownTags = [],
   disabled = false,
   placeholder = '有什么值得记录的？',
+  initialValue,
   autoFocus = true,
   focusToken,
 }: ComposerProps): React.ReactElement {
-  const [value, setValue] = useState('')
+  // The preset is read once: a later prop change must not clobber what the
+  // user has already typed on top of it.
+  const [value, setValue] = useState(initialValue ?? '')
   const [fragment, setFragment] = useState<TagFragment | null>(null)
   const [active, setActive] = useState(0)
   const [images, setImages] = useState<PendingImage[]>([])

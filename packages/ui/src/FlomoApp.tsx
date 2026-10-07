@@ -26,6 +26,7 @@ import {
 } from '@flomo/core'
 
 import { Composer } from './Composer.tsx'
+import { readComposeDeepLink } from './deep-link.ts'
 import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
 import { Sidebar } from './Sidebar.tsx'
@@ -100,6 +101,12 @@ export function FlomoApp({
   const [composeToken, setComposeToken] = useState(0)
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  // The #compose= deep link: parsed once at startup, held until the capture box
+  // has actually mounted with it, then dropped — so a later remount of the
+  // composer never resurrects text the user may already have sent or edited.
+  const [composePreset, setComposePreset] = useState<string | null>(() =>
+    readComposeDeepLink(typeof location === 'undefined' ? '' : location.hash),
+  )
   const probed = useRef(false)
   const searchInput = useRef<HTMLInputElement>(null)
   const titleMenu = useRef<HTMLDivElement>(null)
@@ -107,6 +114,24 @@ export function FlomoApp({
   useEffect(() => {
     if (injectStyles) injectFlomoStyles()
   }, [injectStyles])
+
+  // The address bar should not keep the note: strip the fragment as soon as the
+  // app has read it, so a refresh or a shared bookmark starts clean.
+  useEffect(() => {
+    if (composePreset === null) return
+    if (typeof location !== 'undefined' && location.hash.startsWith('#compose=')) {
+      history.replaceState(null, '', location.pathname + location.search)
+    }
+  }, [])
+
+  // Consumed once the capture box has mounted with the preset in hand.
+  useEffect(() => {
+    if (composePreset === null) return
+    if (snapshot.status === 'unlocked' && showsComposer(view)) {
+      const timer = setTimeout(() => setComposePreset(null), 0)
+      return () => clearTimeout(timer)
+    }
+  }, [composePreset, snapshot.status, view])
 
   // The title dropdown closes on any click outside it and on Escape. Both listen
   // only while the menu is open; the click is heard on `pointerdown` so the menu
@@ -438,6 +463,7 @@ export function FlomoApp({
               onSubmit={handleAdd}
               onAddImage={handleAddImage}
               knownTags={snapshot.tags}
+              initialValue={composePreset ?? undefined}
               focusToken={composeToken}
             />
           ) : null}
