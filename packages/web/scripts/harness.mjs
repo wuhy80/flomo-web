@@ -10,7 +10,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -236,7 +236,15 @@ export async function openApp(url, options = {}) {
   const height = options.height ?? 1000
   const data = options.data ?? (await fixture())
 
-  const profile = join(here, '..', 'node_modules', '.chrome-screenshot')
+  // The setup screenshot needs a browser with no history: a reused profile
+  // would still hold the injected config from an earlier run.
+  const profile = join(
+    here,
+    '..',
+    'node_modules',
+    options.setup === true ? '.chrome-screenshot-setup' : '.chrome-screenshot',
+  )
+  if (options.setup === true) rmSync(profile, { recursive: true, force: true })
   await mkdir(profile, { recursive: true })
 
   const child = spawn(
@@ -305,7 +313,11 @@ export async function openApp(url, options = {}) {
   // from a normal evaluate and then reloading would wipe it — which is exactly
   // what happened the first time this was written, and the app quietly went to
   // the real api.github.com and came back with "Bad credentials".
-  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: bootstrap(data) })
+  // `setup: true` skips the injected config entirely, so the page shows the
+  // first-run 连接数据仓库 form — what a brand-new visitor sees.
+  if (options.setup !== true) {
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: bootstrap(data) })
+  }
 
   await cdp.send('Page.navigate', { url })
   await waitFor('document.querySelector(".fl-root") !== null', 'the app to mount')

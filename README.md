@@ -206,40 +206,110 @@ DSH 插件 dsh-flomo
 
 ---
 
-## 快速开始（网页版）
+## 从零部署指南（图文，约 10 分钟）
 
-```bash
-pnpm install
-pnpm dev            # http://localhost:5273
+全程只用到 GitHub 的免费额度：站点壳跑在 Pages，数据仓库是私有的、不走 Pages。
+
+```mermaid
+graph LR
+  A["① Fork 站点仓库"] --> B["② 开启 Pages<br/>并首次发布"]
+  B --> C["③ 建私有数据仓库"]
+  C --> D["④ 生成细粒度令牌"]
+  D --> E["⑤ 打开站点<br/>连接仓库"]
+  E --> F["⑥ 创建保险库<br/>设密码存恢复码"]
 ```
 
-首次打开会让你填：
+### 第 ① 步：Fork 站点仓库
 
-| 字段 | 说明 |
+打开 **<https://github.com/wuhy80/flomo-web/fork>**，直接点 **Create fork**。
+站点壳的代码是公开的（里面没有任何你的数据），Fork 到你自己账号下才能发布。
+
+Fork 完成后，进入你仓库的 **Actions** 标签页；如果提示 workflows 未启用，点
+**I understand my workflows, go ahead and enable them** 启用。
+
+### 第 ② 步：开启 GitHub Pages 并首次发布
+
+1. 在**你的**仓库：**Settings → Pages**，把 **Build and deployment → Source**
+   选成 **GitHub Actions**；
+2. 打开 **Actions** 标签 → 左侧选 **Deploy web app to GitHub Pages** →
+   右侧 **Run workflow ▾** → 保持 `main` → **Run workflow**；
+3. 等它跑完（约 1 分钟，出现绿色 ✓）。
+
+此后 **<https://你的用户名.github.io/flomo-web/>** 就是你的站点了。以后每次
+push 到 `main` 会自动重新构建发布，也可以随时手动 Run workflow。
+
+> 不想用 Fork？把你本地这份代码 push 到自己的公开仓库（`main` 分支）也可以，
+> 后续步骤完全一致。`base: './'` 让域名根路径和 `/仓库名/` 子路径都能直接用。
+
+### 第 ③ 步：创建私有数据仓库
+
+打开 **<https://github.com/new>**：仓库名填 `flomo-data`，选择 **Private**，
+其他一律不勾，点 **Create**。
+
+> ⚠️ **数据仓库必须私有**。私有仓库不享受免费 Pages——但这里的数据仓库只当
+> 存储用，根本不走 Pages，所以依然免费。
+
+### 第 ④ 步：生成细粒度访问令牌
+
+打开 **<https://github.com/settings/personal-access-tokens/new>**
+（头像 → Settings → Developer settings → Fine-grained tokens → Generate new token）：
+
+| 配置项 | 填什么 |
+|---|---|
+| Token name | 随意，例如 `flomo-sim` |
+| Expiration | 建议设长一些（到期后保存会失败，需重新生成再连接） |
+| Repository access | **Only select repositories** → 勾 `flomo-data` |
+| Permissions → Repository permissions → **Contents** | **Read and write** |
+
+点 **Generate token**，立刻复制 `github_pat_` 开头的令牌——**只显示这一次**。
+其他权限一律不需要。
+
+### 第 ⑤ 步：打开站点，连接仓库
+
+访问你的站点，首次会看到连接表单：
+
+![首次打开：连接你的数据仓库](docs/guide-01-setup.png)
+
+| 字段 | 填什么 |
 |---|---|
 | GitHub 用户名 | 你的账号 |
-| 私有仓库名 | 例如 `flomo-data`（**必须私有**） |
-| 分支 | 可留空 |
-| PAT | 细粒度令牌，权限只要 `Contents: Read and write`，范围限定这一个仓库 |
+| 私有仓库名 | `flomo-data`（**必须私有**） |
+| 分支 | 留空（默认分支） |
+| 细粒度访问令牌（PAT） | 第 ④ 步的令牌 |
 
-在 GitHub 的 **Settings → Developer settings → Fine-grained tokens** 创建。
-`vault.json` 不存在时，下一步会让你**创建保险库**并设置密码。
+保持「在这台设备上记住」勾选，点**连接**。
+（表单上还有个可选的「在我的账号下创建这个私有仓库」——那是给没建仓库的人用的，
+需要令牌额外带 `Administration: Read and write`。按本指南自己建好了仓库，就**不要**
+授予这个权限。）
 
-**不想手动建仓库？** 表单上有一个可选的「在我的账号下创建这个私有仓库」。
-它是**可选**的，因为这一步需要令牌额外具备 `Administration: Read and write` ——
-比应用其它任何时候用到的都宽。如果你自己已经建好仓库，就**不要**授予这个权限。
-（这个按钮背后就是 `createPrivateRepo`，它会顺手把 `owner` 填成令牌所属的账号。）
+### 第 ⑥ 步：创建保险库，设置密码
 
-### 部署到 GitHub Pages
+连接成功后会进入创建保险库页面（和下面的解锁页同一个界面）：设置密码并确认。
+创建后会展示一串**恢复码**——它是忘记密码时取回数据的唯一途径，请抄到密码
+管理器或纸上。
 
-1. 推到一个公开仓库，`main` 分支
-2. Settings → Pages → Source 选 **GitHub Actions**
-3. `.github/workflows/deploy.yml` 会自动构建并发布
+![创建/解锁保险库](docs/guide-02-vault.png)
 
-`vite.config.ts` 里用了 `base: './'`，所以域名根路径和 `/仓库名/` 子路径都能直接用。
+解锁后就是主界面，可以开始记录了：
 
-> ⚠️ **站点壳仓库可以公开，数据仓库必须私有。** 私有仓库不享受免费 Pages，
-> 但这里的数据仓库根本不走 Pages，只当存储用，所以依然免费。
+![主界面](docs/guide-03-feed.png)
+
+### 第 ⑦ 步（可选）：装到手机主屏
+
+手机浏览器访问站点 → 菜单「添加到主屏幕/安装应用」。之后配合系统分享或
+快捷指令，微信里看到的内容可以一键进笔记，见[微信里快速输入](#微信里快速输入)。
+
+### 常见问题
+
+- **想本地开发？** `pnpm install && pnpm dev`，打开 <http://localhost:5273>。
+- **保存失败/令牌过期？** 令牌到期或被删会让保存报错：重新生成一个（第 ④ 步），
+  在站点上断开连接后用新令牌重新连接即可。
+- **忘记密码？** 用恢复码解锁；恢复码和密码都丢了，数据无法找回——这是端到端
+  加密的本质代价。
+- **想更新到最新版？** 在你 Fork 的仓库里 **Sync fork → Update branch**，Pages
+  会自动重新发布。
+- **换设备？** 在新设备打开站点、填同样的仓库和令牌、输密码即可，笔记全在——
+  它们一直在你的私有仓库里。
 
 ---
 

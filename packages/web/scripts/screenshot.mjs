@@ -40,10 +40,11 @@ if (url === undefined || outArg === undefined) {
  * @returns the options.
  */
 function parseOptions(args) {
-  const options = { stopAtGate: false, click: null, open: null, width: 1280, height: 1000 }
+  const options = { stopAtGate: false, setup: false, click: null, open: null, width: 1280, height: 1000 }
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
     if (arg === '--locked') options.stopAtGate = true
+    else if (arg === '--setup') options.setup = true
     else if (arg === '--click') options.click = args[index += 1] ?? null
     else if (arg === '--open') options.open = args[index += 1] ?? null
     else if (arg === '--size') {
@@ -61,12 +62,12 @@ function parseOptions(args) {
 const options = parseOptions(argv.slice(2))
 const out = resolve(outArg)
 
-const app = await openApp(url, { width: options.width, height: options.height })
+const app = await openApp(url, { width: options.width, height: options.height, setup: options.setup })
 try {
   if (options.stopAtGate) {
     await app.waitFor('document.querySelector(".fl-gate") !== null', 'the password gate')
   } else {
-    await app.unlock()
+    if (options.setup !== true) await app.unlock()
   }
 
   if (options.click !== null) {
