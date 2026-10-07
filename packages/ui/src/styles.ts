@@ -657,6 +657,9 @@ export const FLOMO_CSS = `
   position: relative;
   padding: 16px 18px;
   margin-bottom: 12px;
+  /* A visible outline: on the grey page the white cards read as one column
+     unless each is edged. */
+  border: 1px solid var(--flomo-border-strong);
   border-radius: 12px;
   background: var(--flomo-bg);
 }
