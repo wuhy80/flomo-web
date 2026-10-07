@@ -7,7 +7,7 @@
 import type * as React from 'react'
 import { useMemo } from 'react'
 
-import { heatmap } from '@flomo/core'
+import { absoluteDayLabel, heatmap } from '@flomo/core'
 import type { Memo } from '@flomo/core'
 
 export interface HeatmapProps {
@@ -18,8 +18,14 @@ export interface HeatmapProps {
   today?: Date
 }
 
-/** Square size plus gap, in pixels; must match the stylesheet. */
-const CELL = 13
+/** Square size, in pixels; must match the stylesheet. */
+const CELL = 24
+
+/** Gap between squares, in pixels; must match the stylesheet. */
+const GAP = 5
+
+/** Center-to-center distance between two adjacent squares. */
+const PITCH = CELL + GAP
 
 /**
  * Bucket a count into one of five shading levels.
@@ -95,7 +101,7 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
                 className="fl-heatmap-cell"
                 data-level={cell.future ? 0 : level(cell.count)}
                 style={cell.future ? { opacity: 0.35 } : undefined}
-                title={`${cell.key}：${cell.count} 条`}
+                title={`${absoluteDayLabel(cell.key)} · ${cell.count} 条`}
               />
             ))}
           </div>
@@ -108,7 +114,7 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
       <div className="fl-heatmap-months" aria-hidden="true">
         {months.map((label, index) =>
           label === null ? null : (
-            <span key={`${label}-${index}`} className="fl-heatmap-month" style={{ left: index * CELL }}>
+            <span key={`${label}-${index}`} className="fl-heatmap-month" style={{ left: index * PITCH }}>
               {label}
             </span>
           ),

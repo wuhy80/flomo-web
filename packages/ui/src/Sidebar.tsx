@@ -16,11 +16,11 @@ import type { FlomoView } from './views.ts'
 /**
  * Weeks of heatmap shown in the column.
  *
- * Fewer than the 26 the component defaults to, because the sidebar is about 210px
- * wide and flomo puts its calendar there rather than above the feed. Twelve weeks
- * fits without a scrollbar and still reads as a calendar.
+ * flomo's calendar is about 433px across of 24px squares — fifteen weeks at a
+ * 29px pitch — and its column is sized to hold it, so ours matches both numbers
+ * rather than squeezing fewer, smaller weeks into a narrow rail.
  */
-const SIDEBAR_WEEKS = 12
+const SIDEBAR_WEEKS = 15
 
 export interface SidebarProps {
   view: FlomoView
