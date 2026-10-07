@@ -66,7 +66,7 @@ export function viewTitle(view: FlomoView): string {
     case 'insight':
       return 'AI 洞察'
     case 'heatmap':
-      return '热力图'
+      return '记录统计'
     case 'random':
       return '随机漫步'
     case 'settings':

@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { absoluteDayLabel, dayOf, memosToMarkdown, monthOf } from '@flomo/core'
 import type { Memo } from '@flomo/core'
 
+import { compact, tickStep } from './Charts.tsx'
 import { downloadText } from './download.ts'
 import { heatLevel } from './Heatmap.tsx'
 
@@ -61,37 +62,6 @@ interface YearStats {
   totalNotes: number
   totalChars: number
   totalDays: number
-}
-
-/**
- * Abbreviate a count the way the reference charts do: 13.0K, never 13041.
- * @param value - the count.
- * @returns the compact label.
- */
-function compact(value: number): string {
-  if (value >= 1000) {
-    const k = (value / 1000).toFixed(1)
-    return `${k.endsWith('.0') ? k.slice(0, -2) : k}K`
-  }
-  return String(value)
-}
-
-/**
- * Pick a clean tick step for a chart whose tallest bar is `max`.
- *
- * Small axes step by one; larger ones round the quarter up to a 1/2/5 power of
- * ten, so the labels stay readable numbers.
- * @param max - the tallest value, zero allowed.
- * @returns the step between ticks.
- */
-function tickStep(max: number): number {
-  if (max <= 8) return 1
-  const raw = max / 4
-  const power = Math.pow(10, Math.floor(Math.log10(raw)))
-  for (const multiple of [1, 2, 5, 10]) {
-    if (multiple * power >= raw) return multiple * power
-  }
-  return power * 10
 }
 
 /**

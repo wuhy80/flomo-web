@@ -1648,66 +1648,91 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
 
 .fl-insight-saved { font-size: 12.5px; color: var(--flomo-green); }
 
-/* ── 热力图页: the full-page year heatmap ──────────────────────────── */
+/* ── 记录统计页: month digest, trailing-year heatmap, chart cards ───── */
 
-.fl-year-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+/* 月度: the month picker, five headline numbers, one bar per day. */
+.fl-ms { margin-bottom: 26px; }
+
+.fl-ms-select {
+  appearance: none;
+  border: 0;
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M1 1.5l3 3 3-3' fill='none' stroke='%238a8a8a' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat right center;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--flomo-text);
+  padding: 0 14px 0 0;
+  cursor: pointer;
 }
 
-.fl-year-switch { display: flex; gap: 6px; }
-
-.fl-year-summary {
+.fl-ms-nums {
   display: flex;
   flex-wrap: wrap;
-  gap: 22px;
-  font-size: 12.5px;
-  color: var(--flomo-text-soft);
-  margin-bottom: 14px;
+  gap: 10px 34px;
+  margin: 12px 0 18px;
 }
 
-.fl-year-summary strong { color: var(--flomo-text); font-weight: 600; }
+.fl-ms-num { display: flex; flex-direction: column; gap: 3px; }
 
-.fl-year-grid-wrap { min-width: 0; }
-
-/* The year grid fits its container instead of scrolling: 53 week columns share
-   the available width and each cell stays square via aspect-ratio, the way
-   flomo's 热力图 page scales down on narrower windows. */
-.fl-year-grid { display: flex; gap: 8px; width: 100%; }
-
-.fl-year-rail {
-  display: grid;
-  grid-template-rows: repeat(7, 1fr);
-  gap: 3px;
-  padding-top: 18px;
+.fl-ms-num strong {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--flomo-text);
 }
 
-.fl-year-rail span {
+.fl-ms-num span { font-size: 11px; color: var(--flomo-text-faint); }
+
+.fl-ms-chart { display: flex; gap: 10px; }
+
+.fl-ms-bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 160px;
+  border-bottom: 1px solid var(--flomo-border-strong);
+}
+
+.fl-ms-bars i {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: 1.5px 1.5px 0 0;
+  background: var(--flomo-green);
+  opacity: 0.85;
+}
+
+.fl-ms-bars i[data-on="false"] { background: var(--flomo-border); opacity: 1; }
+
+.fl-ms-ticks {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 160px;
   font-size: 10px;
   color: var(--flomo-text-faint);
-  display: flex;
-  align-items: center;
 }
 
-.fl-year-columns { flex: 1; min-width: 0; }
+/* 最近一年: 53 fluid week columns, month labels below, weekday rail right. */
+.fl-ry { margin-bottom: 26px; }
 
-.fl-year-months {
-  position: relative;
-  height: 18px;
-  font-size: 10.5px;
-  color: var(--flomo-text-faint);
+.fl-ry-title {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--flomo-text);
 }
 
-/* Each label anchors to the column where its month begins; (100% + gap) / 53
-   is exactly one column's pitch. */
-.fl-year-months span { position: absolute; white-space: nowrap; }
+.fl-ry-grid { display: flex; gap: 8px; }
 
-.fl-year-weeks { display: flex; gap: 3px; }
+.fl-ry-columns { flex: 1; min-width: 0; }
 
-.fl-year-week {
+.fl-ry-weeks { display: flex; gap: 3px; }
+
+.fl-ry-week {
   flex: 1 1 0;
   min-width: 0;
   display: grid;
@@ -1718,7 +1743,7 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
   gap: 3px;
 }
 
-.fl-year-cell {
+.fl-ry-cell {
   width: 100%;
   aspect-ratio: 1;
   border: 0;
@@ -1728,36 +1753,188 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
   font: inherit;
 }
 
-button.fl-year-cell { cursor: pointer; }
-button.fl-year-cell:hover { box-shadow: 0 0 0 1.5px var(--flomo-green); }
+button.fl-ry-cell { cursor: pointer; }
+button.fl-ry-cell:hover { box-shadow: 0 0 0 1.5px var(--flomo-green); }
 
-.fl-year-cell[data-level="1"] { background: #c6e7d5; }
-.fl-year-cell[data-level="2"] { background: #8ed3ae; }
-.fl-year-cell[data-level="3"] { background: #47b881; }
-.fl-year-cell[data-level="4"] { background: var(--flomo-green); }
+.fl-ry-cell[data-level="1"] { background: #c6e7d5; }
+.fl-ry-cell[data-level="2"] { background: #8ed3ae; }
+.fl-ry-cell[data-level="3"] { background: #47b881; }
+.fl-ry-cell[data-level="4"] { background: var(--flomo-green); }
 
-.fl-year-cell[data-today="true"] { box-shadow: inset 0 0 0 1.5px var(--flomo-text-soft); }
+.fl-ry-cell[data-today="true"] { box-shadow: inset 0 0 0 1.5px var(--flomo-text-soft); }
 
-.fl-year-legend {
-  display: inline-flex;
-  align-items: center;
+.fl-ry-rail {
+  align-self: flex-start;
+  display: grid;
   gap: 3px;
-  margin-left: auto;
-  font-size: 11px;
+}
+
+.fl-ry-rail span {
+  font-size: 10px;
+  color: var(--flomo-text-faint);
+  display: flex;
+  align-items: center;
+}
+
+/* Month labels sit *under* the grid, the axis reading up into the cells; each
+   anchors to the column where its month begins ((100% + gap) / 53 = one pitch). */
+.fl-ry-months {
+  position: relative;
+  margin-top: 6px;
+  height: 15px;
+  font-size: 10.5px;
   color: var(--flomo-text-faint);
 }
 
-.fl-year-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  background: var(--flomo-border);
+.fl-ry-months span { position: absolute; top: 0; white-space: nowrap; }
+
+/* 图表卡片: the six PRO cards and the lightbox 查看 opens. */
+.fl-chart-svg { display: block; width: 100%; height: auto; }
+
+.fl-chart-label { font-size: 10px; fill: var(--flomo-text-soft); }
+.fl-chart-label-faint { fill: var(--flomo-text-faint); }
+.fl-chart-label-inverse { fill: #fff; font-weight: 600; }
+
+.fl-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 90px;
+  height: 100%;
+  font-size: 12px;
+  color: var(--flomo-text-faint);
 }
 
-.fl-year-legend i[data-level="1"] { background: #c6e7d5; }
-.fl-year-legend i[data-level="2"] { background: #8ed3ae; }
-.fl-year-legend i[data-level="3"] { background: #47b881; }
-.fl-year-legend i[data-level="4"] { background: var(--flomo-green); }
+.fl-donut { width: 100%; }
+
+.fl-donut-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--flomo-text-soft);
+}
+
+.fl-donut-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.fl-pcards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fl-pcard {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--flomo-border);
+  border-radius: var(--flomo-radius);
+  background: var(--flomo-bg);
+}
+
+.fl-pcard-chart {
+  flex: 0 0 118px;
+  align-self: center;
+}
+
+.fl-pcard-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.fl-pcard-meta h3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--flomo-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fl-pcard-pro {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #f5c451;
+  background: #2b2b2b;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.fl-pcard-meta p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--flomo-text-faint);
+}
+
+.fl-pcard-view {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin-top: auto;
+  font: inherit;
+  font-size: 12px;
+  color: var(--flomo-blue);
+  cursor: pointer;
+}
+
+.fl-pcard-view:hover { text-decoration: underline; }
+
+.fl-chartbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.fl-chartbox {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  background: var(--flomo-bg);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+}
+
+.fl-chartbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.fl-chartbox-head h3 { margin: 0; font-size: 14px; color: var(--flomo-text); }
+
+.fl-chartbox-close {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--flomo-text-faint);
+  cursor: pointer;
+}
+
+.fl-chartbox-close:hover { color: var(--flomo-text); }
 
 /* 每日回顾 scope settings: rows of label + segmented options. */
 .fl-review-settings {

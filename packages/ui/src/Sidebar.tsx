@@ -185,7 +185,7 @@ export function Sidebar({
       </button>
 
       <button {...rowProps({ kind: 'heatmap' })}>
-        <NavLabel icon="▦" text="热力图" />
+        <NavLabel icon="▦" text="记录统计" />
       </button>
 
       <button {...rowProps({ kind: 'random' })}>
