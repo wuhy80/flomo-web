@@ -1607,6 +1607,10 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
 
 .fl-insight-result-body { font-size: 14.5px; line-height: 1.85; }
 
+.fl-insight-save-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+
+.fl-insight-saved { font-size: 12.5px; color: var(--flomo-green); }
+
 .fl-insight-history { margin-top: 18px; }
 
 .fl-insight-history-toggle {

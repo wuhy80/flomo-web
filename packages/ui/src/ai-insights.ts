@@ -242,6 +242,8 @@ export interface StoredInsight {
   scopeLabel: string
   /** The model's full answer. */
   content: string
+  /** Set once the insight has been saved as a memo, so the UI never duplicates it. */
+  savedAt?: number
 }
 
 /** `localStorage` key holding the insight history. */
@@ -304,6 +306,29 @@ export function removeHistory(id: number, area: AiArea | undefined = defaultArea
     }
   }
   return history
+}
+
+/**
+ * Mark a stored result as already saved as a memo.
+ *
+ * The flag persists with the history, so the save button stays disabled across
+ * reloads and remounts — a second click can never create a duplicate note.
+ * @param id - the run id to mark.
+ * @param area - storage to read and write.
+ * @returns the updated history.
+ */
+export function markInsightSaved(id: number, area: AiArea | undefined = defaultArea()): StoredInsight[] {
+  const updated = loadHistory(area).map((item) =>
+    item.id === id && item.savedAt === undefined ? { ...item, savedAt: Date.now() } : item,
+  )
+  if (area !== undefined) {
+    try {
+      area.setItem(HISTORY_KEY, JSON.stringify(updated))
+    } catch {
+      // Best effort; the in-memory state still prevents this session's duplicates.
+    }
+  }
+  return updated
 }
 
 function isStoredInsight(value: unknown): value is StoredInsight {
