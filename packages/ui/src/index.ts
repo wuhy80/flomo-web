@@ -22,6 +22,10 @@ export { downloadText } from './download.ts'
 
 export { readComposeDeepLink, readShareTarget } from './deep-link.ts'
 
+export { FormatToolsBar } from './FormatTools.tsx'
+export { createFormatTools } from './format-tools.ts'
+export type { FormatTools, ListKind } from './format-tools.ts'
+
 export { GitHubVaultSession, DEFAULT_AUTOSAVE_MS } from './github-session.ts'
 export type { GitHubSessionOptions } from './github-session.ts'
 

@@ -8,8 +8,11 @@
  */
 
 import type * as React from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
+
+import { FormatToolsBar } from './FormatTools.tsx'
+import { createFormatTools } from './format-tools.ts'
 
 import { clockOf, dayOf, parseBlocks, tokenizeInline } from '@flomo/core'
 import type { Block, InlineToken, ListItem, Memo } from '@flomo/core'
@@ -401,6 +404,22 @@ export function MemoItem({
     el.style.height = `${el.scrollHeight}px`
   }, [draft, editing])
 
+  // The editor shares the capture box's toolbar: same transforms, bound to the
+  // edit textarea, with the draft as the value they rewrite.
+  const tools = useMemo(
+    () =>
+      createFormatTools(
+        () => editArea.current,
+        (next, caret) => {
+          setDraft(next)
+          requestAnimationFrame(() => {
+            editArea.current?.setSelectionRange(caret, caret)
+          })
+        },
+      ),
+    [],
+  )
+
   const beginEdit = useCallback(() => {
     setDraft(memo.content)
     setEditing(true)
@@ -438,17 +457,23 @@ export function MemoItem({
             onKeyDown={handleKeyDown}
             aria-label="编辑 MEMO"
           />
-          <div className="fl-memo-edit-actions">
-            <button type="button" className="fl-button fl-button-primary" onClick={commit}>
-              保存
-            </button>
-            <button
-              type="button"
-              className="fl-button fl-button-ghost"
-              onClick={() => setEditing(false)}
-            >
-              取消
-            </button>
+          <div className="fl-memo-edit-bar">
+            <FormatToolsBar tools={tools} />
+            <span className="fl-edit-count" aria-hidden="true">
+              {draft.length} 字
+            </span>
+            <span className="fl-memo-edit-actions">
+              <button
+                type="button"
+                className="fl-button fl-button-ghost"
+                onClick={() => setEditing(false)}
+              >
+                取消
+              </button>
+              <button type="button" className="fl-button fl-button-primary" onClick={commit}>
+                保存
+              </button>
+            </span>
           </div>
         </div>
       </article>
@@ -519,7 +544,7 @@ export function MemoItem({
         ) : null}
       </div>
 
-      <div className="fl-memo-body">{renderBody(memo, onTagClick, onLinkClick)}</div>
+      <div className="fl-memo-body" onDoubleClick={beginEdit}>{renderBody(memo, onTagClick, onLinkClick)}</div>
 
       {memo.images !== undefined && memo.images.length > 0 ? (
         <div className="fl-memo-images">

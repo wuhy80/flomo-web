@@ -896,6 +896,23 @@ del { color: var(--flomo-text-faint); }
 }
 
 .fl-memo-edit textarea:focus { border-color: var(--flomo-green); }
+
+/* The editor's bottom bar: tools on the left, then count, cancel, save —
+   the composer's arrangement carried over. */
+.fl-memo-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.fl-edit-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--flomo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
 .fl-memo-edit-actions { display: flex; gap: 8px; }
 
 /* ── empty / states ──────────────────────────────────────────────────── */
