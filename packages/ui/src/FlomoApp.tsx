@@ -33,6 +33,7 @@ import type { ReviewScope } from '@flomo/core'
 import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
 import { Sidebar } from './Sidebar.tsx'
+import { HeatmapView } from './HeatmapView.tsx'
 import { InsightView } from './InsightView.tsx'
 import { AI_PRESETS, loadAiConfig, saveAiConfig } from './ai-insights.ts'
 import type { AiConfig } from './ai-insights.ts'
@@ -681,14 +682,24 @@ export function FlomoApp({
             </>
           ) : null}
 
+          {view.kind === 'heatmap' ? (
+            <HeatmapView
+              memos={snapshot.memos}
+              onSelectDay={(day) => {
+                setView({ kind: 'day', day })
+                setQuery('')
+              }}
+            />
+          ) : null}
+
           {view.kind === 'insight' ? (
-        <InsightView
-          memos={snapshot.memos}
-          tags={snapshot.tags.map((tag) => tag.tag)}
-          onOpenSettings={() => setView({ kind: 'settings' })}
-          onSaveNote={(content) => session.add(content)}
-        />
-      ) : null}
+            <InsightView
+              memos={snapshot.memos}
+              tags={snapshot.tags.map((tag) => tag.tag)}
+              onOpenSettings={() => setView({ kind: 'settings' })}
+              onSaveNote={(content) => session.add(content)}
+            />
+          ) : null}
 
       {view.kind === 'random' ? (
             <>

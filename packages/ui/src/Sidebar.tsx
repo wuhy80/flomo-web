@@ -184,6 +184,10 @@ export function Sidebar({
         <NavLabel icon="◎" text="AI 洞察" />
       </button>
 
+      <button {...rowProps({ kind: 'heatmap' })}>
+        <NavLabel icon="▦" text="热力图" />
+      </button>
+
       <button {...rowProps({ kind: 'random' })}>
         <NavLabel icon="🎲" text="随机漫步" />
       </button>

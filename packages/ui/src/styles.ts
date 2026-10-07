@@ -1648,6 +1648,117 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
 
 .fl-insight-saved { font-size: 12.5px; color: var(--flomo-green); }
 
+/* ── 热力图页: the full-page year heatmap ──────────────────────────── */
+
+.fl-year-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.fl-year-switch { display: flex; gap: 6px; }
+
+.fl-year-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  font-size: 12.5px;
+  color: var(--flomo-text-soft);
+  margin-bottom: 14px;
+}
+
+.fl-year-summary strong { color: var(--flomo-text); font-weight: 600; }
+
+.fl-year-grid-wrap { min-width: 0; }
+
+/* The year grid fits its container instead of scrolling: 53 week columns share
+   the available width and each cell stays square via aspect-ratio, the way
+   flomo's 热力图 page scales down on narrower windows. */
+.fl-year-grid { display: flex; gap: 8px; width: 100%; }
+
+.fl-year-rail {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+  padding-top: 18px;
+}
+
+.fl-year-rail span {
+  font-size: 10px;
+  color: var(--flomo-text-faint);
+  display: flex;
+  align-items: center;
+}
+
+.fl-year-columns { flex: 1; min-width: 0; }
+
+.fl-year-months {
+  position: relative;
+  height: 18px;
+  font-size: 10.5px;
+  color: var(--flomo-text-faint);
+}
+
+/* Each label anchors to the column where its month begins; (100% + gap) / 53
+   is exactly one column's pitch. */
+.fl-year-months span { position: absolute; white-space: nowrap; }
+
+.fl-year-weeks { display: flex; gap: 3px; }
+
+.fl-year-week {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: repeat(7, auto);
+  /* The final column holds fewer than 7 days; without this, the flex-stretch
+     slack inflates its rows into tall pills instead of leaving them square. */
+  align-content: start;
+  gap: 3px;
+}
+
+.fl-year-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 0;
+  padding: 0;
+  border-radius: 2px;
+  background: var(--flomo-border);
+  font: inherit;
+}
+
+button.fl-year-cell { cursor: pointer; }
+button.fl-year-cell:hover { box-shadow: 0 0 0 1.5px var(--flomo-green); }
+
+.fl-year-cell[data-level="1"] { background: #c6e7d5; }
+.fl-year-cell[data-level="2"] { background: #8ed3ae; }
+.fl-year-cell[data-level="3"] { background: #47b881; }
+.fl-year-cell[data-level="4"] { background: var(--flomo-green); }
+
+.fl-year-cell[data-today="true"] { box-shadow: inset 0 0 0 1.5px var(--flomo-text-soft); }
+
+.fl-year-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--flomo-text-faint);
+}
+
+.fl-year-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--flomo-border);
+}
+
+.fl-year-legend i[data-level="1"] { background: #c6e7d5; }
+.fl-year-legend i[data-level="2"] { background: #8ed3ae; }
+.fl-year-legend i[data-level="3"] { background: #47b881; }
+.fl-year-legend i[data-level="4"] { background: var(--flomo-green); }
+
 /* 每日回顾 scope settings: rows of label + segmented options. */
 .fl-review-settings {
   display: flex;

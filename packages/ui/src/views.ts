@@ -22,6 +22,8 @@ export type FlomoView =
   | { kind: 'review' }
   /** AI 洞察: send a scope of notes to the configured AI provider. */
   | { kind: 'insight' }
+  /** The full-page heatmap for a whole year. */
+  | { kind: 'heatmap' }
   /** One note at a time, drawn at random. */
   | { kind: 'random' }
   /** Repository and vault settings. */
@@ -63,6 +65,8 @@ export function viewTitle(view: FlomoView): string {
       return '每日回顾'
     case 'insight':
       return 'AI 洞察'
+    case 'heatmap':
+      return '热力图'
     case 'random':
       return '随机漫步'
     case 'settings':
