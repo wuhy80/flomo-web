@@ -1,7 +1,8 @@
 /**
  * The capture box — the single most-used control in flomo, so it gets the most
- * care: it auto-grows, submits on Cmd/Ctrl+Enter, completes `#tags` from what
- * the user has already written, and never loses a draft to a stray click.
+ * care: it auto-grows, submits on Cmd/Ctrl+Enter from the round button or the
+ * keyboard, completes `#tags` from what the user has already written (the
+ * toolbar's `#` opens the same menu), and never loses a draft to a stray click.
  *
  * @module @flomo/ui/Composer
  */
@@ -135,6 +136,27 @@ export function Composer({
     })
   }, [value, disabled, onSubmit, resize])
 
+  /**
+   * Drop a `#` at the caret from the toolbar, which opens tag completion.
+   *
+   * The fragment is read from the live DOM inside the same rAF that moves the
+   * caret, so the suggestion menu sees the character React has just committed.
+   */
+  const insertTagStart = useCallback(() => {
+    const el = textarea.current
+    if (!el) return
+    const caret = el.selectionStart ?? el.value.length
+    setValue(`${value.slice(0, caret)}#${value.slice(caret)}`)
+    requestAnimationFrame(() => {
+      const node = textarea.current
+      if (node === null) return
+      node.focus()
+      node.setSelectionRange(caret + 1, caret + 1)
+      syncFragment()
+      resize()
+    })
+  }, [value, syncFragment, resize])
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       // The completion menu owns the navigation keys only while it is open, so
@@ -219,17 +241,57 @@ export function Composer({
       ) : null}
 
       <div className="fl-composer-bar">
-        <span className="fl-composer-hint">
-          {value.length > 0 ? `${value.length} 字 · ` : ''}Ctrl/Cmd + Enter 发送
-        </span>
-        <div className="fl-composer-actions">
+        <div className="fl-composer-tools">
+          <button type="button" className="fl-tool" title="插入标签" onClick={insertTagStart}>
+            #
+          </button>
+          <button type="button" className="fl-tool" title="插入图片（尚未支持）" disabled>
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <rect
+                x="2"
+                y="3"
+                width="12"
+                height="10"
+                rx="1.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
+              <circle cx="5.8" cy="6.4" r="1.2" fill="currentColor" />
+              <path
+                d="m4 11.5 3-3 2.2 2.2 1.8-1.8 2 2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+        <div className="fl-composer-side">
+          {value.length > 0 ? (
+            <span className="fl-composer-count" aria-hidden="true">
+              {value.length} 字
+            </span>
+          ) : null}
           <button
             type="button"
-            className="fl-button fl-button-primary"
+            className="fl-send"
             onClick={submit}
             disabled={!canSend}
+            title={canSend ? '发送（Ctrl/Cmd + Enter）' : '先写点什么'}
+            aria-label="发送"
           >
-            发送
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path
+                d="M8 13V3M3.5 7.5 8 3l4.5 4.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
         </div>
       </div>

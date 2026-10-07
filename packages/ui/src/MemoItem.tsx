@@ -11,7 +11,7 @@ import type * as React from 'react'
 import { useCallback, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
-import { clockOf, parseBlocks, tokenizeInline } from '@flomo/core'
+import { clockOf, dayOf, parseBlocks, tokenizeInline } from '@flomo/core'
 import type { Memo } from '@flomo/core'
 
 export interface MemoItemProps {
@@ -283,25 +283,19 @@ export function MemoItem({
         )}
       </div>
 
-      <div className="fl-memo-body">{renderBody(memo, onTagClick, onLinkClick)}</div>
-
-      <div className="fl-memo-foot">
-        <span>
-          {memo.pinned ? <span className="fl-memo-pin">已置顶 · </span> : null}
-          {clockOf(memo.createdAt)}
-          {memo.updatedAt !== memo.createdAt ? ' · 已编辑' : ''}
+      <div className="fl-memo-head">
+        {/* The full stamp sits on the card itself, the way flomo shows it. With
+            no day headings above the feed, the date has to live on each note. */}
+        <span className="fl-memo-stamp">
+          {dayOf(memo.createdAt)} {clockOf(memo.createdAt)}
         </span>
-        <span className="fl-memo-tags">
-          {memo.tags.map((tag) => (
-            <InlineMark
-              key={tag}
-              kind="tag"
-              value={tag}
-              onActivate={() => onTagClick(tag)}
-            />
-          ))}
-        </span>
+        {memo.pinned ? <span className="fl-memo-pin">已置顶</span> : null}
+        {memo.updatedAt !== memo.createdAt ? (
+          <span className="fl-memo-edited">已编辑</span>
+        ) : null}
       </div>
+
+      <div className="fl-memo-body">{renderBody(memo, onTagClick, onLinkClick)}</div>
     </article>
   )
 }

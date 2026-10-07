@@ -1,12 +1,15 @@
 /**
- * The memo feed, grouped by day with a pinned section on top.
+ * The memo feed.
+ *
+ * One flat list, like flomo: there are no day headings, because every memo
+ * carries its full timestamp at its own top. Pinned memos still float to the
+ * head of the list, so a pin from last month stays where the user put it.
  *
  * @module @flomo/ui/Feed
  */
 
 import type * as React from 'react'
 
-import { dayLabel, dayOf } from '@flomo/core'
 import type { Memo } from '@flomo/core'
 
 import { MemoItem } from './MemoItem.tsx'
@@ -17,11 +20,6 @@ export interface FeedProps {
   memos: readonly Memo[]
   /** Shown when the list is empty. */
   emptyText?: string
-  /**
-   * Group by day. Turned off where the day headings would be noise — a single
-   * memo's backlink list, for instance, is short and already scoped.
-   */
-  groupByDay?: boolean
   onEdit: MemoItemProps['onEdit']
   onRemove: MemoItemProps['onRemove']
   onPin: MemoItemProps['onPin']
@@ -30,43 +28,16 @@ export interface FeedProps {
   onOpen: MemoItemProps['onOpen']
 }
 
-/** A day (or the pinned bucket) and the memos under it. */
-interface Group {
-  key: string
-  label: string
-  memos: Memo[]
-}
-
 /**
- * Bucket memos into day groups, preserving the incoming order.
- *
- * Pinned memos are split into their own leading group rather than being left in
- * place, so that a pin from last month does not drag its old day header to the
- * top of the feed and split today's group in two.
+ * Split a memo list into pins leading and the rest, preserving either order.
  * @param memos - the memos, newest first.
- * @returns the ordered groups.
+ * @returns the memos with pins first.
  */
-function group(memos: readonly Memo[]): Group[] {
+function withPinsFirst(memos: readonly Memo[]): Memo[] {
   const pinned: Memo[] = []
-  const byDay = new Map<string, Memo[]>()
-
-  for (const memo of memos) {
-    if (memo.pinned) {
-      pinned.push(memo)
-      continue
-    }
-    const day = dayOf(memo.createdAt)
-    const bucket = byDay.get(day)
-    if (bucket) bucket.push(memo)
-    else byDay.set(day, [memo])
-  }
-
-  const groups: Group[] = []
-  if (pinned.length > 0) groups.push({ key: '__pinned__', label: '置顶', memos: pinned })
-  for (const [day, bucket] of byDay) {
-    groups.push({ key: day, label: dayLabel(day), memos: bucket })
-  }
-  return groups
+  const rest: Memo[] = []
+  for (const memo of memos) (memo.pinned ? pinned : rest).push(memo)
+  return [...pinned, ...rest]
 }
 
 /**
@@ -77,7 +48,6 @@ function group(memos: readonly Memo[]): Group[] {
 export function Feed({
   memos,
   emptyText = '还没有记录，写下第一条吧。',
-  groupByDay = true,
   onEdit,
   onRemove,
   onPin,
@@ -89,26 +59,19 @@ export function Feed({
     return <div className="fl-empty">{emptyText}</div>
   }
 
-  const sections = groupByDay ? group(memos) : [{ key: 'flat', label: '', memos: [...memos] }]
-
   return (
     <div>
-      {sections.map((section) => (
-        <section key={section.key}>
-          {section.label ? <div className="fl-day">{section.label}</div> : null}
-          {section.memos.map((memo) => (
-            <MemoItem
-              key={memo.id}
-              memo={memo}
-              onEdit={onEdit}
-              onRemove={onRemove}
-              onPin={onPin}
-              onTagClick={onTagClick}
-              onLinkClick={onLinkClick}
-              onOpen={onOpen}
-            />
-          ))}
-        </section>
+      {withPinsFirst(memos).map((memo) => (
+        <MemoItem
+          key={memo.id}
+          memo={memo}
+          onEdit={onEdit}
+          onRemove={onRemove}
+          onPin={onPin}
+          onTagClick={onTagClick}
+          onLinkClick={onLinkClick}
+          onOpen={onOpen}
+        />
       ))}
     </div>
   )

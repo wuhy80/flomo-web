@@ -43,7 +43,7 @@ export function sameView(a: FlomoView, b: FlomoView): boolean {
 export function viewTitle(view: FlomoView): string {
   switch (view.kind) {
     case 'all':
-      return '全部记录'
+      return '全部笔记'
     case 'tag':
       return `#${view.tag}`
     case 'link':

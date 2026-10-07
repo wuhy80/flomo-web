@@ -33,7 +33,7 @@ import { injectFlomoStyles } from './styles.ts'
 import { useFlomoSession } from './useFlomoSession.ts'
 import { useShortcuts } from './shortcuts.ts'
 import type { ShortcutAction } from './shortcuts.ts'
-import { showsComposer, viewTitle } from './views.ts'
+import { showsComposer, sameView, viewTitle } from './views.ts'
 import type { FlomoView } from './views.ts'
 import type { FlomoSession } from './session.ts'
 
@@ -71,6 +71,14 @@ function savedLabel(iso: string | null): string {
   return `已保存 ${hh}:${mm}`
 }
 
+/** The views the column title's dropdown offers, in flomo's order. */
+const VIEW_MENU: Array<{ kind: 'all' | 'review' | 'random' | 'settings'; label: string }> = [
+  { kind: 'all', label: '全部笔记' },
+  { kind: 'review', label: '每日回顾' },
+  { kind: 'random', label: '随机漫步' },
+  { kind: 'settings', label: '设置' },
+]
+
 /**
  * The application shell.
  * @param props - the session and presentation options.
@@ -90,12 +98,35 @@ export function FlomoApp({
   const [randomTick, setRandomTick] = useState(0)
   const [composeToken, setComposeToken] = useState(0)
   const [importMessage, setImportMessage] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const probed = useRef(false)
   const searchInput = useRef<HTMLInputElement>(null)
+  const titleMenu = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (injectStyles) injectFlomoStyles()
   }, [injectStyles])
+
+  // The title dropdown closes on any click outside it and on Escape. Both listen
+  // only while the menu is open; the click is heard on `pointerdown` so the menu
+  // is gone before the click's `click` half can land somewhere new.
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const closeOnPointer = (event: PointerEvent) => {
+      if (titleMenu.current && !titleMenu.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnPointer)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointer)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [menuOpen])
 
   // Probe the remote exactly once. The ref guard matters because `refresh`
   // briefly parks the status back on 'probing', which would otherwise re-enter.
@@ -312,7 +343,42 @@ export function FlomoApp({
       <main className="fl-main">
         <div className="fl-column">
           <div className="fl-column-head">
-            <h1 className="fl-column-title">{viewTitle(view)}</h1>
+            <div className="fl-title-wrap" ref={titleMenu}>
+              <h1 className="fl-column-title">
+                <button
+                  type="button"
+                  className="fl-title-toggle"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((open) => !open)}
+                >
+                  {viewTitle(view)}
+                  <span className="fl-title-caret" aria-hidden="true">
+                    ▾
+                  </span>
+                </button>
+              </h1>
+              {menuOpen ? (
+                <div className="fl-title-menu" role="menu" aria-label="切换视图">
+                  {VIEW_MENU.map((item) => (
+                    <button
+                      key={item.kind}
+                      type="button"
+                      role="menuitem"
+                      className="fl-title-menu-item"
+                      data-current={sameView(view, { kind: item.kind }) ? 'true' : 'false'}
+                      onClick={() => {
+                        setView({ kind: item.kind })
+                        setQuery('')
+                        setMenuOpen(false)
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
             {view.kind === 'all' || view.kind === 'tag' || view.kind === 'link' ? (
               <div className="fl-search">
                 <input
@@ -323,6 +389,10 @@ export function FlomoApp({
                   aria-label="搜索 MEMO"
                   onChange={(event) => setQuery(event.target.value)}
                 />
+                <span className="fl-search-kbd" aria-hidden="true">
+                  <kbd>Ctrl</kbd>
+                  <kbd>K</kbd>
+                </span>
               </div>
             ) : null}
           </div>
@@ -391,7 +461,7 @@ export function FlomoApp({
             ) : (
               <>
                 <div className="fl-card-lg">
-                  <Feed memos={[focused]} groupByDay={false} {...memoHandlers} />
+                  <Feed memos={[focused]} {...memoHandlers} />
                 </div>
 
                 {focusedLinks.length > 0 ? (
@@ -430,7 +500,6 @@ export function FlomoApp({
                 ) : (
                   <Feed
                     memos={focusedBacklinks.map((link) => link.source)}
-                    groupByDay={false}
                     {...memoHandlers}
                   />
                 )}
@@ -456,7 +525,7 @@ export function FlomoApp({
               <p className="fl-review-note">随机漫步：每次一条，翻到哪里算哪里。</p>
               {randomMemo ? (
                 <div className="fl-card-lg">
-                  <Feed memos={[randomMemo]} groupByDay={false} {...memoHandlers} />
+                  <Feed memos={[randomMemo]} {...memoHandlers} />
                 </div>
               ) : (
                 <div className="fl-empty">还没有记录。</div>

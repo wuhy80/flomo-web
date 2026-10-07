@@ -86,18 +86,6 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
 
   return (
     <div className="fl-heatmap-wrap">
-      {/* Month labels, absolutely placed at the column where each month starts.
-          Without them the grid reads as a decorative texture rather than as
-          something with a time axis. */}
-      <div className="fl-heatmap-months" aria-hidden="true">
-        {months.map((label, index) =>
-          label === null ? null : (
-            <span key={`${label}-${index}`} className="fl-heatmap-month" style={{ left: index * CELL }}>
-              {label}
-            </span>
-          ),
-        )}
-      </div>
       <div className="fl-heatmap" role="img" aria-label="记录热力图">
         {columns.map((column, index) => (
           <div className="fl-heatmap-week" key={column[0]?.key ?? index}>
@@ -113,6 +101,18 @@ export function Heatmap({ memos, weeks = 26, today = new Date() }: HeatmapProps)
           </div>
         ))}
         <span className="fl-visually-hidden">{`每格 ${CELL} 像素`}</span>
+      </div>
+      {/* Month labels go *under* the grid, the way flomo lays it out: labels on
+          top read as a header row for the cells beneath them, labels on the
+          bottom read as the axis. */}
+      <div className="fl-heatmap-months" aria-hidden="true">
+        {months.map((label, index) =>
+          label === null ? null : (
+            <span key={`${label}-${index}`} className="fl-heatmap-month" style={{ left: index * CELL }}>
+              {label}
+            </span>
+          ),
+        )}
       </div>
     </div>
   )

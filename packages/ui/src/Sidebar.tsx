@@ -34,6 +34,25 @@ export interface SidebarProps {
 }
 
 /**
+ * The icon-plus-text label of one navigation row.
+ *
+ * flomo marks every nav row with a small glyph before the text; the glyph is
+ * decorative, so it is hidden from assistive tech and the text stands alone.
+ * @param props - the glyph and the row text.
+ * @returns the label element.
+ */
+function NavLabel({ icon, text }: { icon: string; text: string }): React.ReactElement {
+  return (
+    <span className="fl-nav-label">
+      <span className="fl-nav-icon" aria-hidden="true">
+        {icon}
+      </span>
+      {text}
+    </span>
+  )
+}
+
+/**
  * The navigation column.
  * @param props - current view, the corpus, and the selection callback.
  * @returns the sidebar element.
@@ -84,16 +103,16 @@ export function Sidebar({
       <Heatmap memos={memos} weeks={SIDEBAR_WEEKS} />
 
       <button {...rowProps({ kind: 'all' })}>
-        <span>全部</span>
+        <NavLabel icon="▦" text="全部" />
         <span className="fl-nav-count">{memos.length}</span>
       </button>
 
       <button {...rowProps({ kind: 'review' })}>
-        <span>每日回顾</span>
+        <NavLabel icon="✦" text="每日回顾" />
       </button>
 
       <button {...rowProps({ kind: 'random' })}>
-        <span>随机漫步</span>
+        <NavLabel icon="🎲" text="随机漫步" />
       </button>
 
       {tags.length > 0 ? (
@@ -131,7 +150,7 @@ export function Sidebar({
         </div>
         {showSettings ? (
           <button {...rowProps({ kind: 'settings' })}>
-            <span>设置</span>
+            <NavLabel icon="⚙" text="设置" />
           </button>
         ) : null}
         <div className="fl-shortcut-hint">

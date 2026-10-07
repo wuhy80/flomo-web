@@ -30,6 +30,10 @@ export const FLOMO_CSS = `
   --flomo-green-soft: #eaf6f0;
   --flomo-hover: #f7f7f7;
   --flomo-danger: #d03050;
+  --flomo-blue: #4a7df0;
+  --flomo-blue-strong: #2f62d8;
+  --flomo-blue-soft: #ecf2fe;
+  --flomo-input-bg: #f2f2f2;
   --flomo-radius: 10px;
   --flomo-radius-sm: 6px;
   --flomo-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
@@ -103,13 +107,32 @@ export const FLOMO_CSS = `
   cursor: pointer;
 }
 
+.fl-nav-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fl-nav-icon {
+  width: 18px;
+  flex: none;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1;
+}
+
 .fl-nav-item:hover { background: var(--flomo-hover); }
 
 .fl-nav-item[aria-current="true"] {
-  background: var(--flomo-green-soft);
-  color: var(--flomo-green);
+  background: var(--flomo-green);
+  color: #fff;
   font-weight: 600;
 }
+
+.fl-nav-item[aria-current="true"]:hover { background: var(--flomo-green); }
+
+.fl-nav-item[aria-current="true"] .fl-nav-count { color: rgba(255, 255, 255, 0.8); }
 
 .fl-nav-count {
   font-size: 12px;
@@ -197,18 +220,78 @@ export const FLOMO_CSS = `
 
 .fl-column-title { font-size: 19px; font-weight: 600; margin: 0; }
 
+.fl-title-wrap { position: relative; }
+
+/* The title doubles as the view switcher: a caret marks it as a dropdown, in
+   the way flomo's feed header opens one. */
+.fl-title-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: -6px;
+  padding: 2px 8px 2px 6px;
+  border: 0;
+  border-radius: var(--flomo-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 19px;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fl-title-toggle:hover { background: var(--flomo-hover); }
+
+.fl-title-caret { font-size: 11px; color: var(--flomo-text-faint); }
+
+.fl-title-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 160px;
+  padding: 5px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius-sm);
+  background: var(--flomo-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.fl-title-menu-item {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--flomo-text);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fl-title-menu-item:hover { background: var(--flomo-hover); }
+.fl-title-menu-item[data-current="true"] { color: var(--flomo-green); font-weight: 600; }
+
+/* A grey pill, not a bordered box: flomo's search reads as part of the page
+   until it is used, and the Ctrl K hint lives inside the pill at its end. */
 .fl-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--flomo-border-strong);
-  border-radius: var(--flomo-radius-sm);
-  padding: 6px 10px;
-  min-width: 200px;
-  background: var(--flomo-bg);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  min-width: 220px;
+  background: var(--flomo-input-bg);
 }
 
-.fl-search:focus-within { border-color: var(--flomo-green); }
+.fl-search:focus-within {
+  border-color: var(--flomo-border-strong);
+  background: var(--flomo-bg);
+}
 
 .fl-search input {
   border: 0;
@@ -222,6 +305,19 @@ export const FLOMO_CSS = `
 }
 
 .fl-search input::placeholder { color: var(--flomo-text-faint); }
+
+.fl-search-kbd { display: flex; gap: 3px; flex: none; }
+
+.fl-search-kbd kbd {
+  font-family: var(--flomo-mono);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 4px;
+  background: var(--flomo-bg);
+  color: var(--flomo-text-faint);
+}
 
 /* ── composer ────────────────────────────────────────────────────────── */
 
@@ -261,9 +357,60 @@ export const FLOMO_CSS = `
   justify-content: space-between;
   gap: 12px;
   min-height: 32px;
+  margin-top: 6px;
 }
 
-.fl-composer-hint { font-size: 12px; color: var(--flomo-text-faint); }
+.fl-composer-tools { display: flex; align-items: center; gap: 2px; }
+
+.fl-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--flomo-text-soft);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fl-tool:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+
+.fl-tool:disabled { opacity: 0.4; cursor: default; }
+.fl-tool:disabled:hover { background: transparent; color: var(--flomo-text-soft); }
+
+.fl-composer-side { display: flex; align-items: center; gap: 10px; }
+
+.fl-composer-count {
+  font-size: 12px;
+  color: var(--flomo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The round send button flomo parks in the composer's bottom-right corner:
+   green while there is something to send, quiet grey while there is not. */
+.fl-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--flomo-green);
+  color: #fff;
+  cursor: pointer;
+}
+
+.fl-send:hover { background: #14904f; }
+
+.fl-send:disabled { background: var(--flomo-input-bg); color: var(--flomo-text-faint); cursor: default; }
+.fl-send:disabled:hover { background: var(--flomo-input-bg); }
 
 .fl-suggest {
   list-style: none;
@@ -298,8 +445,6 @@ export const FLOMO_CSS = `
   color: var(--flomo-green);
 }
 
-.fl-composer-actions { display: flex; align-items: center; gap: 8px; }
-
 .fl-button {
   border: 1px solid var(--flomo-border-strong);
   border-radius: var(--flomo-radius-sm);
@@ -330,13 +475,6 @@ export const FLOMO_CSS = `
 .fl-button-danger:hover { background: #fdf0f3; }
 
 /* ── feed ────────────────────────────────────────────────────────────── */
-
-.fl-day {
-  padding: 16px 0 4px;
-  font-size: 12px;
-  color: var(--flomo-text-soft);
-  letter-spacing: 0.3px;
-}
 
 .fl-memo {
   position: relative;
@@ -393,21 +531,40 @@ export const FLOMO_CSS = `
   border-radius: 0;
 }
 
-.fl-memo-foot {
+/* The full stamp sits above the body, like flomo's cards — with no day
+   headings in the feed, the date belongs to the note itself. */
+.fl-memo-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-bottom: 6px;
   font-size: 12px;
   color: var(--flomo-text-faint);
-  min-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 
-.fl-memo-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.fl-memo-stamp { font-variant-numeric: tabular-nums; }
 
-.fl-memo-tag { color: var(--flomo-text-soft); cursor: pointer; }
-.fl-memo-tag:hover { color: var(--flomo-green); }
+.fl-memo-pin { color: var(--flomo-green); font-size: 11px; }
+.fl-memo-edited { font-size: 11px; }
+
+/* A #tag reads as a pill: light blue, rounded, the way flomo paints it. */
+.fl-memo-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  margin: 0 1px;
+  border-radius: 999px;
+  background: var(--flomo-blue-soft);
+  color: var(--flomo-blue);
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.fl-memo-tag:hover {
+  background: #dfe9fd;
+  color: var(--flomo-blue-strong);
+}
 
 /* A [[link]] is prose that happens to be navigable, so it reads as emphasis
    rather than as a tag: green and underlined on hover, not grey. */
@@ -443,8 +600,6 @@ export const FLOMO_CSS = `
   border-radius: 4px;
   background: var(--flomo-bg-sunken);
 }
-
-.fl-memo-pin { color: var(--flomo-green); font-size: 11px; }
 
 .fl-memo-actions {
   position: absolute;
@@ -656,7 +811,7 @@ export const FLOMO_CSS = `
    they label instead of staying behind. */
 .fl-heatmap-wrap { overflow-x: auto; padding-bottom: 4px; }
 
-.fl-heatmap-months { position: relative; height: 13px; margin-bottom: 3px; }
+.fl-heatmap-months { position: relative; height: 13px; margin-top: 4px; }
 
 .fl-heatmap-month {
   position: absolute;
@@ -791,14 +946,15 @@ export const FLOMO_CSS = `
   .fl-column { padding: 16px 14px 80px; }
   .fl-column-head { margin-bottom: 14px; }
   .fl-column-title { font-size: 17px; }
+  .fl-title-toggle { font-size: 17px; }
   .fl-search { min-width: 0; flex: 1; }
+  /* No physical keyboard on this size, so the hint is only noise. */
+  .fl-search-kbd { display: none; }
 
   /* Actions go below the memo they act on. They were rendering above it, which
      reads as acting on the note that follows. */
   .fl-memo { display: flex; flex-direction: column; }
   .fl-memo-body { order: 1; }
-  .fl-memo-foot { order: 2; flex-direction: column; align-items: flex-start; gap: 6px; }
-  .fl-memo-tags { justify-content: flex-start; }
   .fl-memo-actions {
     order: 3;
     position: static;

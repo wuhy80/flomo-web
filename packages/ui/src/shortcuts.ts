@@ -56,7 +56,15 @@ export function isTypingTarget(target: EventTarget | null): boolean {
  * @returns the action, or `null` when the app should ignore the key.
  */
 export function resolveShortcut(event: ShortcutEvent): ShortcutAction | null {
-  // Leave every modified combination to the browser and the operating system.
+  // Ctrl/Cmd+K is the search box's own accelerator, and it works while typing —
+  // that is what separates it from the bare `/`, which must never be stolen
+  // mid-sentence. It has to be recognised before the bail-out below hands every
+  // modified keystroke to the browser.
+  if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+    if (event.key === 'k' || event.key === 'K') return { kind: 'search' }
+    return null
+  }
+  // Leave every other modified combination to the browser and the operating system.
   if (event.metaKey || event.ctrlKey || event.altKey) return null
   if (isTypingTarget(event.target)) return null
 

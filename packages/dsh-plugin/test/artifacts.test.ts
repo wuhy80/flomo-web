@@ -456,7 +456,7 @@ describe('built client bundle', () => {
     assert.match(html, /data-dsh-panel-entry="flomo"/)
   })
 
-  it('renders the unlocked flomo UI with a composer, day group, tags and links', async () => {
+  it('renders the unlocked flomo UI with a composer, timestamps, tags and links', async () => {
     const { registrations } = await loadClientBundle()
     const page = registrations.find((r) => r.name === 'main')
     assert.ok(page)
@@ -481,7 +481,8 @@ describe('built client bundle', () => {
     assert.match(html, /fl-composer/, 'the capture box is the point of the app')
     assert.match(html, /读完《深度工作》很有收获/)
     assert.match(html, /#读书/)
-    assert.match(html, /今天/, 'the feed groups by day')
+    assert.match(html, /fl-memo-stamp/, 'each memo opens with its own full timestamp')
+    assert.ok(!html.includes('fl-day'), 'the feed does not group by day, like flomo')
     assert.match(html, /每日回顾/)
     assert.match(html, /随机漫步/)
     // Both inline markers are interactive, so both carry the click affordance.
