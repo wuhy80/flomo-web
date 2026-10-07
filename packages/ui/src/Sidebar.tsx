@@ -179,6 +179,10 @@ export function Sidebar({
         <NavLabel icon="✦" text="每日回顾" />
       </button>
 
+      <button {...rowProps({ kind: 'insight' })}>
+        <NavLabel icon="◎" text="AI 洞察" />
+      </button>
+
       <button {...rowProps({ kind: 'random' })}>
         <NavLabel icon="🎲" text="随机漫步" />
       </button>

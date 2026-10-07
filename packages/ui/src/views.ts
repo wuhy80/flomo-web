@@ -20,6 +20,8 @@ export type FlomoView =
   | { kind: 'focus'; id: string }
   /** A handful of older notes, stable for the whole day. */
   | { kind: 'review' }
+  /** AI 洞察: send a scope of notes to the configured AI provider. */
+  | { kind: 'insight' }
   /** One note at a time, drawn at random. */
   | { kind: 'random' }
   /** Repository and vault settings. */
@@ -59,6 +61,8 @@ export function viewTitle(view: FlomoView): string {
       return '单条笔记'
     case 'review':
       return '每日回顾'
+    case 'insight':
+      return 'AI 洞察'
     case 'random':
       return '随机漫步'
     case 'settings':

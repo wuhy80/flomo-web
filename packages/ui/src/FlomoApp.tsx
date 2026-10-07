@@ -30,6 +30,9 @@ import { readComposeDeepLink, readMemoDeepLink, readShareTarget } from './deep-l
 import { downloadText } from './download.ts'
 import { Feed } from './Feed.tsx'
 import { Sidebar } from './Sidebar.tsx'
+import { InsightView } from './InsightView.tsx'
+import { loadAiConfig, saveAiConfig } from './ai-insights.ts'
+import type { AiConfig } from './ai-insights.ts'
 import { UnlockGate } from './UnlockGate.tsx'
 import { injectFlomoStyles } from './styles.ts'
 import { useFlomoSession } from './useFlomoSession.ts'
@@ -107,6 +110,8 @@ export function FlomoApp({
   // The #compose= deep link: parsed once at startup, held until the capture box
   // has actually mounted with it, then dropped — so a later remount of the
   // composer never resurrects text the user may already have sent or edited.
+  const [aiConfig, setAiConfig] = useState<AiConfig>(() => loadAiConfig())
+  const [aiSaved, setAiSaved] = useState(false)
   const [composePreset, setComposePreset] = useState<string | null>(() => {
     if (typeof location === 'undefined') return null
     return readComposeDeepLink(location.hash) ?? readShareTarget(location.search)
@@ -577,7 +582,16 @@ export function FlomoApp({
             </>
           ) : null}
 
-          {view.kind === 'random' ? (
+          {view.kind === 'insight' ? (
+        <InsightView
+          memos={snapshot.memos}
+          tags={snapshot.tags.map((tag) => tag.tag)}
+          onOpenSettings={() => setView({ kind: 'settings' })}
+          onSaveNote={(content) => session.add(content)}
+        />
+      ) : null}
+
+      {view.kind === 'random' ? (
             <>
               <p className="fl-review-note">随机漫步：每次一条，翻到哪里算哪里。</p>
               {randomMemo ? (
@@ -680,6 +694,59 @@ export function FlomoApp({
                 ) : null}
               </div>
               {renderSettingsExtra?.()}
+              <div className="fl-card-lg" style={{ marginTop: 16 }}>
+                <h3 className="fl-settings-title">AI 洞察服务</h3>
+                <p className="fl-review-note">
+                  洞察会把所选笔记的明文发送给你自己的 AI 服务商。任何 OpenAI 兼容端点都可以：
+                  DeepSeek 官方、opencode 套餐的网关、GLM 开放平台等。密钥只存在本机。
+                </p>
+                <div className="fl-field">
+                  <span className="fl-field-label">Base URL（不含 /chat/completions）</span>
+                  <input
+                    className="fl-input"
+                    value={aiConfig.baseUrl}
+                    onChange={(event) => setAiConfig({ ...aiConfig, baseUrl: event.target.value })}
+                    placeholder="https://api.deepseek.com"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className="fl-field">
+                  <span className="fl-field-label">API Key</span>
+                  <input
+                    className="fl-input"
+                    type="password"
+                    value={aiConfig.apiKey}
+                    onChange={(event) => setAiConfig({ ...aiConfig, apiKey: event.target.value })}
+                    placeholder="sk-…"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className="fl-field">
+                  <span className="fl-field-label">模型</span>
+                  <input
+                    className="fl-input"
+                    value={aiConfig.model}
+                    onChange={(event) => setAiConfig({ ...aiConfig, model: event.target.value })}
+                    placeholder="deepseek-chat"
+                    spellCheck={false}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button
+                    type="button"
+                    className="fl-button fl-button-primary"
+                    disabled={aiConfig.apiKey.trim() === ''}
+                    onClick={() => {
+                      saveAiConfig(aiConfig)
+                      setAiSaved(true)
+                    }}
+                  >
+                    保存 AI 设置
+                  </button>
+                  {aiSaved ? <span className="fl-recovery-hint">已保存 ✓</span> : null}
+                </div>
+              </div>
             </>
           ) : null}
         </div>

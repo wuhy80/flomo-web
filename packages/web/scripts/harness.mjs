@@ -108,6 +108,13 @@ export async function fixture() {
  * @param data - the fixture.
  * @returns the source to evaluate.
  */
+/** The canned AI completion the bootstrap answers chat/completions calls with.
+ * Kept in normal code so JSON.stringify escapes its newlines into the template
+ * safely — a real newline inside the injected source would be a syntax error. */
+const AI_REPLY = {
+  choices: [{ message: { content: '## 洞察结果\n\n- 你在 **工程** 上投入最多\n- 建议每天回顾一次' } }],
+}
+
 function bootstrap(data) {
   return `(() => {
   try {
@@ -133,6 +140,19 @@ function bootstrap(data) {
     const url = String((input && input.url) || input);
     const path = url.slice(url.indexOf(prefix) + prefix.length).split('?')[0];
     const method = (init && init.method) || 'GET';
+
+    // AI 洞察 calls an OpenAI-compatible endpoint straight from the page; tests
+    // assert against the recorded request instead of a live provider.
+    if (url.includes('/chat/completions')) {
+      let aiBody = {};
+      try {
+        aiBody = JSON.parse(String(init && init.body));
+      } catch (error) {
+        /* body was not JSON */
+      }
+      window.__aiCalls = (window.__aiCalls ?? []).concat([{ url, body: aiBody }]);
+      return reply(${JSON.stringify(AI_REPLY)});
+    }
 
     if (method === 'PUT') {
       window.__flomoWrites.push({ path, body: init && init.body ? String(init.body) : '' });
@@ -461,11 +481,12 @@ export async function openApp(url, options = {}) {
      * @param password - the fixture password.
      */
     async unlock(password = 'demo') {
-      if (
-        await evaluate('document.querySelector(".fl-composer, .fl-card-lg") !== null')
-      ) {
-        return
-      }
+      // Wait for whichever appears first: the trust unlock may beat the gate.
+      await waitFor(
+        'document.querySelector(".fl-gate input[type=password], .fl-composer, .fl-card-lg") !== null',
+        'the gate or an already-open feed',
+      )
+      if (await evaluate('document.querySelector(".fl-composer, .fl-card-lg") !== null')) return
       await waitFor('document.querySelector(".fl-gate input[type=password]") !== null', 'the gate')
       await session.typeInto('.fl-gate input[type=password]', password)
       await evaluate('document.querySelector(".fl-gate form").requestSubmit()')
