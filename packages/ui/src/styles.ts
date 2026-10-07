@@ -40,19 +40,22 @@ export const FLOMO_CSS = `
     "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   --flomo-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
-  display: flex;
-  /* The host is display:flex (to make the app fill the page height), which makes
+  /* flomo centres the whole two-column block as one unit: sidebar and feed sit
+     shoulder to shoulder over the grey page, and the page scrolls together.
+     The host is display:flex (to make the app fill the page height), which makes
      this element a flex item — and a flex item with no width shrinks to its
-     content. Without this the whole app is only as wide as its widest child,
-     which is invisible in the feed and glaring on the centred gate screens. */
+     content, hence the explicit width. */
+  display: flex;
+  justify-content: center;
+  gap: 36px;
   width: 100%;
   height: 100%;
   min-height: 0;
+  overflow-y: auto;
+  padding: 0 28px;
   font-family: var(--flomo-font);
   font-size: 15px;
   color: var(--flomo-text);
-  /* flomo's page is a quiet grey with white cards floating on it; the cards set
-     their own background back to --flomo-bg. */
   background: var(--flomo-bg-sunken);
   -webkit-font-smoothing: antialiased;
 }
@@ -65,16 +68,16 @@ export const FLOMO_CSS = `
 
 .fl-sidebar {
   /* Sized to hold flomo's calendar: 289px of grid (fourteen weeks of 16px
-     squares at a 21px pitch) plus the column's own 12px padding and the
-     grid's 8px inset. */
+     squares at a 21px pitch) plus breathing room. No divider and no independent
+     scroll: the sidebar is simply the left half of the centred block, and the
+     page scrolls as one. */
   width: 330px;
   flex: none;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 20px 12px 12px;
-  border-right: 1px solid var(--flomo-border);
-  overflow-y: auto;
+  padding: 20px 0 24px;
 }
 
 .fl-brand {
@@ -228,16 +231,18 @@ export const FLOMO_CSS = `
 /* ── main column ─────────────────────────────────────────────────────── */
 
 .fl-main {
-  flex: 1;
+  /* Shrink-wraps to the feed's width (at most 70% of the viewport) so the gap
+     between the columns stays a gap instead of becoming centring space, and to
+     the feed's height so the page — not the column — is what scrolls. */
+  flex: 0 1 auto;
+  align-self: flex-start;
+  width: min(70vw, 860px);
   min-width: 0;
-  overflow-y: auto;
   overflow-x: hidden;
 }
 
 .fl-column {
-  max-width: 70vw;
-  margin: 0 auto;
-  padding: 28px 28px 120px;
+  padding: 24px 0 120px;
 }
 
 .fl-column-head {
@@ -1375,17 +1380,17 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
      outright — which is what this used to do — leaves a phone with no way to
      reach the review, the random walk, the settings or any tag: the app quietly
      loses most of its navigation on the device it is most likely to be used on. */
-  .fl-root { flex-direction: column; }
+  .fl-root { flex-direction: column; gap: 0; padding: 0; }
 
   .fl-sidebar {
     width: 100%;
+    align-self: auto;
     flex-direction: row;
     align-items: center;
     gap: 2px;
     padding: 8px 10px;
     overflow-x: auto;
     overflow-y: hidden;
-    border-right: 0;
     border-bottom: 1px solid var(--flomo-border);
   }
 
@@ -1412,7 +1417,7 @@ button.fl-cal-cell:hover { filter: brightness(0.9); }
   .fl-sidebar-foot .fl-stats-strip,
   .fl-shortcut-hint { display: none; }
 
-  .fl-main { flex: 1; min-height: 0; }
+  .fl-main { flex: 1; width: auto; min-height: 0; }
   .fl-column { padding: 16px 14px 80px; }
   .fl-column-head { margin-bottom: 14px; }
   .fl-column-title { font-size: 17px; }
