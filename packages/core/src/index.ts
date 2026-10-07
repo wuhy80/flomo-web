@@ -88,9 +88,10 @@ export {
   tagKey,
   tagSegments,
   tagStats,
+  tagTree,
   tokenizeTags,
 } from './tags.ts'
-export type { TagFragment, TagStat, TagToken } from './tags.ts'
+export type { TagFragment, TagStat, TagToken, TagTreeNode } from './tags.ts'
 
 export {
   absoluteDayLabel,

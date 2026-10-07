@@ -66,6 +66,63 @@ export function tagStats(memos: readonly { tags: readonly string[] }[]): TagStat
   )
 }
 
+/** One node of the tag hierarchy the sidebar renders. */
+export interface TagTreeNode {
+  /** The node's own segment, as first encountered. */
+  name: string
+  /** The full path (`读书/认知`) — the tag as it is written on memos. */
+  path: string
+  /**
+   * Memos carrying exactly this tag. A tag that only exists as someone's
+   * parent — created by a `#读书/认知` memo without any plain `#读书` memo —
+   * has 0: flomo treats every level as its own tag.
+   */
+  count: number
+  /** Sub-tags, siblings sorted alphabetically by name. */
+  children: TagTreeNode[]
+}
+
+/**
+ * Fold the flat tag list into the hierarchy the slash syntax implies.
+ *
+ * `#读书/认知` makes `读书` a foldable parent whether or not any memo carries
+ * it bare, and a tag that is both a parent and written on its own (`#读书` and
+ * `#读书/认知`) becomes one node holding its own count *and* its children.
+ * Paths merge case-insensitively, matching every other tag comparison; the
+ * first casing seen is the one displayed.
+ * @param stats - the corpus's tag frequencies.
+ * @returns the root nodes, alphabetical by name.
+ */
+export function tagTree(stats: readonly TagStat[]): TagTreeNode[] {
+  const roots: TagTreeNode[] = []
+  const index = new Map<string, TagTreeNode>()
+
+  for (const stat of stats) {
+    const segments = tagSegments(stat.tag)
+    let level = roots
+    let path = ''
+    for (const [depth, name] of segments.entries()) {
+      path = depth === 0 ? name : `${path}/${name}`
+      const key = tagKey(path)
+      let node = index.get(key)
+      if (node === undefined) {
+        node = { name, path, count: 0, children: [] }
+        index.set(key, node)
+        level.push(node)
+      }
+      if (depth === segments.length - 1) node.count = stat.count
+      level = node.children
+    }
+  }
+
+  const sortLevel = (nodes: TagTreeNode[]): void => {
+    nodes.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+    for (const node of nodes) sortLevel(node.children)
+  }
+  sortLevel(roots)
+  return roots
+}
+
 /**
  * Whether a memo carries a given tag, ignoring case.
  * @param memo - the memo to test.

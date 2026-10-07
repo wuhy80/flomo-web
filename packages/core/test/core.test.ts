@@ -45,6 +45,7 @@ import {
   suggestTags,
   tagFragmentAtCaret,
   tagStats,
+  tagTree,
   tokenizeInline,
   corpusStats,
 } from '../src/index.ts'
@@ -128,6 +129,65 @@ describe('tags', () => {
       { tag: 'a', count: 2 },
       { tag: 'b', count: 1 },
     ])
+  })
+
+  it('builds the hierarchy the slash syntax implies', () => {
+    const tree = tagTree([
+      { tag: '读书/认知', count: 2 },
+      { tag: '读书', count: 1 },
+    ])
+    assert.deepEqual(tree, [
+      {
+        name: '读书',
+        path: '读书',
+        count: 1,
+        children: [{ name: '认知', path: '读书/认知', count: 2, children: [] }],
+      },
+    ])
+  })
+
+  it('creates a parent that no memo carries bare', () => {
+    // flomo treats every level as its own tag: `#读书/认知` alone still makes
+    // 读书 a foldable parent, with zero memos of its own.
+    const tree = tagTree([{ tag: '读书/认知', count: 2 }])
+    assert.equal(tree.length, 1)
+    assert.equal(tree[0]?.count, 0)
+    assert.equal(tree[0]?.children[0]?.count, 2)
+  })
+
+  it('handles three levels written at once', () => {
+    const tree = tagTree([{ tag: 'Books/Different/营销近视症', count: 1 }])
+    const level1 = tree[0]
+    const level2 = level1?.children[0]
+    const level3 = level2?.children[0]
+    assert.equal(level1?.name, 'Books')
+    assert.equal(level2?.name, 'Different')
+    assert.equal(level3?.name, '营销近视症')
+    assert.equal(level3?.count, 1)
+    assert.equal(level1?.count, 0)
+    assert.equal(level2?.count, 0)
+  })
+
+  it('sorts siblings alphabetically at every level', () => {
+    const tree = tagTree([
+      { tag: 'b/x', count: 1 },
+      { tag: 'a', count: 1 },
+      { tag: 'b/y', count: 1 },
+    ])
+    assert.deepEqual(tree.map((node) => node.name), ['a', 'b'])
+    const b = tree.find((node) => node.name === 'b')
+    assert.deepEqual(b?.children.map((node) => node.name), ['x', 'y'])
+  })
+
+  it('merges paths case-insensitively, keeping the first casing', () => {
+    const tree = tagTree([
+      { tag: 'books/x', count: 1 },
+      { tag: 'Books', count: 3 },
+    ])
+    assert.equal(tree.length, 1)
+    assert.equal(tree[0]?.name, 'books')
+    assert.equal(tree[0]?.count, 3)
+    assert.equal(tree[0]?.children[0]?.name, 'x')
   })
 })
 

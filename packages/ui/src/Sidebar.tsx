@@ -5,11 +5,12 @@
  */
 
 import type * as React from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
-import { corpusStats } from '@flomo/core'
-import type { Memo, TagStat } from '@flomo/core'
+import { corpusStats, tagTree } from '@flomo/core'
+import type { Memo, TagStat, TagTreeNode } from '@flomo/core'
 
+import { loadFoldedTags, saveFoldedTags } from './folded-tags.ts'
 import { Heatmap } from './Heatmap.tsx'
 import { loadPinnedTags, savePinnedTags } from './pinned-tags.ts'
 import { StatsModal } from './StatsModal.tsx'
@@ -70,6 +71,7 @@ export function Sidebar({
   const stats = corpusStats(memos, tags.length)
   const [statsOpen, setStatsOpen] = useState(false)
   const [pinned, setPinned] = useState<string[]>(() => loadPinnedTags())
+  const [folded, setFolded] = useState<string[]>(() => loadFoldedTags())
 
   /**
    * Pin or unpin a tag. Pinned tags float into their own section above the
@@ -80,6 +82,17 @@ export function Sidebar({
     const next = pinned.includes(tag) ? pinned.filter((name) => name !== tag) : [...pinned, tag]
     setPinned(next)
     savePinnedTags(next)
+  }
+
+  /**
+   * Fold or unfold one branch of the tag tree. The list of folded paths
+   * persists on this device, like the pins do.
+   * @param path - the full path of the branch to toggle.
+   */
+  const toggleFold = (path: string): void => {
+    const next = folded.includes(path) ? folded.filter((item) => item !== path) : [...folded, path]
+    setFolded(next)
+    saveFoldedTags(next)
   }
 
   /**
@@ -138,7 +151,95 @@ export function Sidebar({
   }
 
   const pinnedRows = tags.filter((stat) => pinned.includes(stat.tag)).map(renderTagRow)
-  const restRows = tags.filter((stat) => !pinned.includes(stat.tag)).map(renderTagRow)
+
+  // The hierarchy the slash syntax implies: `#读书/认知` makes `读书` a foldable
+  // parent whether or not anything carries a bare `#读书`. Pinned leaves live
+  // only in the pinned section; a pinned tag that is also a parent keeps its
+  // place in the tree, because its children hang off it.
+  const tree = useMemo(() => {
+    const prunePinnedLeaves = (nodes: readonly TagTreeNode[]): TagTreeNode[] =>
+      nodes
+        .map((node) => ({ ...node, children: prunePinnedLeaves(node.children) }))
+        .filter((node) => !(pinned.includes(node.path) && node.children.length === 0))
+    return prunePinnedLeaves(tagTree(tags))
+  }, [tags, pinned])
+
+  /**
+   * One level of the tree, as rows indented by depth. A branch with children
+   * grows a fold arrow; the name navigates, exactly like flomo's list.
+   * @param nodes - the branches to render.
+   * @param depth - how far under the root this level sits.
+   * @returns the rows.
+   */
+  const renderLevel = (nodes: readonly TagTreeNode[], depth: number): React.ReactElement[] =>
+    nodes.map((node) => {
+      const target: FlomoView = { kind: 'tag', tag: node.path }
+      const isPinned = pinned.includes(node.path)
+      const isFolded = folded.includes(node.path)
+      const hasChildren = node.children.length > 0
+      return (
+        <div key={node.path} className="fl-tag-branch">
+          <button
+            type="button"
+            className="fl-tag-row"
+            style={depth > 0 ? { paddingLeft: 10 + depth * 14 } : undefined}
+            aria-current={sameView(view, target) ? 'true' : 'false'}
+            onClick={() => onSelect(target)}
+            title={`#${node.path}`}
+          >
+            {hasChildren ? (
+              <span
+                role="button"
+                tabIndex={0}
+                className="fl-tag-fold"
+                aria-expanded={!isFolded}
+                aria-label={isFolded ? `展开 #${node.path}` : `折叠 #${node.path}`}
+                title={isFolded ? '展开' : '折叠'}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  toggleFold(node.path)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  toggleFold(node.path)
+                }}
+              >
+                {isFolded ? '▸' : '▾'}
+              </span>
+            ) : (
+              <span className="fl-tag-fold fl-tag-fold-none" aria-hidden="true" />
+            )}
+            <span className="fl-tag-name">#{node.name}</span>
+            <span className="fl-nav-count">{node.count}</span>
+            <span
+              role="button"
+              tabIndex={0}
+              className="fl-tag-pin"
+              aria-pressed={isPinned}
+              aria-label={isPinned ? `取消置顶 #${node.path}` : `置顶 #${node.path}`}
+              title={isPinned ? '取消置顶' : '置顶'}
+              onClick={(event) => {
+                event.stopPropagation()
+                togglePin(node.path)
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                event.stopPropagation()
+                togglePin(node.path)
+              }}
+            >
+              📌
+            </span>
+          </button>
+          {hasChildren && !isFolded ? renderLevel(node.children, depth + 1) : null}
+        </div>
+      )
+    })
+
+  const treeRows = renderLevel(tree, 0)
 
   return (
     <nav className="fl-sidebar" aria-label="主导航">
@@ -200,10 +301,10 @@ export function Sidebar({
               <div className="fl-tag-list">{pinnedRows}</div>
             </>
           ) : null}
-          {restRows.length > 0 ? (
+          {treeRows.length > 0 ? (
             <>
               <div className="fl-sidebar-section">全部标签</div>
-              <div className="fl-tag-list">{restRows}</div>
+              <div className="fl-tag-list">{treeRows}</div>
             </>
           ) : null}
         </>

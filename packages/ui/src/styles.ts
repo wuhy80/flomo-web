@@ -158,6 +158,9 @@ export const FLOMO_CSS = `
 
 .fl-tag-list { display: flex; flex-direction: column; gap: 1px; }
 
+/* A branch is its row plus, when unfolded, the nested branches below it. */
+.fl-tag-branch { display: flex; flex-direction: column; gap: 1px; }
+
 .fl-tag-row {
   display: flex;
   align-items: center;
@@ -186,6 +189,23 @@ export const FLOMO_CSS = `
 
 /* Keep the count and the pin packed on the right when a row carries all three. */
 .fl-tag-row .fl-nav-count { margin-left: auto; }
+
+/* The fold arrow heads every tree row — a live toggle on branches, a same-width
+   spacer on leaves, so names stay aligned down the list. */
+.fl-tag-fold {
+  flex: none;
+  width: 13px;
+  font-size: 10.5px;
+  line-height: 1;
+  text-align: center;
+  color: var(--flomo-text-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.fl-tag-fold:hover { color: var(--flomo-text); }
+
+.fl-tag-fold-none { cursor: default; }
 
 /* The pin floats in on hover and stays lit while pressed — the affordance
    flomo uses to lift a tag into its pinned section. */
