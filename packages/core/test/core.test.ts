@@ -1115,7 +1115,24 @@ describe('markdown inline', () => {
       { type: 'code', value: '代码' },
     ])
   })
-})
+
+  it('tokenises underline and highlight from the format menu', () => {
+    assert.deepEqual(tokenizeInline('<u>重点</u> 与 ==关键词=='), [
+      { type: 'underline', value: '重点' },
+      { type: 'text', value: ' 与 ' },
+      { type: 'mark', value: '关键词' },
+    ])
+    assert.equal(markupOf({ type: 'underline', value: '重点' }), '<u>重点</u>')
+    assert.equal(markupOf({ type: 'mark', value: '关键词' }), '==关键词==')
+  })
+
+  it('indexes tags inside underline and highlight', () => {
+    assert.deepEqual(parseTags('<u>#划线</u> 与 ==#高亮=='), ['划线', '高亮'])
+  })
+
+  it('leaves an unclosed <u> in the text rather than eating it', () => {
+    assert.deepEqual(tokenizeInline('<u>没写完'), [{ type: 'text', value: '<u>没写完' }])
+  })})
 
 describe('media', () => {
   it('seals and opens raw bytes', async () => {

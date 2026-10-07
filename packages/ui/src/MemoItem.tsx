@@ -158,6 +158,10 @@ function renderTokens(
         return <em key={key}>{containerContent(token, onTagClick, onLinkClick)}</em>
       case 'strike':
         return <del key={key}>{containerContent(token, onTagClick, onLinkClick)}</del>
+      case 'underline':
+        return <u key={key} className="fl-md-u">{containerContent(token, onTagClick, onLinkClick)}</u>
+      case 'mark':
+        return <mark key={key} className="fl-md-mark">{containerContent(token, onTagClick, onLinkClick)}</mark>
       case 'code':
         return <code key={key}>{token.value}</code>
       case 'url':

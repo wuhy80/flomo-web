@@ -409,6 +409,45 @@ export const FLOMO_CSS = `
 
 .fl-tool-text { font-size: 13px; font-weight: 600; letter-spacing: 0.2px; }
 
+/* The Aa format menu: a small floating card above the button, one glyph per
+   format, exactly flomo's arrangement. */
+.fl-aa-wrap { position: relative; display: flex; }
+
+.fl-aa-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 8px;
+  background: var(--flomo-bg);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+.fl-aa-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--flomo-text);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.fl-aa-option:hover { background: var(--flomo-hover); }
+
+.fl-aa-u { text-decoration: underline; text-underline-offset: 2px; }
+
+.fl-aa-hl { padding: 0 3px; border-radius: 3px; background: #fff3a3; }
+
 .fl-tool {
   display: flex;
   align-items: center;
@@ -699,6 +738,16 @@ export const FLOMO_CSS = `
 .fl-md-table th { background: var(--flomo-bg-sunken); font-weight: 600; }
 
 del { color: var(--flomo-text-faint); }
+
+.fl-md-u { text-decoration: underline; text-underline-offset: 3px; }
+
+/* flomo's highlight: a warm yellow band behind the text. */
+.fl-md-mark {
+  background: #fff3a3;
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
+}
 
 .fl-quote {
   margin: 0.6em 0;

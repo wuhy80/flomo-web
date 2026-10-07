@@ -35,10 +35,12 @@ function inlinePattern(): RegExp {
   return new RegExp(
     [
       '\\[\\[([^[\\]\\n]+)\\]\\]',
+      '<u>([^<\\n]+)</u>',
       '!\\[([^\\]\\n]*)\\]\\((https?://[^)\\s]+)\\)',
       '\\[([^\\]\\n]+)\\]\\((https?://[^)\\s]+)\\)',
       '\\*\\*([^*\\n]+)\\*\\*',
       '~~([^~\\n]+)~~',
+      '==([^=\\n]+)==',
       '`([^`\\n]+)`',
       '(?<![\\w\\\\])_([^_\\n]+)_(?!\\w)',
       '\\*([^*\\n]+)\\*',
@@ -72,6 +74,10 @@ export interface InlineToken {
     | 'strong'
     | 'em'
     | 'strike'
+    /** `<u>underline</u>`, from the composer's format menu. */
+    | 'underline'
+    /** `==highlight==`, from the composer's format menu. */
+    | 'mark'
     | 'code'
     /** A `[text](url)` Markdown link. */
     | 'mdlink'
@@ -131,13 +137,15 @@ export function tokenizeInline(content: string): InlineToken[] {
     const start = match.index ?? 0
     if (start < cursor) continue
 
-    const [wikilink, imageAlt, imageUrl, mdText, mdUrl, strong, strike, code, emUnder, emStar, url, tag] =
+    const [wikilink, underline, imageAlt, imageUrl, mdText, mdUrl, strong, strike, mark, code, emUnder, emStar, url, tag] =
       match.slice(1)
 
     let token: InlineToken | null = null
 
     if (wikilink !== undefined) {
       token = { type: 'link', value: wikilink.trim() }
+    } else if (underline !== undefined) {
+      token = { type: 'underline', value: underline, ...childrenField(underline) }
     } else if (imageUrl !== undefined) {
       token = { type: 'image', value: imageAlt ?? '', url: imageUrl }
     } else if (mdUrl !== undefined) {
@@ -147,6 +155,8 @@ export function tokenizeInline(content: string): InlineToken[] {
       token = { type: 'strong', value: strong, ...childrenField(strong) }
     } else if (strike !== undefined) {
       token = { type: 'strike', value: strike, ...childrenField(strike) }
+    } else if (mark !== undefined) {
+      token = { type: 'mark', value: mark, ...childrenField(mark) }
     } else if (code !== undefined) {
       token = { type: 'code', value: code }
     } else if (emUnder !== undefined) {
@@ -207,6 +217,10 @@ export function markupOf(token: InlineToken): string | null {
       return `*${inner(token.value, token.children)}*`
     case 'strike':
       return `~~${inner(token.value, token.children)}~~`
+    case 'underline':
+      return `<u>${inner(token.value, token.children)}</u>`
+    case 'mark':
+      return `==${inner(token.value, token.children)}==`
     case 'code':
       return `\`${token.value}\``
     case 'mdlink':

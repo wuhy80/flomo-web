@@ -137,7 +137,9 @@ export function Composer({
   const [images, setImages] = useState<PendingImage[]>([])
   const [busyImage, setBusyImage] = useState(false)
   const [imageError, setImageError] = useState<string | null>(null)
+  const [aaOpen, setAaOpen] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
+  const aaWrap = useRef<HTMLSpanElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const suggestions = useMemo(
@@ -363,14 +365,67 @@ export function Composer({
     [syncFragment, resize],
   )
 
-  /** Toggle a `## ` heading on the first selected line. */
-  const toggleHeading = useCallback((): void => {
-    editLines((line, index) => {
-      if (index > 0) return line
-      if (/^ {0,3}#{1,6}\s/.test(line)) return line.replace(/^ {0,3}#{1,6}\s+/, '')
-      return `## ${line}`
+  // The Aa menu closes on any click outside its anchor.
+  useEffect(() => {
+    if (!aaOpen) return undefined
+    const close = (event: PointerEvent) => {
+      if (aaWrap.current && !aaWrap.current.contains(event.target as Node)) {
+        setAaOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [aaOpen])
+
+  /** Wrap (or unwrap) the current selection with an inline format pair. */
+  const wrapSelection = useCallback((before: string, after: string): void => {
+    const el = textarea.current
+    if (!el) return
+    const start = el.selectionStart ?? 0
+    const end = el.selectionEnd ?? 0
+    const current = el.value
+    const selected = current.slice(start, end)
+    const pre = current.slice(start - before.length, start)
+    const post = current.slice(end, end + after.length)
+    // Two shapes count as already-wrapped: the markers sit just outside the
+    // selection, or the user selected them together with the word. Either way
+    // the toggle strips them instead of stacking another pair.
+    const wrappedOutside = selected.length > 0 && pre === before && post === after
+    const wrappedInside =
+      selected.length >= before.length + after.length &&
+      selected.startsWith(before) &&
+      selected.endsWith(after)
+    let next: string
+    let caret: number
+    if (wrappedOutside) {
+      next = current.slice(0, start - before.length) + selected + current.slice(end + after.length)
+      caret = start - before.length + selected.length
+    } else if (wrappedInside) {
+      const inner = selected.slice(before.length, selected.length - after.length)
+      next = current.slice(0, start) + inner + current.slice(end)
+      caret = start + inner.length
+    } else {
+      next = current.slice(0, start) + before + selected + after + current.slice(end)
+      caret = start + before.length + selected.length
+    }
+    setValue(next)
+    requestAnimationFrame(() => {
+      const node = textarea.current
+      if (node === null) return
+      node.focus()
+      node.setSelectionRange(caret, caret)
+      syncFragment()
+      resize()
     })
-  }, [editLines])
+  }, [syncFragment, resize])
+
+  /** The three formats of flomo's Aa menu. */
+  const applyFormat = useCallback((kind: 'bold' | 'underline' | 'mark'): void => {
+    if (kind === 'bold') wrapSelection('**', '**')
+    else if (kind === 'underline') wrapSelection('<u>', '</u>')
+    else wrapSelection('==', '==')
+    setAaOpen(false)
+  }, [wrapSelection])
 
   /**
    * Toggle a list marker over the selected lines.
@@ -556,9 +611,30 @@ export function Composer({
             </svg>
           </button>
           <span className="fl-tool-divider" aria-hidden="true" />
-          <button type="button" className="fl-tool fl-tool-text" title="标题" onClick={toggleHeading}>
-            Aa
-          </button>
+          <span className="fl-aa-wrap" ref={aaWrap}>
+            <button
+              type="button"
+              className="fl-tool fl-tool-text"
+              title="文字格式"
+              aria-expanded={aaOpen}
+              onClick={() => setAaOpen((open) => !open)}
+            >
+              Aa
+            </button>
+            {aaOpen ? (
+              <span className="fl-aa-menu">
+                <button type="button" className="fl-aa-option" title="加粗" onClick={() => applyFormat('bold')}>
+                  <strong>B</strong>
+                </button>
+                <button type="button" className="fl-aa-option" title="下划线" onClick={() => applyFormat('underline')}>
+                  <span className="fl-aa-u">U</span>
+                </button>
+                <button type="button" className="fl-aa-option" title="高亮" onClick={() => applyFormat('mark')}>
+                  <span className="fl-aa-hl">H</span>
+                </button>
+              </span>
+            ) : null}
+          </span>
           <button
             type="button"
             className="fl-tool"
