@@ -12,7 +12,7 @@
  */
 
 import type * as React from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { absoluteDayLabel, dayOf, memosToMarkdown, monthOf } from '@flomo/core'
 import type { Memo } from '@flomo/core'
@@ -164,6 +164,44 @@ export function StatsModal({
   onSelectDay,
 }: StatsModalProps): React.ReactElement {
   const [tab, setTab] = useState<'month' | 'year'>('month')
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Drag-to-scroll for the mouse. The rail is hidden, so the wheel is not the
+  // only way to move; the drag arms only after a few pixels of travel, and a
+  // dragged gesture swallows its own click, so buttons under the hand never
+  // fire by accident.
+  const drag = useRef({ active: false, moved: false, x: 0, y: 0, top: 0, left: 0 })
+
+  const onDragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return
+    drag.current = { active: true, moved: false, x: event.clientX, y: event.clientY, top: 0, left: 0 }
+    const el = scrollRef.current
+    if (el !== null) {
+      drag.current.top = el.scrollTop
+      drag.current.left = el.scrollLeft
+    }
+  }, [])
+
+  const onDragMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const state = drag.current
+    const el = scrollRef.current
+    if (!state.active || el === null) return
+    const dx = event.clientX - state.x
+    const dy = event.clientY - state.y
+    if (!state.moved && Math.hypot(dx, dy) < 5) return
+    state.moved = true
+    el.style.cursor = 'grabbing'
+    document.body.style.userSelect = 'none'
+    el.scrollTop = state.top - dy
+    el.scrollLeft = state.left - dx
+  }, [])
+
+  const onDragEnd = useCallback(() => {
+    drag.current.active = false
+    const el = scrollRef.current
+    if (el !== null) el.style.removeProperty('cursor')
+    document.body.style.removeProperty('user-select')
+  }, [])
 
   // Escape closes, like the view dropdown and the memo editor.
   useEffect(() => {
@@ -268,6 +306,21 @@ export function StatsModal({
         role="dialog"
         aria-modal="true"
         aria-label="记录统计"
+        ref={scrollRef}
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerLeave={onDragEnd}
+        onPointerCancel={onDragEnd}
+        onClickCapture={(event) => {
+          // A drag is a scroll gesture, not a press: whatever click it ends on
+          // must not fire.
+          if (drag.current.moved) {
+            event.preventDefault()
+            event.stopPropagation()
+            drag.current.moved = false
+          }
+        }}
         onClick={(event) => event.stopPropagation()}
       >
         <header className="fl-modal-head">

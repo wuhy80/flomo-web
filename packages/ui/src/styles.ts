@@ -1143,7 +1143,12 @@ button.fl-heatmap-cell:hover { filter: brightness(0.9); }
   padding: 20px 24px 24px;
   border-radius: 14px;
   background: var(--flomo-bg);
+  /* The dialog scrolls by wheel and by drag; the rail itself is visual noise,
+     so it is hidden on every engine while the scrolling stays. */
+  scrollbar-width: none;
 }
+
+.fl-modal::-webkit-scrollbar { display: none; }
 
 .fl-modal-head {
   position: relative;
