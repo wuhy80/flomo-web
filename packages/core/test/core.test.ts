@@ -140,18 +140,19 @@ describe('tags', () => {
       {
         name: '读书',
         path: '读书',
-        count: 1,
+        count: 3,
         children: [{ name: '认知', path: '读书/认知', count: 2, children: [] }],
       },
     ])
   })
 
-  it('creates a parent that no memo carries bare', () => {
+  it('counts a bare-parent branch as its whole sub-tree', () => {
     // flomo treats every level as its own tag: `#读书/认知` alone still makes
-    // 读书 a foldable parent, with zero memos of its own.
+    // 读书 a foldable parent — and its count is the branch total, so the
+    // number never reads as a misleading 0.
     const tree = tagTree([{ tag: '读书/认知', count: 2 }])
     assert.equal(tree.length, 1)
-    assert.equal(tree[0]?.count, 0)
+    assert.equal(tree[0]?.count, 2)
     assert.equal(tree[0]?.children[0]?.count, 2)
   })
 
@@ -164,8 +165,22 @@ describe('tags', () => {
     assert.equal(level2?.name, 'Different')
     assert.equal(level3?.name, '营销近视症')
     assert.equal(level3?.count, 1)
-    assert.equal(level1?.count, 0)
-    assert.equal(level2?.count, 0)
+    assert.equal(level2?.count, 1)
+    assert.equal(level1?.count, 1)
+  })
+
+  it('aggregates sibling branch totals into the parent', () => {
+    const tree = tagTree([
+      { tag: '日记/2026/10/08', count: 3 },
+      { tag: '日记/2026/10/09', count: 1 },
+      { tag: '日记/2026/11/01', count: 2 },
+    ])
+    const year = tree[0]?.children[0]
+    const month10 = year?.children.find((node) => node.name === '10')
+    const month11 = year?.children.find((node) => node.name === '11')
+    assert.equal(month10?.count, 4)
+    assert.equal(month11?.count, 2)
+    assert.equal(year?.count, 6)
   })
 
   it('sorts siblings alphabetically at every level', () => {
@@ -186,7 +201,7 @@ describe('tags', () => {
     ])
     assert.equal(tree.length, 1)
     assert.equal(tree[0]?.name, 'books')
-    assert.equal(tree[0]?.count, 3)
+    assert.equal(tree[0]?.count, 4)
     assert.equal(tree[0]?.children[0]?.name, 'x')
   })
 })

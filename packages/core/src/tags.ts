@@ -73,9 +73,10 @@ export interface TagTreeNode {
   /** The full path (`读书/认知`) — the tag as it is written on memos. */
   path: string
   /**
-   * Memos carrying exactly this tag. A tag that only exists as someone's
+   * How many memos opening this tag shows: its own plus every descendant's,
+   * the number a parent row displays. A tag that only exists as someone's
    * parent — created by a `#读书/认知` memo without any plain `#读书` memo —
-   * has 0: flomo treats every level as its own tag.
+   * still counts its branch, so the number is never a misleading 0.
    */
   count: number
   /** Sub-tags, siblings sorted alphabetically by name. */
@@ -88,8 +89,10 @@ export interface TagTreeNode {
  * `#读书/认知` makes `读书` a foldable parent whether or not any memo carries
  * it bare, and a tag that is both a parent and written on its own (`#读书` and
  * `#读书/认知`) becomes one node holding its own count *and* its children.
- * Paths merge case-insensitively, matching every other tag comparison; the
- * first casing seen is the one displayed.
+ * Every node's count is its branch total — own memos plus all descendants —
+ * matching what a click on the tag shows. Paths merge case-insensitively,
+ * matching every other tag comparison; the first casing seen is the one
+ * displayed.
  * @param stats - the corpus's tag frequencies.
  * @returns the root nodes, alphabetical by name.
  */
@@ -114,6 +117,15 @@ export function tagTree(stats: readonly TagStat[]): TagTreeNode[] {
       level = node.children
     }
   }
+
+  // Branch totals fold upward after the build: a parent shows everything a
+  // click on it would reveal, so `#日记/2026` reads as the whole year, not
+  // the handful of memos tagged with the year alone.
+  const foldUp = (node: TagTreeNode): number => {
+    node.count += node.children.reduce((sum, child) => sum + foldUp(child), 0)
+    return node.count
+  }
+  for (const root of roots) foldUp(root)
 
   const sortLevel = (nodes: TagTreeNode[]): void => {
     nodes.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
