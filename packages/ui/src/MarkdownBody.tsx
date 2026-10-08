@@ -10,7 +10,7 @@
  */
 
 import type * as React from 'react'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { parseBlocks, tokenizeInline } from '@flomo/core'
@@ -25,6 +25,16 @@ export interface MarkdownBodyProps {
   onLinkClick?: (target: string) => void
   /** Open the note a `@[id]` reference points to; omitted renders inert chips. */
   onMemoOpen?: (id: string) => void
+  /**
+   * Tick or untick the task on a source line; omitted renders boxes inert.
+   * The line number is the one the block parser recorded for the item.
+   */
+  onTaskToggle?: (line: number) => void
+  /**
+   * Decrypts a media ref, so an `![alt](ref)` whose target is not a web URL
+   * still shows its image; omitted renders such images as nothing.
+   */
+  readImage?: (ref: string) => Promise<{ bytes: Uint8Array; mime: string }>
 }
 
 /**
@@ -37,10 +47,12 @@ export function MarkdownBody({
   onTagClick = () => {},
   onLinkClick = () => {},
   onMemoOpen = () => {},
+  onTaskToggle,
+  readImage,
 }: MarkdownBodyProps): React.ReactElement {
   const nodes = parseBlocks(content).map((block: Block, index) => {
     const inline = (text: string): React.ReactNode[] =>
-      renderTokens(tokenizeInline(text), onTagClick, onLinkClick, onMemoOpen)
+      renderTokens(tokenizeInline(text), onTagClick, onLinkClick, onMemoOpen, readImage)
     const key = `${index}-${block.type}`
     switch (block.type) {
       case 'code':
@@ -75,6 +87,7 @@ export function MarkdownBody({
           onTagClick,
           onLinkClick,
           onMemoOpen,
+          onTaskToggle,
           key,
         )
       case 'table': {
@@ -181,6 +194,7 @@ function safeUrl(url: string | undefined): string | null {
  * @param tokens - the token stream to render.
  * @param onTagClick - tag navigation.
  * @param onLinkClick - link navigation.
+ * @param readImage - decrypts media refs for inline images, when available.
  * @returns the nodes.
  */
 function renderTokens(
@@ -188,6 +202,7 @@ function renderTokens(
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
   onMemoOpen: (id: string) => void,
+  readImage?: (ref: string) => Promise<{ bytes: Uint8Array; mime: string }>,
 ): React.ReactNode[] {
   return tokens.map((token, index) => {
     const key = `${index}-${token.type}`
@@ -209,15 +224,15 @@ function renderTokens(
           </button>
         )
       case 'strong':
-        return <strong key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</strong>
+        return <strong key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen, readImage)}</strong>
       case 'em':
-        return <em key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</em>
+        return <em key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen, readImage)}</em>
       case 'strike':
-        return <del key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</del>
+        return <del key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen, readImage)}</del>
       case 'underline':
-        return <u key={key} className="fl-md-u">{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</u>
+        return <u key={key} className="fl-md-u">{containerContent(token, onTagClick, onLinkClick, onMemoOpen, readImage)}</u>
       case 'mark':
-        return <mark key={key} className="fl-md-mark">{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</mark>
+        return <mark key={key} className="fl-md-mark">{containerContent(token, onTagClick, onLinkClick, onMemoOpen, readImage)}</mark>
       case 'code':
         return <code key={key}>{token.value}</code>
       case 'url':
@@ -229,18 +244,23 @@ function renderTokens(
       case 'mdlink': {
         const href = safeUrl(token.url)
         if (href === null) {
-          return <span key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen)}</span>
+          return <span key={key}>{containerContent(token, onTagClick, onLinkClick, onMemoOpen, readImage)}</span>
         }
         return (
           <a key={key} className="fl-md-a" href={href} target="_blank" rel="noopener noreferrer">
-            {containerContent(token, onTagClick, onLinkClick, onMemoOpen)}
+            {containerContent(token, onTagClick, onLinkClick, onMemoOpen, readImage)}
           </a>
         )
       }
       case 'image': {
         const href = safeUrl(token.url)
-        if (href === null) return null
-        return <img key={key} className="fl-md-img" src={href} alt={token.value} loading="lazy" />
+        if (href !== null) {
+          return <img key={key} className="fl-md-img" src={href} alt={token.value} loading="lazy" />
+        }
+        // Not a web URL: a media ref from the vault, decryptable only through
+        // the session. Without a loader or a target there is nothing to show.
+        if (readImage === undefined || token.url === undefined) return null
+        return <MediaImage key={key} mediaRef={token.url} alt={token.value} readImage={readImage} />
       }
       default:
         return <span key={key}>{token.value}</span>
@@ -278,15 +298,58 @@ function containerContent(
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
   onMemoOpen: (id: string) => void,
+  readImage?: (ref: string) => Promise<{ bytes: Uint8Array; mime: string }>,
 ): React.ReactNode {
   if (token.children === undefined) return token.value
-  return renderTokens(token.children, onTagClick, onLinkClick, onMemoOpen)
+  return renderTokens(token.children, onTagClick, onLinkClick, onMemoOpen, readImage)
+}
+
+/**
+ * An inline `![alt](ref)` whose target is a vault media ref, decrypted on
+ * demand — the body counterpart of the memo card's attached-image tiles. The
+ * bytes arrive through the session; the object URL dies with the element.
+ * @param props - the media ref, its alt text, and the decrypting loader.
+ * @returns the image element, a placeholder while loading, a note on failure.
+ */
+function MediaImage({
+  mediaRef,
+  alt,
+  readImage,
+}: {
+  mediaRef: string
+  alt: string
+  readImage: (ref: string) => Promise<{ bytes: Uint8Array; mime: string }>
+}): React.ReactElement {
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let revoked: string | null = null
+    let live = true
+    readImage(mediaRef)
+      .then(({ bytes, mime }) => {
+        if (!live) return
+        revoked = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: mime }))
+        setSrc(revoked)
+      })
+      .catch(() => {
+        if (live) setFailed(true)
+      })
+    return () => {
+      live = false
+      if (revoked !== null) URL.revokeObjectURL(revoked)
+    }
+  }, [mediaRef, readImage])
+
+  if (failed) return <span className="fl-md-img fl-media-failed">图片加载失败</span>
+  if (src === null) return <span className="fl-md-img fl-media-loading" aria-label={alt} />
+  return <img className="fl-md-img" src={src} alt={alt} loading="lazy" />
 }
 
 /**
  * One list item's content: a box glyph ahead of the text when it is a task,
  * and any sub-list indented beneath it.
- * @param props - the item and the two navigations.
+ * @param props - the item and the navigations.
  * @returns the item's nodes.
  */
 function renderListItem(
@@ -294,32 +357,64 @@ function renderListItem(
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
   onMemoOpen: (id: string) => void,
+  onTaskToggle?: (line: number) => void,
 ): React.ReactNode {
-  const label =
-    item.task === null ? (
-      renderInline(item.text, onTagClick, onLinkClick, onMemoOpen)
-    ) : (
-      <span className="fl-task">
+  let label: React.ReactNode
+  if (item.task === null) {
+    label = renderInline(item.text, onTagClick, onLinkClick, onMemoOpen)
+  } else {
+    // A box with a line to rewrite is a real control — clicking it flips the
+    // `[ ]`/`[x]` the parser recorded; without one it stays a glyph.
+    const box =
+      onTaskToggle !== undefined ? (
+        <button
+          type="button"
+          className="fl-task-box"
+          role="checkbox"
+          aria-checked={item.task}
+          aria-label={item.task ? '标记为未完成' : '标记为已完成'}
+          title={item.task ? '标记为未完成' : '标记为已完成'}
+          onClick={(event) => {
+            event.stopPropagation()
+            onTaskToggle(item.line)
+          }}
+          // Ticking a box must not read as the card's double-click-to-edit.
+          onDoubleClick={(event) => event.stopPropagation()}
+        >
+          {item.task ? '☑' : '☐'}
+        </button>
+      ) : (
         <span className="fl-task-box" aria-hidden="true">
           {item.task ? '☑' : '☐'}
         </span>
+      )
+    label = (
+      <span className="fl-task">
+        {box}
         <span className={item.task ? 'fl-task-text fl-task-done' : 'fl-task-text'}>
           {renderInline(item.text, onTagClick, onLinkClick, onMemoOpen)}
         </span>
       </span>
     )
+  }
   if (item.children === undefined) return label
   return (
     <>
       {label}
-      {renderList(item.children, onTagClick, onLinkClick, onMemoOpen)}
+      {renderList(
+        item.children,
+        onTagClick,
+        onLinkClick,
+        onMemoOpen,
+        onTaskToggle,
+      )}
     </>
   )
 }
 
 /**
  * A list at any nesting depth.
- * @param props - the items, their flavour, and the two navigations.
+ * @param props - the items, their flavour, and the navigations.
  * @returns the list element.
  */
 function renderList(
@@ -327,13 +422,16 @@ function renderList(
   onTagClick: (tag: string) => void,
   onLinkClick: (target: string) => void,
   onMemoOpen: (id: string) => void,
+  onTaskToggle?: (line: number) => void,
   key?: string,
 ): React.ReactNode {
   const Tag = group.ordered ? 'ol' : 'ul'
   return (
     <Tag key={key} className="fl-md-list">
       {group.items.map((item, index) => (
-        <li key={index}>{renderListItem(item, onTagClick, onLinkClick, onMemoOpen)}</li>
+        <li key={index}>
+          {renderListItem(item, onTagClick, onLinkClick, onMemoOpen, onTaskToggle)}
+        </li>
       ))}
     </Tag>
   )

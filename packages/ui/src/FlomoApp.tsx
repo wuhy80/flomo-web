@@ -244,8 +244,8 @@ export function FlomoApp({
   }, [])
 
   const handleAdd = useCallback(
-    (content: string, images: string[]) => {
-      session.add(content, images.length > 0 ? images : undefined)
+    (content: string) => {
+      session.add(content)
       // Writing is the common case, so pull the user back to the live feed if
       // they were browsing a tag or a review panel.
       if (view.kind !== 'all') setView({ kind: 'all' })

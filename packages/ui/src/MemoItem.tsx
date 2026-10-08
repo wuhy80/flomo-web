@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { FormatToolsBar } from './FormatTools.tsx'
-import { createFormatTools } from './format-tools.ts'
+import { continueListOnEnter, createFormatTools } from './format-tools.ts'
 
 import { clockOf, dayOf } from '@flomo/core'
 import type { Memo } from '@flomo/core'
@@ -181,11 +181,56 @@ export function MemoItem({
     setEditing(false)
   }, [draft, memo.content, memo.id, onEdit])
 
+  /**
+   * Flip one rendered task box back into the source and save it as a real
+   * edit: the parser hands the item's line, the `[ ]`/`[x]` there swaps, and
+   * the memo goes through the same path an edit does — persisted, not a
+   * display-only tick.
+   */
+  const toggleTask = useCallback(
+    (line: number) => {
+      const lines = memo.content.split('\n')
+      const target = lines[line]
+      if (target === undefined) return
+      const flipped = target.replace(
+        /^(\s*(?:[-*+]|\d{1,9}[.)])\s+)\[([ xX])\]/,
+        (marker, tick: string) => `${marker}[${tick.toLowerCase() === 'x' ? ' ' : 'x'}]`,
+      )
+      if (flipped === target) return
+      lines[line] = flipped
+      const next = lines.join('\n').trim()
+      if (next.length > 0) onEdit(memo.id, next)
+    },
+    [memo.content, memo.id, onEdit],
+  )
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
         event.preventDefault()
         commit()
+      }
+      // The capture box's list continuation, on the same terms: a list line's
+      // marker rides the newline, a spent marker retires, fences stay plain.
+      if (
+        event.key === 'Enter' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        const el = editArea.current
+        const caret = el?.selectionStart ?? -1
+        if (el !== null && caret >= 0 && caret === el.selectionEnd) {
+          const next = continueListOnEnter(el.value, caret)
+          if (next !== null) {
+            event.preventDefault()
+            setDraft(next.value)
+            requestAnimationFrame(() => {
+              editArea.current?.setSelectionRange(next.caret, next.caret)
+            })
+          }
+        }
       }
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -408,7 +453,7 @@ export function MemoItem({
         ) : null}
       </div>
 
-      <div className="fl-memo-body" onDoubleClick={beginEdit}><MarkdownBody content={memo.content} onTagClick={onTagClick} onLinkClick={onLinkClick} onMemoOpen={onOpen} /></div>
+      <div className="fl-memo-body" onDoubleClick={beginEdit}><MarkdownBody content={memo.content} onTagClick={onTagClick} onLinkClick={onLinkClick} onMemoOpen={onOpen} onTaskToggle={toggleTask} readImage={readImage} /></div>
 
       {memo.images !== undefined && memo.images.length > 0 ? (
         <div className="fl-memo-images">

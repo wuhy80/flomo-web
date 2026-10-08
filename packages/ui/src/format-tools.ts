@@ -6,8 +6,15 @@
  * caret to a `commit` callback, so each host keeps its own state and resize
  * story. The buttons live in {@link module:@flomo/ui/FormatTools}.
  *
+ * The Enter continuation ({@linkcode continueListOnEnter}) serves the same
+ * hosts from the keydown handler: a list line that gets an Enter keeps its
+ * flavour on the next line, so `*`, `1.` and task boxes never have to be
+ * retyped per line.
+ *
  * @module @flomo/ui/format-tools
  */
+
+import { isInsideFence } from '@flomo/core'
 
 /** One list flavour the toolbar toggles. */
 export type ListKind = 'ul' | 'ol' | 'task'
@@ -117,6 +124,72 @@ export function createFormatTools(
         )
       }
     },
+  }
+}
+
+/** The next value and caret a keypress should commit. */
+export interface KeyEdit {
+  value: string
+  caret: number
+}
+
+/**
+ * A list line's prefix: the indent, a bullet or a number, one space, and for
+ * tasks the box. The box is captured separately so a continuation can restart
+ * it unticked while the exit case can strip it whole.
+ */
+const LIST_PREFIX = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))[ \t]+(\[[ xX]\][ \t]+)?/
+
+/**
+ * What Enter on a list line should do, or null when Enter stays plain.
+ *
+ * A line carrying a list marker passes the marker on: the same bullet, the
+ * next number, or a fresh unticked box — always with the line's own indent, so
+ * a nested `1.` under a `*` item continues as `2.` at the same depth. An item
+ * that holds nothing but its marker ends the list instead, dropping the marker
+ * the way every list editor does. Inside a fenced block Enter is never touched.
+ *
+ * The caret may sit mid-line; text after it rides down to the new item, which
+ * is the split every Markdown field performs.
+ * @param value - the field's value.
+ * @param caret - the collapsed caret offset.
+ * @returns the continued value and caret, or null for a plain newline.
+ */
+export function continueListOnEnter(value: string, caret: number): KeyEdit | null {
+  if (isInsideFence(value, caret)) return null
+  const lineStart = value.lastIndexOf('\n', Math.max(0, caret - 1)) + 1
+  const prefix = LIST_PREFIX.exec(value.slice(lineStart, caret))
+  if (prefix === null) return null
+  const markerEnd = lineStart + prefix[0].length
+  const indent = prefix[1] ?? ''
+  const box = prefix[5]
+  const tail = value.slice(markerEnd, caret)
+  const lineEnd = value.indexOf('\n', caret)
+  const restOfLine = lineEnd === -1 ? value.slice(caret) : value.slice(caret, lineEnd)
+
+  // Nothing but the marker before the caret and nothing after it: the item is
+  // empty, so Enter retires the marker rather than stacking a new one. An
+  // untouched task box counts as empty too — otherwise a checklist could never
+  // be left with Enter alone. The line itself stays on as the empty line the
+  // caret now sits on; only the marker (and its trailing spaces) goes.
+  if (tail.trim() === '' && restOfLine.trim() === '') {
+    return {
+      value: value.slice(0, lineStart) + (lineEnd === -1 ? '' : value.slice(lineEnd)),
+      caret: lineStart,
+    }
+  }
+
+  const freshBox = box !== undefined ? '[ ] ' : ''
+  let marker: string
+  if (prefix[2] !== undefined) {
+    marker = `${prefix[2]} ${freshBox}`
+  } else {
+    marker = `${Number.parseInt(prefix[3] ?? '1', 10) + 1}${prefix[4] ?? '.'} ${freshBox}`
+  }
+  const insert = `\n${indent}${marker}`
+  return {
+    value: value.slice(0, caret) + insert + value.slice(caret),
+    caret: caret + insert.length,
   }
 }
 

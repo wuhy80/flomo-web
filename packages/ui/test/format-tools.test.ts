@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { createFormatTools } from '../src/format-tools.ts'
+import { continueListOnEnter, createFormatTools } from '../src/format-tools.ts'
 
 /** A fake textarea plus the commits the tools produced. */
 function fakeTextarea(initial: string, selectionStart = 0, selectionEnd = selectionStart) {
@@ -104,5 +104,66 @@ describe('format tools', () => {
     tools.insertTagStart()
     assert.equal(commits[0]?.next, '前#后')
     assert.equal(commits[0]?.caret, 2)
+  })
+})
+
+describe('continueListOnEnter', () => {
+  it('hands a bullet marker to the next line', () => {
+    const next = continueListOnEnter('- 已办', 4)
+    assert.equal(next?.value, '- 已办\n- ')
+    assert.equal(next?.caret, 7)
+  })
+
+  it('keeps the asterisk the author chose', () => {
+    const next = continueListOnEnter('* 甲', 3)
+    assert.equal(next?.value, '* 甲\n* ')
+    assert.equal(next?.caret, 6)
+  })
+
+  it('increments an ordered marker and keeps its delimiter', () => {
+    assert.equal(continueListOnEnter('3. 丙', 4)?.value, '3. 丙\n4. ')
+    assert.equal(continueListOnEnter('2) 丁', 4)?.value, '2) 丁\n3) ')
+  })
+
+  it('restarts a task box unticked', () => {
+    const next = continueListOnEnter('- [x] 完成', 8)
+    assert.equal(next?.value, '- [x] 完成\n- [ ] ')
+    assert.equal(next?.caret, 15)
+  })
+
+  it('continues a nested numbered item at its own indent', () => {
+    const doc = '* 顶层\n  1. 子项'
+    const next = continueListOnEnter(doc, doc.length)
+    assert.equal(next?.value, '* 顶层\n  1. 子项\n  2. ')
+    assert.equal(next?.caret, doc.length + 6)
+  })
+
+  it('splits the line when the caret sits mid-item', () => {
+    const next = continueListOnEnter('- 前缀后缀', 4)
+    assert.equal(next?.value, '- 前缀\n- 后缀')
+    assert.equal(next?.caret, 7)
+  })
+
+  it('retires a spent bullet instead of stacking one', () => {
+    const doc = '- 一行\n- '
+    const next = continueListOnEnter(doc, doc.length)
+    assert.equal(next?.value, '- 一行\n')
+    assert.equal(next?.caret, 5)
+  })
+
+  it('retires a spent task box the same way', () => {
+    const next = continueListOnEnter('- [ ] ', 6)
+    assert.equal(next?.value, '')
+    assert.equal(next?.caret, 0)
+  })
+
+  it('leaves prose lines alone', () => {
+    assert.equal(continueListOnEnter('普通文字', 4), null)
+  })
+
+  it('leaves lines inside a fence alone', () => {
+    const doc = '```\n- 假装列表\n```'
+    const caret = doc.indexOf('- ') + 2
+    assert.equal(continueListOnEnter(doc, caret), null)
   })
 })

@@ -497,68 +497,6 @@ export const FLOMO_CSS = `
   font-variant-numeric: tabular-nums;
 }
 
-/* Pending attachments: flomo shows removable thumbnails with a dashed tile
-   that adds the next one, always present so the row reads as a drop zone. */
-.fl-composer-attach {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.fl-attach-thumb {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  border-radius: 8px;
-  overflow: visible;
-}
-
-.fl-attach-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 8px;
-  display: block;
-  border: 1px solid var(--flomo-border);
-}
-
-.fl-attach-remove {
-  position: absolute;
-  top: -7px;
-  right: -7px;
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 13px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.fl-attach-remove:hover { background: rgba(0, 0, 0, 0.75); }
-
-.fl-attach-add {
-  width: 72px;
-  height: 72px;
-  border: 1px dashed var(--flomo-border-strong);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--flomo-text-faint);
-  font-size: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.fl-attach-add:hover { border-color: var(--flomo-green); color: var(--flomo-green); }
-.fl-attach-add:disabled { cursor: default; opacity: 0.6; }
-
 .fl-attach-error { font-size: 12px; color: var(--flomo-danger); }
 
 /* Attached images on a memo: square tiles under the body, like flomo's. */
@@ -734,6 +672,37 @@ export const FLOMO_CSS = `
 .fl-task-box { color: var(--flomo-green); font-size: 0.95em; }
 .fl-task-text { overflow-wrap: anywhere; }
 .fl-task-done { color: var(--flomo-text-faint); text-decoration: line-through; }
+
+/* A rendered task box with a line to rewrite is a button, not a glyph: it
+   keeps the glyph's look but takes clicks and a keyboard focus ring. */
+button.fl-task-box {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0 1px;
+  margin: 0;
+  font: inherit;
+  line-height: inherit;
+  color: var(--flomo-green);
+  font-size: 0.95em;
+  cursor: pointer;
+  border-radius: 3px;
+}
+button.fl-task-box:hover { background: var(--flomo-green-soft); }
+button.fl-task-box:focus-visible { outline: 1px solid var(--flomo-green); }
+
+/* Inline image placeholders while a media ref decrypts, and when it will not
+   come: same footprint as the image they stand in for. */
+.fl-media-loading,
+.fl-media-failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  background: var(--flomo-bg-sunken);
+  font-size: 11px;
+  color: var(--flomo-text-faint);
+}
 
 .fl-md-hr {
   border: 0;

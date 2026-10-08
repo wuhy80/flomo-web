@@ -1022,8 +1022,8 @@ describe('markdown blocks', () => {
     assert.deepEqual(
       parseBlocks(['- 第一', '* 第二', '', '1. 甲', '2) 乙'].join('\n')),
       [
-        { type: 'list', ordered: false, items: [{ text: '第一', task: null }, { text: '第二', task: null }] },
-        { type: 'list', ordered: true, items: [{ text: '甲', task: null }, { text: '乙', task: null }] },
+        { type: 'list', ordered: false, items: [{ text: '第一', task: null, line: 0 }, { text: '第二', task: null, line: 1 }] },
+        { type: 'list', ordered: true, items: [{ text: '甲', task: null, line: 3 }, { text: '乙', task: null, line: 4 }] },
       ],
     )
   })
@@ -1034,9 +1034,9 @@ describe('markdown blocks', () => {
         type: 'list',
         ordered: false,
         items: [
-          { text: '未完成', task: false },
-          { text: '已完成', task: true },
-          { text: '普通条目', task: null },
+          { text: '未完成', task: false, line: 0 },
+          { text: '已完成', task: true, line: 1 },
+          { text: '普通条目', task: null, line: 2 },
         ],
       },
     ])
@@ -1094,6 +1094,18 @@ describe('nested lists', () => {
     if (list === undefined || list.type !== 'list') return
     assert.equal(list.items[0]?.children?.ordered, true)
     assert.deepEqual((list.items[0]?.children?.items ?? []).map((item) => item.text), ['第一步', '第二步'])
+  })
+
+  it('records the source line of every item, nested or not', () => {
+    const blocks = parseBlocks(
+      ['正文', '- [ ] 待办', '* 顶层', '  1. [x] 子任务'].join('\n'),
+    )
+    const list = blocks[1]
+    assert.ok(list !== undefined && list.type === 'list')
+    if (list === undefined || list.type !== 'list') return
+    assert.equal(list.items[0]?.line, 1)
+    assert.equal(list.items[1]?.line, 2)
+    assert.equal(list.items[1]?.children?.items[0]?.line, 3)
   })
 
   it('ends the list at a dedent past its start', () => {

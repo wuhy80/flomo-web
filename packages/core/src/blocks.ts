@@ -34,6 +34,12 @@ export interface ListItem {
   text: string
   /** null when the item is not a task; otherwise whether its box is ticked. */
   task: boolean | null
+  /**
+   * The item's own line in the source body, counting from zero. A rendered
+   * task box maps back to the `[ ]`/`[x]` it came from through this, so a
+   * click can rewrite exactly that line.
+   */
+  line: number
   /** Sub-items indented under this one; the sub-list keeps its own flavour. */
   children?: { ordered: boolean; items: ListItem[] }
 }
@@ -211,11 +217,11 @@ export function parseBlocks(content: string): Block[] {
       const stack: Array<{ indent: number; ordered: boolean; items: ListItem[] }> = [
         { indent: baseIndent, ordered, items: [] },
       ]
-      const taskOf = (raw: string): ListItem => {
+      const taskOf = (raw: string, line: number): ListItem => {
         const task = TASK.exec(raw)
         return task !== null
-          ? { text: task[2] ?? '', task: (task[1] ?? ' ').toLowerCase() === 'x' }
-          : { text: raw, task: null }
+          ? { text: task[2] ?? '', task: (task[1] ?? ' ').toLowerCase() === 'x', line }
+          : { text: raw, task: null, line }
       }
       for (; index < lines.length; index += 1) {
         const raw = lines[index] ?? ''
@@ -231,7 +237,7 @@ export function parseBlocks(content: string): Block[] {
           top = stack[stack.length - 1]
         }
         if (top === undefined) break
-        const item = taskOf(next[3] ?? '')
+        const item = taskOf(next[3] ?? '', index)
         if (indent > top.indent) {
           // A deeper line nests under the item just added. A flavour switch
           // while nesting is allowed: `1.` inside a `-` item is the author's
