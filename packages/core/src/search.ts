@@ -9,7 +9,7 @@
  * @module @flomo/core/search
  */
 
-import { hasTag } from './tags.ts'
+import { tagKey } from './tags.ts'
 import { dayOf } from './time.ts'
 import type { Memo } from './types.ts'
 
@@ -17,7 +17,11 @@ import type { Memo } from './types.ts'
 export interface SearchQuery {
   /** Case-insensitive substring to match against the body. */
   text?: string
-  /** Tag to require, without the leading `#`. */
+  /**
+   * Tag to require, without the leading `#`. The tag's whole sub-tree counts:
+   * `日记/2026/10` also matches a memo tagged `#日记/2026/10/08`, the way a
+   * parent row in the sidebar shows everything filed under its branch.
+   */
   tag?: string
   /** Restrict to memos created on this `YYYY-MM-DD` day. */
   day?: string
@@ -30,7 +34,8 @@ export interface SearchQuery {
  *
  * Matching is a plain case-insensitive substring test rather than anything
  * fuzzy: with a personal corpus the user usually remembers a literal word, and
- * a predictable match beats a clever one.
+ * a predictable match beats a clever one. A tag filter matches the tag and
+ * everything beneath it in the slash hierarchy.
  * @param memos - the corpus, any order.
  * @param query - the filter to apply.
  * @returns matching memos, newest first.
@@ -40,8 +45,20 @@ export function searchMemos(
   query: SearchQuery = {},
 ): Memo[] {
   const needle = query.text?.trim().toLocaleLowerCase()
+  // The tag needle is computed once here rather than per memo; a sub-tree
+  // match is `key === needle` or `key.startsWith(needle + '/')`, both
+  // case-insensitive like every other tag comparison.
+  const tagNeedle = query.tag === undefined || query.tag === '' ? null : tagKey(query.tag)
+  const matchesTag = (memo: Memo): boolean => {
+    if (tagNeedle === null) return true
+    const branch = `${tagNeedle}/`
+    return memo.tags.some((t) => {
+      const key = tagKey(t)
+      return key === tagNeedle || key.startsWith(branch)
+    })
+  }
   const results = memos.filter((memo) => {
-    if (query.tag && !hasTag(memo, query.tag)) return false
+    if (!matchesTag(memo)) return false
     if (query.day && dayOf(memo.createdAt) !== query.day) return false
     if (needle && !memo.content.toLocaleLowerCase().includes(needle)) return false
     return true

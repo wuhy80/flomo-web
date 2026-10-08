@@ -17,6 +17,7 @@ import {
   dailyReview,
   dayOf,
   exportFilename,
+  hasTag,
   memosToJson,
   memosToMarkdown,
   outgoingLinks,
@@ -42,7 +43,7 @@ import { injectFlomoStyles } from './styles.ts'
 import { useFlomoSession } from './useFlomoSession.ts'
 import { useShortcuts } from './shortcuts.ts'
 import type { ShortcutAction } from './shortcuts.ts'
-import { showsComposer, sameView, viewTitle } from './views.ts'
+import { showsComposer, sameView, viewTitle, diaryTagOf } from './views.ts'
 import type { FlomoView } from './views.ts'
 import type { FlomoSession } from './session.ts'
 
@@ -243,6 +244,20 @@ export function FlomoApp({
     setQuery('')
   }, [])
 
+  // The day's diary lives under one nested tag, so the tag view *is* the diary
+  // page: every memo filed there shows up, and the feed's composer stays at
+  // hand. First visit of the day creates the memo — after that the button is
+  // a pure jump, which keeps one diary per day by construction.
+  const diaryTag = diaryTagOf(dayOf(new Date()))
+  const handleDiary = useCallback(() => {
+    const tag = diaryTagOf(dayOf(new Date()))
+    if (!snapshot.memos.some((memo) => hasTag(memo, tag))) {
+      session.add(`#${tag}`)
+    }
+    setView({ kind: 'tag', tag })
+    setQuery('')
+  }, [snapshot.memos, session])
+
   const handleAdd = useCallback(
     (content: string) => {
       session.add(content)
@@ -409,6 +424,8 @@ export function FlomoApp({
           setView(next)
           setQuery('')
         }}
+        onDiary={handleDiary}
+        diaryTag={diaryTag}
         brand={brand}
         showSettings={showSettings}
       />

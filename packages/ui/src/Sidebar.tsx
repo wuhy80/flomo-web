@@ -7,7 +7,7 @@
 import type * as React from 'react'
 import { useMemo, useState } from 'react'
 
-import { corpusStats, tagTree } from '@flomo/core'
+import { corpusStats, tagKey, tagTree } from '@flomo/core'
 import type { Memo, TagStat, TagTreeNode } from '@flomo/core'
 
 import { loadFoldedTags, saveFoldedTags } from './folded-tags.ts'
@@ -30,6 +30,13 @@ export interface SidebarProps {
   memos: readonly Memo[]
   tags: readonly TagStat[]
   onSelect: (view: FlomoView) => void
+  /**
+   * The 日记 button's action: jump to today's diary, creating it when the day
+   * has none yet. Absent (a host without the affordance) renders no row.
+   */
+  onDiary?: () => void
+  /** Today's diary tag, for the row's active state alongside `onDiary`. */
+  diaryTag?: string
   /** Brand text shown at the top. */
   brand?: string
   /** Hide the settings row when the host owns configuration instead. */
@@ -65,6 +72,8 @@ export function Sidebar({
   memos,
   tags,
   onSelect,
+  onDiary,
+  diaryTag,
   brand = 'flomo',
   showSettings = true,
 }: SidebarProps): React.ReactElement {
@@ -276,6 +285,24 @@ export function Sidebar({
         <NavLabel icon="▦" text="全部" />
         <span className="fl-nav-count">{memos.length}</span>
       </button>
+
+      {onDiary !== undefined ? (
+        <button
+          type="button"
+          className="fl-nav-item"
+          aria-current={
+            view.kind === 'tag' &&
+            diaryTag !== undefined &&
+            tagKey(view.tag) === tagKey(diaryTag)
+              ? ('true' as const)
+              : ('false' as const)
+          }
+          title={diaryTag !== undefined ? `#${diaryTag}` : '日记'}
+          onClick={onDiary}
+        >
+          <NavLabel icon="📅" text="日记" />
+        </button>
+      ) : null}
 
       <button {...rowProps({ kind: 'review' })}>
         <NavLabel icon="✦" text="每日回顾" />

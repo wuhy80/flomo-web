@@ -6,6 +6,19 @@
 
 import { absoluteDayLabel } from '@flomo/core'
 
+/**
+ * The tag of one day's diary, `2026-10-08` becoming `日记/2026/10/08`.
+ *
+ * The 日记 button jumps to this tag's view; the memo carrying it is the day's
+ * diary, created on first visit — one per day, findable again through the tag
+ * tree like any other nested tag.
+ * @param day - a `YYYY-MM-DD` day key, as `dayOf` produces.
+ * @returns the diary tag without its leading `#`.
+ */
+export function diaryTagOf(day: string): string {
+  return `日记/${day.split('-').join('/')}`
+}
+
 /** Which panel the main column is showing. */
 export type FlomoView =
   /** The full reverse-chronological feed. */

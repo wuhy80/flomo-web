@@ -377,6 +377,35 @@ describe('queries', () => {
     assert.deepEqual(searchMemos(corpus, { tag: 'work', text: '复盘' }).map((m) => m.id), ['3'])
   })
 
+  it('includes the whole sub-tree when the tag has children', () => {
+    const nested: Memo[] = [
+      memo({ id: 'd1', content: '十月八日 #日记/2026/10/08', createdAt: '2026-10-08T10:00:00.000Z' }),
+      memo({ id: 'd2', content: '十月九日 #日记/2026/10/09', createdAt: '2026-10-09T10:00:00.000Z' }),
+      memo({ id: 'd3', content: '年度计划 #日记/2026', createdAt: '2026-01-01T10:00:00.000Z' }),
+      memo({ id: 'd4', content: '别月的事 #日记/2025/12/24', createdAt: '2025-12-24T10:00:00.000Z' }),
+      memo({ id: 'd5', content: '无关 #other', createdAt: '2026-10-01T10:00:00.000Z' }),
+    ]
+    // A month shows everything filed under its days; a bare-tag memo of the
+    // same branch counts too.
+    assert.deepEqual(
+      searchMemos(nested, { tag: '日记/2026/10' }).map((m) => m.id),
+      ['d2', 'd1'],
+    )
+    assert.deepEqual(
+      searchMemos(nested, { tag: '日记/2026' }).map((m) => m.id),
+      ['d2', 'd1', 'd3'],
+    )
+    // The day itself matches exactly, and siblings of the branch stay out.
+    assert.deepEqual(searchMemos(nested, { tag: '日记/2026/10/08' }).map((m) => m.id), ['d1'])
+    assert.deepEqual(searchMemos(nested, { tag: '日记' }).length, 4)
+  })
+
+  it('matches tags case-insensitively, including the branch prefix', () => {
+    const cased: Memo[] = [memo({ id: 'c1', content: 'x #Work/Notes' })]
+    assert.deepEqual(searchMemos(cased, { tag: 'work' }).map((m) => m.id), ['c1'])
+    assert.deepEqual(searchMemos(cased, { tag: 'WORK/notes' }).map((m) => m.id), ['c1'])
+  })
+
   it('honours the limit', () => {
     assert.equal(searchMemos(corpus, { limit: 2 }).length, 2)
   })
