@@ -134,6 +134,29 @@ export interface KeyEdit {
 }
 
 /**
+ * A task line's head: the indent, a bullet or a number, one space, then the
+ * box. Group order matters to {@linkcode flipTaskLine}, which rebuilds the
+ * line from the captured pieces rather than from the whole match.
+ */
+const TASK_HEAD = /^([ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+)\[([ xX])\]/
+
+/**
+ * Tick or untick one source line's task box, or null when it holds none.
+ *
+ * The box is the only thing rewritten: the marker and indent come back
+ * untouched, and the line keeps its text — a rendered checkbox maps to this
+ * one swap when the user clicks it.
+ * @param line - one raw line of a memo body.
+ * @returns the flipped line, or null when the line is not a task.
+ */
+export function flipTaskLine(line: string): string | null {
+  const head = TASK_HEAD.exec(line)
+  if (head === null) return null
+  const tick = (head[2] ?? ' ').toLowerCase()
+  return `${line.slice(0, head[1]?.length ?? 0)}[${tick === 'x' ? ' ' : 'x'}]${line.slice(head[0].length)}`
+}
+
+/**
  * A list line's prefix: the indent, a bullet or a number, one space, and for
  * tasks the box. The box is captured separately so a continuation can restart
  * it unticked while the exit case can strip it whole.

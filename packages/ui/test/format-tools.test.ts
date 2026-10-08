@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { continueListOnEnter, createFormatTools } from '../src/format-tools.ts'
+import { continueListOnEnter, createFormatTools, flipTaskLine } from '../src/format-tools.ts'
 
 /** A fake textarea plus the commits the tools produced. */
 function fakeTextarea(initial: string, selectionStart = 0, selectionEnd = selectionStart) {
@@ -165,5 +165,37 @@ describe('continueListOnEnter', () => {
     const doc = '```\n- 假装列表\n```'
     const caret = doc.indexOf('- ') + 2
     assert.equal(continueListOnEnter(doc, caret), null)
+  })
+})
+
+describe('flipTaskLine', () => {
+  it('ticks an unchecked box, leaving the marker and text whole', () => {
+    assert.equal(flipTaskLine('- [ ] 买菜'), '- [x] 买菜')
+  })
+
+  it('unticks a checked box', () => {
+    assert.equal(flipTaskLine('- [x] 买菜'), '- [ ] 买菜')
+  })
+
+  it('keeps the asterisk, the indent and the ordered marker', () => {
+    assert.equal(flipTaskLine('* [ ] 甲'), '* [x] 甲')
+    assert.equal(flipTaskLine('  1. [x] 子任务'), '  1. [ ] 子任务')
+  })
+
+  it('accepts a capital tick and writes a lowercase one', () => {
+    assert.equal(flipTaskLine('- [X] 大写'), '- [ ] 大写')
+  })
+
+  it('returns null for a line without a task box', () => {
+    assert.equal(flipTaskLine('- 普通条目'), null)
+    assert.equal(flipTaskLine('正文'), null)
+  })
+
+  it('never stacks a second box on a line that already has one', () => {
+    // The regression that shipped once: a two-argument replace callback read
+    // the marker prefix as the tick, producing `- [ ][x]`.
+    const once = flipTaskLine('- [ ] 买菜')
+    assert.equal(once, '- [x] 买菜')
+    assert.equal(flipTaskLine(once ?? ''), '- [ ] 买菜')
   })
 })

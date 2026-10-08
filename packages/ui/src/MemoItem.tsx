@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { FormatToolsBar } from './FormatTools.tsx'
-import { continueListOnEnter, createFormatTools } from './format-tools.ts'
+import { continueListOnEnter, createFormatTools, flipTaskLine } from './format-tools.ts'
 
 import { clockOf, dayOf } from '@flomo/core'
 import type { Memo } from '@flomo/core'
@@ -192,11 +192,8 @@ export function MemoItem({
       const lines = memo.content.split('\n')
       const target = lines[line]
       if (target === undefined) return
-      const flipped = target.replace(
-        /^(\s*(?:[-*+]|\d{1,9}[.)])\s+)\[([ xX])\]/,
-        (marker, tick: string) => `${marker}[${tick.toLowerCase() === 'x' ? ' ' : 'x'}]`,
-      )
-      if (flipped === target) return
+      const flipped = flipTaskLine(target)
+      if (flipped === null || flipped === target) return
       lines[line] = flipped
       const next = lines.join('\n').trim()
       if (next.length > 0) onEdit(memo.id, next)
