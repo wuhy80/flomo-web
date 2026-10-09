@@ -450,7 +450,11 @@ export function MemoItem({
         ) : null}
       </div>
 
-      <div className="fl-memo-body" onDoubleClick={beginEdit}><MarkdownBody content={memo.content} onTagClick={onTagClick} onLinkClick={onLinkClick} onMemoOpen={onOpen} onTaskToggle={toggleTask} readImage={readImage} /></div>
+      {/* Triple-click opens the editor: double-click was one click too easy to
+          spend by accident, and `detail` is the browser's own count of
+          consecutive clicks. Tags, links and task boxes stop their own clicks,
+          so pressing them never stacks toward an edit. */}
+      <div className="fl-memo-body" onClick={(event) => { if (event.detail >= 3) beginEdit() }}><MarkdownBody content={memo.content} onTagClick={onTagClick} onLinkClick={onLinkClick} onMemoOpen={onOpen} onTaskToggle={toggleTask} readImage={readImage} /></div>
 
       {memo.images !== undefined && memo.images.length > 0 ? (
         <div className="fl-memo-images">

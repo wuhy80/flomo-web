@@ -378,8 +378,6 @@ function renderListItem(
             event.stopPropagation()
             onTaskToggle(item.line)
           }}
-          // Ticking a box must not read as the card's double-click-to-edit.
-          onDoubleClick={(event) => event.stopPropagation()}
         >
           {item.task ? '☑' : '☐'}
         </button>
