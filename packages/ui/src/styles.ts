@@ -954,11 +954,20 @@ del { color: var(--flomo-text-faint); }
   font-size: 15px;
   line-height: 1.75;
   resize: none;
-  overflow: hidden;
+  /* Past the cap the draft scrolls: the rail stays subtle but is visible, so
+     a long note shows that there is more below the fold. */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--flomo-border-strong) transparent;
   color: inherit;
   background: var(--flomo-bg);
   outline: 0;
 }
+
+.fl-memo-edit textarea::-webkit-scrollbar { width: 6px; }
+.fl-memo-edit textarea::-webkit-scrollbar-track { background: transparent; }
+.fl-memo-edit textarea::-webkit-scrollbar-thumb { background: var(--flomo-border-strong); border-radius: 3px; }
+.fl-memo-edit textarea::-webkit-scrollbar-thumb:hover { background: var(--flomo-text-faint); }
 
 .fl-memo-edit textarea:focus { border-color: var(--flomo-green); }
 
