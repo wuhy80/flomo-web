@@ -58,6 +58,7 @@ describe('resolveShortcut', () => {
     assert.deepEqual(resolveShortcut(key('/')), { kind: 'search' })
     assert.deepEqual(resolveShortcut(key('c')), { kind: 'compose' })
     assert.deepEqual(resolveShortcut(key('C')), { kind: 'compose' })
+    assert.deepEqual(resolveShortcut(key('t')), { kind: 'view', view: 'todo' })
     assert.deepEqual(resolveShortcut(key('g')), { kind: 'view', view: 'all' })
     assert.deepEqual(resolveShortcut(key('r')), { kind: 'view', view: 'review' })
     assert.deepEqual(resolveShortcut(key('w')), { kind: 'view', view: 'random' })

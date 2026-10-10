@@ -21,6 +21,8 @@ export function diaryTagOf(day: string): string {
 
 /** Which panel the main column is showing. */
 export type FlomoView =
+  /** The standalone TODO checklist. */
+  | { kind: 'todo' }
   /** The full reverse-chronological feed. */
   | { kind: 'all' }
   /** The feed filtered to one tag. */
@@ -64,6 +66,8 @@ export function sameView(a: FlomoView, b: FlomoView): boolean {
  */
 export function viewTitle(view: FlomoView): string {
   switch (view.kind) {
+    case 'todo':
+      return 'TODO'
     case 'all':
       return '全部笔记'
     case 'tag':

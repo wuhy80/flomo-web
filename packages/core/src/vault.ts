@@ -6,6 +6,7 @@
  *
  * ```
  * vault.json          KDF params + a sealed known plaintext — safe to publish
+ * todo.json           the TODO checklist, sealed under the vault key
  * data/2025-06.json   one month of memos, sealed under the vault key
  * data/2025-07.json
  * ```
@@ -39,9 +40,11 @@ import {
   CHECK_PLAINTEXT,
 } from './crypto.ts'
 import type { GitHubDirEntry } from './github.ts'
+import { parseTodoDocument, parseTodoPlain, TODO_FILE } from './todos.ts'
+import type { TodoDocument } from './todos.ts'
 import { dayOf, monthOf } from './time.ts'
 import { parseTags } from './tags.ts'
-import type { Memo, Shard, ShardIndex, VaultHeader } from './types.ts'
+import type { Memo, Shard, ShardIndex, Todo, VaultHeader } from './types.ts'
 
 /** Default directory holding the monthly shards. */
 export const DATA_DIR = 'data'
@@ -152,6 +155,10 @@ export class FlomoVault {
   private readonly memos = new Map<string, Memo>()
   private readonly shardShas = new Map<string, string>()
   private readonly dirty = new Set<string>()
+  /** The standalone checklist, in stored order; open tasks first, new at the top. */
+  private todoItems: Todo[] = []
+  private todoSha: string | null = null
+  private todosDirty = false
   /** Serializes writes so two saves can never interleave their round trips. */
   private writeChain: Promise<void> = Promise.resolve()
 
@@ -307,6 +314,20 @@ export class FlomoVault {
       for (const memo of parsed) this.memos.set(memo.id, memo)
       this.shardShas.set(month, file.sha)
     }
+
+    // The checklist rides along with the same full load: one small document, so
+    // an absent file simply means an empty list.
+    this.todoItems = []
+    this.todoSha = null
+    this.todosDirty = false
+    const todoFile = await this.store.readText(TODO_FILE)
+    if (todoFile) {
+      const doc = parseTodoDocument(todoFile.text)
+      const plain = await openSealed(this.key, { iv: doc.iv, ct: doc.ct })
+      this.todoItems = parseTodoPlain(plain)
+      this.todoSha = todoFile.sha
+    }
+
     this.dirty.clear()
     return this.memos.size
   }
@@ -320,6 +341,18 @@ export class FlomoVault {
       if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1
       return a.createdAt < b.createdAt ? 1 : -1
     })
+  }
+
+  /**
+   * The whole checklist, in stored order.
+   *
+   * Display grouping (open first, done sunk to the bottom) is a view concern —
+   * {@link splitTodos} does that — so the vault hands back exactly what it
+   * stores.
+   * @returns a fresh array.
+   */
+  todos(): Todo[] {
+    return [...this.todoItems]
   }
 
   /**
@@ -458,9 +491,103 @@ export class FlomoVault {
     return true
   }
 
+  /**
+   * Mark the checklist as needing a write. Todo changes share the memo writes'
+   * debounce-and-flush pipeline, only ever landing in their own file.
+   */
+  private touchTodos(): void {
+    this.todosDirty = true
+  }
+
+  /**
+   * Add a task at the top of the checklist — where Google Tasks puts a new
+   * entry, and where the next one belongs while the Enter key is still warm.
+   * @param content - the task text.
+   * @returns the stored todo.
+   */
+  addTodo(content: string): Todo {
+    const now = new Date().toISOString()
+    const todo: Todo = { id: this.newId(), content, createdAt: now }
+    this.todoItems.unshift(todo)
+    this.touchTodos()
+    return todo
+  }
+
+  /**
+   * Replace a task's text.
+   * @param id - the todo to edit.
+   * @param content - the new text.
+   * @returns the updated todo.
+   * @throws when the id is unknown.
+   */
+  editTodo(id: string, content: string): Todo {
+    const todo = this.todoItems.find((item) => item.id === id)
+    if (!todo) throw new Error(`找不到 todo：${id}`)
+    const updated: Todo = { ...todo, content }
+    this.todoItems.splice(this.todoItems.indexOf(todo), 1, updated)
+    this.touchTodos()
+    return updated
+  }
+
+  /**
+   * Complete or reopen a task.
+   * @param id - the todo to change.
+   * @param done - the new value; omitted toggles.
+   * @returns the updated todo.
+   * @throws when the id is unknown.
+   */
+  toggleTodo(id: string, done?: boolean): Todo {
+    const todo = this.todoItems.find((item) => item.id === id)
+    if (!todo) throw new Error(`找不到 todo：${id}`)
+    const next = done ?? todo.completedAt === undefined
+    if (next === (todo.completedAt !== undefined)) return todo
+    const updated: Todo = { ...todo }
+    if (next) updated.completedAt = new Date().toISOString()
+    else delete updated.completedAt
+    this.todoItems.splice(this.todoItems.indexOf(todo), 1, updated)
+    this.touchTodos()
+    return updated
+  }
+
+  /**
+   * Delete one task.
+   * @param id - the todo to remove.
+   * @returns true when something was removed.
+   */
+  removeTodo(id: string): boolean {
+    const index = this.todoItems.findIndex((item) => item.id === id)
+    if (index === -1) return false
+    this.todoItems.splice(index, 1)
+    this.touchTodos()
+    return true
+  }
+
+  /**
+   * Drop every completed task, as the checklist's own 清除已完成 does.
+   * @returns how many tasks were removed.
+   */
+  clearCompletedTodos(): number {
+    const before = this.todoItems.length
+    this.todoItems = this.todoItems.filter((todo) => todo.completedAt === undefined)
+    const removed = before - this.todoItems.length
+    if (removed > 0) this.touchTodos()
+    return removed
+  }
+
   /** @returns the shard months with unsaved changes. */
   get dirtyMonths(): string[] {
     return [...this.dirty].sort()
+  }
+
+  /**
+   * Whether any change — memo or todo — is waiting to be written.
+   *
+   * The single question a session's save path needs; the memo-only
+   * {@link FlomoVault.dirtyMonths} stays for callers that specifically care
+   * about shards.
+   */
+  get hasPendingWrites(): boolean {
+    return this.dirty.size > 0 || this.todosDirty
   }
 
   /**
@@ -500,7 +627,7 @@ export class FlomoVault {
    * @returns the months that were written.
    */
   async flush(): Promise<string[]> {
-    if (this.dirty.size === 0) return []
+    if (!this.hasPendingWrites) return []
 
     const run = async (): Promise<string[]> => {
       // Recomputed inside the chained run, so a flush queued behind another
@@ -533,6 +660,25 @@ export class FlomoVault {
         this.shardShas.set(month, sha)
         this.dirty.delete(month)
         written.push(month)
+      }
+
+      // The checklist lands in its own file — a ticked box never rewrites a
+      // month of notes. The write joins the same chained run as the shards, so
+      // overlapping flushes still cannot interleave.
+      if (this.todosDirty) {
+        const body = await seal(this.key, JSON.stringify(this.todoItems))
+        const doc: TodoDocument = {
+          v: 1,
+          iv: body.iv,
+          ct: body.ct,
+          updatedAt: new Date().toISOString(),
+        }
+        const sha = await this.store.writeText(TODO_FILE, `${JSON.stringify(doc)}\n`, {
+          sha: this.todoSha ?? undefined,
+          message: 'flomo: update todo',
+        })
+        this.todoSha = sha
+        this.todosDirty = false
       }
       return written
     }

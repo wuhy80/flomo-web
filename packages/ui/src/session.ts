@@ -14,7 +14,7 @@
  * @module @flomo/ui/session
  */
 
-import type { Memo, TagStat } from '@flomo/core'
+import type { Memo, TagStat, Todo } from '@flomo/core'
 
 /** Where the session currently is in its lifecycle. */
 export type SessionStatus =
@@ -38,6 +38,11 @@ export interface SessionSnapshot {
   status: SessionStatus
   memos: readonly Memo[]
   tags: readonly TagStat[]
+  /**
+   * The standalone TODO checklist, in stored order. Empty until the backend has
+   * loaded one; a backend without todo support keeps it empty for good.
+   */
+  todos: readonly Todo[]
   /** User-facing failure text, already localized. */
   error: string | null
   /** True while a save is in flight. */
@@ -121,6 +126,25 @@ export interface FlomoSession {
    * @returns a human-readable summary of what happened.
    */
   importJson(text: string): Promise<string>
+
+  /**
+   * The standalone TODO checklist.
+   *
+   * Optional because only some backends carry it: the GitHub session keeps the
+   * checklist in its own encrypted file, while the DSH panel's host protocol
+   * does not speak todos yet, and a host without the methods should be able to
+   * say so rather than stub five throwing functions. Views check for the
+   * methods and show a pointer to the web app in their absence.
+   */
+  addTodo?(content: string): void
+  /** Replace a task's text. */
+  editTodo?(id: string, content: string): void
+  /** Complete or reopen a task; omitted toggles. */
+  toggleTodo?(id: string, done?: boolean): void
+  /** Delete one task. */
+  removeTodo?(id: string): void
+  /** Drop every completed task. */
+  clearCompletedTodos?(): void
 
   /** Push pending changes now, bypassing the auto-save debounce. */
   save(): Promise<void>

@@ -22,7 +22,7 @@ import {
   tagStats,
   WrongPasswordError,
 } from '@flomo/core'
-import type { CacheArea, Memo, TagStat, TextStore } from '@flomo/core'
+import type { CacheArea, Memo, TagStat, TextStore, Todo } from '@flomo/core'
 
 import { clearTrust, loadTrust, saveTrust } from './device-trust.ts'
 import { describeError } from './session.ts'
@@ -63,6 +63,7 @@ export class GitHubVaultSession implements FlomoSession {
     status: 'probing',
     memos: [],
     tags: [],
+    todos: [],
     error: null,
     saving: false,
     offline: false,
@@ -147,7 +148,8 @@ export class GitHubVaultSession implements FlomoSession {
   private syncFromVault(patch: Partial<SessionSnapshot> = {}): void {
     const memos: Memo[] = this.vault ? this.vault.all() : []
     const tags: TagStat[] = tagStats(memos)
-    this.update({ memos, tags, ...patch })
+    const todos: Todo[] = this.vault ? this.vault.todos() : []
+    this.update({ memos, tags, todos, ...patch })
   }
 
   /** {@inheritDoc FlomoSession.refresh} */
@@ -292,6 +294,31 @@ export class GitHubVaultSession implements FlomoSession {
     this.mutate((vault) => vault.pin(id, pinned))
   }
 
+  /** {@inheritDoc FlomoSession.addTodo} */
+  addTodo(content: string): void {
+    this.mutate((vault) => vault.addTodo(content))
+  }
+
+  /** {@inheritDoc FlomoSession.editTodo} */
+  editTodo(id: string, content: string): void {
+    this.mutate((vault) => vault.editTodo(id, content))
+  }
+
+  /** {@inheritDoc FlomoSession.toggleTodo} */
+  toggleTodo(id: string, done?: boolean): void {
+    this.mutate((vault) => vault.toggleTodo(id, done))
+  }
+
+  /** {@inheritDoc FlomoSession.removeTodo} */
+  removeTodo(id: string): void {
+    this.mutate((vault) => vault.removeTodo(id))
+  }
+
+  /** {@inheritDoc FlomoSession.clearCompletedTodos} */
+  clearCompletedTodos(): void {
+    this.mutate((vault) => vault.clearCompletedTodos())
+  }
+
   /** {@inheritDoc FlomoSession.importJson} */
   async importJson(text: string): Promise<string> {
     if (!this.vault) throw new Error('保险库尚未解锁。')
@@ -321,7 +348,7 @@ export class GitHubVaultSession implements FlomoSession {
 
   /** {@inheritDoc FlomoSession.save} */
   async save(): Promise<void> {
-    if (!this.vault || this.vault.dirtyMonths.length === 0) return
+    if (!this.vault || !this.vault.hasPendingWrites) return
     this.update({ saving: true })
     try {
       await this.vault.flush()

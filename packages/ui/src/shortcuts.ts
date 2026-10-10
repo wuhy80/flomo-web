@@ -18,7 +18,7 @@ export type ShortcutAction =
   /** Focus the capture box. */
   | { kind: 'compose' }
   /** Switch to a top-level view. */
-  | { kind: 'view'; view: 'all' | 'review' | 'random' }
+  | { kind: 'view'; view: 'todo' | 'all' | 'review' | 'random' }
 
 /** The subset of a keyboard event the resolver reads. */
 export interface ShortcutEvent {
@@ -74,6 +74,9 @@ export function resolveShortcut(event: ShortcutEvent): ShortcutAction | null {
     case 'c':
     case 'C':
       return { kind: 'compose' }
+    case 't':
+    case 'T':
+      return { kind: 'view', view: 'todo' }
     case 'g':
     case 'G':
       return { kind: 'view', view: 'all' }

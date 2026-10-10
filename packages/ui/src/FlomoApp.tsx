@@ -12,6 +12,7 @@ import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
+  activeTodoCount,
   backlinks,
   corpusStats,
   dailyReview,
@@ -36,6 +37,7 @@ import { Feed } from './Feed.tsx'
 import { Sidebar } from './Sidebar.tsx'
 import { HeatmapView } from './HeatmapView.tsx'
 import { InsightView } from './InsightView.tsx'
+import { TodoView } from './TodoView.tsx'
 import { AI_PRESETS, loadAiConfig, saveAiConfig } from './ai-insights.ts'
 import type { AiConfig } from './ai-insights.ts'
 import { UnlockGate } from './UnlockGate.tsx'
@@ -82,7 +84,8 @@ function savedLabel(iso: string | null): string {
 }
 
 /** The views the column title's dropdown offers, in flomo's order. */
-const VIEW_MENU: Array<{ kind: 'all' | 'review' | 'random' | 'settings'; label: string }> = [
+const VIEW_MENU: Array<{ kind: 'todo' | 'all' | 'review' | 'random' | 'settings'; label: string }> = [
+  { kind: 'todo', label: 'TODO' },
   { kind: 'all', label: '全部笔记' },
   { kind: 'review', label: '每日回顾' },
   { kind: 'random', label: '随机漫步' },
@@ -420,6 +423,7 @@ export function FlomoApp({
         view={view}
         memos={snapshot.memos}
         tags={snapshot.tags}
+        todoCount={activeTodoCount(snapshot.todos)}
         onSelect={(next) => {
           setView(next)
           setQuery('')
@@ -530,6 +534,20 @@ export function FlomoApp({
               </span>
               <span>{snapshot.saving ? '保存中…' : savedLabel(snapshot.lastSavedAt)}</span>
             </div>
+          ) : null}
+
+          {view.kind === 'todo' ? (
+            /* Bound conditionally on purpose: a backend without todo support
+               must arrive here as `undefined`, which is exactly the signal
+               TodoView uses to show its "use the web app" notice. */
+            <TodoView
+              todos={snapshot.todos}
+              onAdd={session.addTodo?.bind(session)}
+              onEdit={session.editTodo?.bind(session)}
+              onToggle={session.toggleTodo?.bind(session)}
+              onRemove={session.removeTodo?.bind(session)}
+              onClearCompleted={session.clearCompletedTodos?.bind(session)}
+            />
           ) : null}
 
           {view.kind === 'all' || view.kind === 'tag' || view.kind === 'day' ? (

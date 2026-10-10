@@ -77,8 +77,21 @@ export { dailyReview, DEFAULT_REVIEW_SCOPE, pickRandom, randomWalk, searchMemos 
 export type { ReviewScope } from './search.ts'
 export type { SearchQuery } from './search.ts'
 
-export { corpusStats, heatmap, streak } from './stats.ts'
+export {
+  corpusStats,
+  heatmap,
+  streak,
+} from './stats.ts'
 export type { CorpusStats } from './stats.ts'
+
+export {
+  TODO_FILE,
+  activeTodoCount,
+  parseTodoDocument,
+  parseTodoPlain,
+  splitTodos,
+} from './todos.ts'
+export type { TodoDocument, TodoGroups } from './todos.ts'
 
 export {
   hasTag,
@@ -113,4 +126,4 @@ export {
 } from './vault.ts'
 export type { CreatedVault, TextStore } from './vault.ts'
 
-export type { Memo, Shard, ShardIndex, ShardRef, VaultHeader } from './types.ts'
+export type { Memo, Shard, ShardIndex, ShardRef, Todo, VaultHeader } from './types.ts'

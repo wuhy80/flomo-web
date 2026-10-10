@@ -513,7 +513,7 @@ export class FlomoHostService {
    * @returns the months written.
    */
   async save(): Promise<string[]> {
-    if (!this.vault || this.vault.dirtyMonths.length === 0) return []
+    if (!this.vault || !this.vault.hasPendingWrites) return []
     const written = await this.vault.flush()
     this.lastSavedAt = new Date().toISOString()
     this.error = null

@@ -41,6 +41,9 @@ export type { SidebarProps } from './Sidebar.tsx'
 export { StatsModal } from './StatsModal.tsx'
 export type { StatsModalProps } from './StatsModal.tsx'
 
+export { TodoView } from './TodoView.tsx'
+export type { TodoHandlers, TodoViewProps } from './TodoView.tsx'
+
 export { FLOMO_CSS, STYLE_ELEMENT_ID, injectFlomoStyles } from './styles.ts'
 
 export { UnlockGate } from './UnlockGate.tsx'

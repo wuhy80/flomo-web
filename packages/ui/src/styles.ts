@@ -1165,6 +1165,177 @@ del { color: var(--flomo-text-faint); }
 
 .fl-review-note { margin-bottom: 18px; font-size: 13px; color: var(--flomo-text-soft); }
 
+/* ── TODO checklist ──────────────────────────────────────────────────── */
+/* Modelled on Google Tasks: quick-add row on top, round checkboxes that fill
+   green when ticked, done work sunk into a collapsible group at the bottom. */
+
+.fl-todo { display: flex; flex-direction: column; }
+
+.fl-todo-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 12px;
+  border-bottom: 1px solid var(--flomo-border);
+  margin-bottom: 6px;
+}
+
+.fl-todo-add-icon {
+  flex: none;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--flomo-text-soft);
+}
+
+.fl-todo-add input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--flomo-text);
+  padding: 6px 0;
+  outline: none;
+}
+
+.fl-todo-add input::placeholder { color: var(--flomo-text-faint); }
+
+.fl-todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fl-todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 2px;
+  border-radius: var(--flomo-radius-sm);
+}
+
+.fl-todo-item:hover { background: var(--flomo-hover); }
+
+/* The round tick box: an outlined circle while open, the vault green filled
+   with a white check once done — the one bit of colour on the panel. */
+.fl-todo-check {
+  flex: none;
+  width: 19px;
+  height: 19px;
+  border: 1.5px solid var(--flomo-border-strong);
+  border-radius: 50%;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.fl-todo-check:hover { border-color: var(--flomo-green); }
+
+.fl-todo-check[data-done="true"] {
+  background: var(--flomo-green);
+  border-color: var(--flomo-green);
+}
+
+.fl-todo-text {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--flomo-text);
+  text-align: left;
+  cursor: text;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+
+.fl-todo-edit {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--flomo-green);
+  border-radius: var(--flomo-radius-sm);
+  background: var(--flomo-bg);
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--flomo-text);
+  padding: 4px 8px;
+  outline: none;
+}
+
+.fl-todo-remove {
+  flex: none;
+  border: 0;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--flomo-text-faint);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--flomo-radius-sm);
+  opacity: 0;
+}
+
+.fl-todo-item:hover .fl-todo-remove,
+.fl-todo-remove:focus-visible { opacity: 1; }
+
+.fl-todo-remove:hover { color: var(--flomo-danger); background: var(--flomo-hover); }
+
+/* Done rows keep their place in the completed group: dimmed, struck through,
+   and with the delete affordance one hover away like the open rows. */
+.fl-todo-item[data-done="true"] .fl-todo-text {
+  color: var(--flomo-text-soft);
+  text-decoration: line-through;
+}
+
+.fl-todo-done { margin-top: 14px; }
+
+.fl-todo-done-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+.fl-todo-done-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--flomo-text-soft);
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.fl-todo-done-toggle:hover { color: var(--flomo-text); }
+
+.fl-todo-done-caret { font-size: 10px; line-height: 1; }
+
+.fl-todo-clear {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--flomo-blue);
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.fl-todo-clear:hover { color: var(--flomo-blue-strong); }
+
 /* ── heatmap ─────────────────────────────────────────────────────────── */
 
 /* The wrapper scrolls, not the grid, so the month labels travel with the cells

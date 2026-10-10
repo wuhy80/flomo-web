@@ -58,6 +58,25 @@ export interface Shard {
   updatedAt: string
 }
 
+/**
+ * One entry of the standalone TODO list.
+ *
+ * Todos deliberately share nothing with {@link Memo}: no tags, no shards, no
+ * feed. They live in their own encrypted document so the checklist stays a
+ * checklist, and completion is carried by `completedAt` rather than a boolean —
+ * the field's presence *is* the done state, the same trick `pinned` uses.
+ */
+export interface Todo {
+  /** Stable unique id, minted client-side. */
+  id: string
+  /** The task text, plain — no tag or link syntax is parsed out of it. */
+  content: string
+  /** ISO-8601 creation timestamp. */
+  createdAt: string
+  /** ISO-8601 completion timestamp; absent while the task is open. */
+  completedAt?: string
+}
+
 /** A memo plus the bookkeeping needed to know which shard owns it. */
 export interface ShardRef {
   month: string

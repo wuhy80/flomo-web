@@ -276,6 +276,7 @@ function fakeSession(overrides: Partial<SessionSnapshot> = {}): {
     status: 'unlocked',
     memos: [],
     tags: [],
+    todos: [],
     error: null,
     saving: false,
     offline: false,

@@ -21,6 +21,10 @@ const INITIAL: SessionSnapshot = {
   status: 'probing',
   memos: [],
   tags: [],
+  // The host protocol does not carry the TODO checklist yet, so the panel's
+  // snapshot keeps it permanently empty; the TODO view shows a pointer to the
+  // web app when the session has no todo methods.
+  todos: [],
   error: null,
   saving: false,
   // The host process owns the network and the ciphertext, so the panel never

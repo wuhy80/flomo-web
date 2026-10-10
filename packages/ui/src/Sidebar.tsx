@@ -37,6 +37,12 @@ export interface SidebarProps {
   onDiary?: () => void
   /** Today's diary tag, for the row's active state alongside `onDiary`. */
   diaryTag?: string
+  /**
+   * How many TODO tasks are still open, for the TODO row's count badge.
+   * Absent keeps the row but leaves the count off, the way hosts without the
+   * feature show it.
+   */
+  todoCount?: number
   /** Brand text shown at the top. */
   brand?: string
   /** Hide the settings row when the host owns configuration instead. */
@@ -74,6 +80,7 @@ export function Sidebar({
   onSelect,
   onDiary,
   diaryTag,
+  todoCount,
   brand = 'flomo',
   showSettings = true,
 }: SidebarProps): React.ReactElement {
@@ -281,6 +288,14 @@ export function Sidebar({
         onSelectDay={(day) => onSelect({ kind: 'day', day })}
       />
 
+      {/* TODO sits above 全部, Google-Tasks-style: the checklist is the one
+          thing people open more often than the feed, and the badge counts what
+          is still open rather than everything stored. */}
+      <button {...rowProps({ kind: 'todo' })}>
+        <NavLabel icon="☑" text="TODO" />
+        {todoCount !== undefined ? <span className="fl-nav-count">{todoCount}</span> : null}
+      </button>
+
       <button {...rowProps({ kind: 'all' })}>
         <NavLabel icon="▦" text="全部" />
         <span className="fl-nav-count">{memos.length}</span>
@@ -352,7 +367,8 @@ export function Sidebar({
           </button>
         ) : null}
         <div className="fl-shortcut-hint">
-          <kbd>/</kbd> 搜索 · <kbd>c</kbd> 记录 · <kbd>g</kbd> 全部 · <kbd>r</kbd> 回顾
+          <kbd>/</kbd> 搜索 · <kbd>c</kbd> 记录 · <kbd>t</kbd> 待办 · <kbd>g</kbd> 全部 ·{' '}
+          <kbd>r</kbd> 回顾
         </div>
       </div>
 
