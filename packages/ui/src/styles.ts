@@ -1298,6 +1298,31 @@ del { color: var(--flomo-text-faint); }
 
 .fl-todo-remove:hover { color: var(--flomo-danger); background: var(--flomo-hover); }
 
+/* 删除的两段确认：第一次点击只武装状态，按钮换成红色问句。 */
+.fl-todo-remove[data-confirm="true"] {
+  width: auto;
+  padding: 3px 8px;
+  color: var(--flomo-danger);
+  background: rgba(208, 48, 80, 0.1);
+  opacity: 1;
+}
+
+.fl-todo-remove-confirm:hover { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.18); }
+
+/* 键盘选中态：一行淡绿，和焦点格同一族颜色。 */
+.fl-todo-item[data-selected="true"] > .fl-todo-line,
+.fl-quad-item[data-selected="true"] > .fl-todo-line {
+  background: var(--flomo-green-soft);
+}
+
+.fl-todo-hints {
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--flomo-text-faint);
+  line-height: 1.6;
+  user-select: none;
+}
+
 /* Done rows keep their place in the completed group: dimmed, struck through,
    and with the delete affordance one hover away like the open rows. */
 .fl-todo-item[data-done="true"] .fl-todo-text {

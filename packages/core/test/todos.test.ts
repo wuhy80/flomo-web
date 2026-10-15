@@ -13,7 +13,11 @@ import {
   FlomoVault,
   findTodo,
   flattenTodos,
+  indentTodoAt,
+  insertAfterTodoAt,
   insertTodoAt,
+  moveTodoAt,
+  outdentTodoAt,
   parseDateOnly,
   parseTodoPlain,
   removeTodoAt,
@@ -356,6 +360,89 @@ describe('the todo forest', () => {
       'delegate',
       'overdue reads as urgent',
     )
+  })
+})
+
+describe('indent, outdent and move', () => {
+  const task = (id: string, extra: Partial<Todo> = {}): Todo => ({
+    id,
+    content: `task ${id}`,
+    createdAt: '2026-10-10T00:00:00.000Z',
+    ...extra,
+  })
+
+  it('demotes a task under the sibling above it, subtree riding along', () => {
+    const tree: Todo[] = [
+      task('a'),
+      task('b', { children: [task('b1')] }),
+      task('c', { children: [task('c1')] }),
+    ]
+    const next = indentTodoAt(tree, 'c')
+    const b = findTodo(next, 'b')
+    assert.deepEqual(b?.children?.map((child) => child.id), ['b1', 'c'], 'c lands after b1')
+    assert.equal(findTodo(next, 'c')?.children?.length, 1, "c's subtree rides along")
+    assert.equal(findTodo(next, 'c1')?.id, 'c1')
+  })
+
+  it('refuses to demote a first child and reports no change', () => {
+    const tree: Todo[] = [task('a', { children: [task('a1')] }), task('b')]
+    assert.equal(indentTodoAt(tree, 'a1'), tree, 'the same array comes back')
+  })
+
+  it('promotes a task to the parent level, right after the parent', () => {
+    const tree: Todo[] = [
+      task('a'),
+      task('b', { children: [task('b1'), task('b2', { children: [task('b2a')] })] }),
+    ]
+    const next = outdentTodoAt(tree, 'b2')
+    assert.deepEqual(
+      next.map((top) => top.id),
+      ['a', 'b', 'b2'],
+      'b2 follows b at the top level',
+    )
+    assert.equal(findTodo(next, 'b2a')?.id, 'b2a', "b2's subtree rides along")
+    assert.deepEqual(findTodo(next, 'b')?.children?.map((child) => child.id), ['b1'])
+  })
+
+  it('leaves a root task alone on outdent', () => {
+    const tree: Todo[] = [task('a'), task('b')]
+    assert.equal(outdentTodoAt(tree, 'a'), tree)
+  })
+
+  it('swaps a task with the sibling above or below', () => {
+    const tree: Todo[] = [task('a'), task('b'), task('c')]
+    assert.deepEqual(moveTodoAt(tree, 'b', -1).map((top) => top.id), ['b', 'a', 'c'])
+    assert.deepEqual(moveTodoAt(tree, 'b', 1).map((top) => top.id), ['a', 'c', 'b'])
+    assert.equal(moveTodoAt(tree, 'a', -1), tree, 'already first')
+    assert.equal(moveTodoAt(tree, 'c', 1), tree, 'already last')
+  })
+
+  it('moves nested tasks within their own siblings only', () => {
+    const tree: Todo[] = [
+      task('a', { children: [task('a1'), task('a2')] }),
+      task('b'),
+    ]
+    const next = moveTodoAt(tree, 'a2', -1)
+    assert.deepEqual(findTodo(next, 'a')?.children?.map((child) => child.id), ['a2', 'a1'])
+    assert.deepEqual(next.map((top) => top.id), ['a', 'b'], 'siblings outside stay put')
+  })
+
+  it('keeps the original forest on nested no-ops, by reference', () => {
+    // The regression this pins: a walk that rebuilt every level on its way out
+    // made untouched parents look changed and broke no-op detection.
+    const tree: Todo[] = [task('a', { children: [task('a1', { children: [task('a1a')] })] }), task('b')]
+    assert.equal(indentTodoAt(tree, 'a'), tree, 'a first child cannot demote')
+    assert.equal(outdentTodoAt(tree, 'a'), tree, 'a root cannot promote')
+    assert.equal(moveTodoAt(tree, 'a1a', 1), tree, 'an only child cannot move')
+    assert.equal(insertAfterTodoAt(tree, 'nope', task('x')), tree)
+  })
+
+  it('inserts after a task at any depth', () => {
+    const tree: Todo[] = [task('a', { children: [task('a1')] }), task('b')]
+    const next = insertAfterTodoAt(tree, 'a1', task('a2'))
+    assert.deepEqual(findTodo(next, 'a')?.children?.map((child) => child.id), ['a1', 'a2'])
+    // An unknown anchor is a silent no-op — callers validate ids themselves.
+    assert.equal(insertAfterTodoAt(tree, 'nope', task('x')), tree)
   })
 })
 

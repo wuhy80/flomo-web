@@ -233,6 +233,141 @@ export function insertTodoAt(todos: readonly Todo[], todo: Todo, parentId: strin
 }
 
 /**
+ * Insert a task as the next sibling of another task.
+ * @param todos - the forest.
+ * @param afterId - the task to insert after.
+ * @param todo - the task to insert.
+ * @returns the new forest.
+ * @throws when `afterId` is unknown.
+ */
+export function insertAfterTodoAt(todos: readonly Todo[], afterId: string, todo: Todo): Todo[] {
+  let changed = false
+  // The walk returns the ORIGINAL list when nothing below changed — a rebuilt
+  // array on every level would make every parent look changed and wreck the
+  // no-op detection the outer return relies on.
+  const walk = (list: readonly Todo[]): Todo[] => {
+    const index = list.findIndex((task) => task.id === afterId)
+    if (index !== -1) {
+      changed = true
+      const next = [...list]
+      next.splice(index + 1, 0, todo)
+      return next
+    }
+    let next: Todo[] | null = null
+    for (let at = 0; at < list.length; at += 1) {
+      const task = list[at]!
+      if (task.children === undefined) continue
+      const children = walk(task.children)
+      if (children === task.children) continue
+      next = next ?? [...list]
+      next[at] = { ...task, children }
+      break // one id matches, so at most one subtree changes
+    }
+    return next ?? (list as Todo[])
+  }
+  const next = walk(todos)
+  // The no-op path hands the caller's array back, same contract as updateTodoAt.
+  return changed ? next : (todos as Todo[])
+}
+
+/**
+ * Demote a task: it becomes the last child of the sibling above it, its own
+ * subtree riding along. A first child has nobody to nest under and stays put.
+ * @param todos - the forest.
+ * @param id - the task to demote.
+ * @returns the new forest.
+ */
+export function indentTodoAt(todos: readonly Todo[], id: string): Todo[] {
+  let changed = false
+  // Same identity discipline as insertAfterTodoAt: a level that did not
+  // change hands back its own array.
+  const walk = (list: readonly Todo[]): Todo[] => {
+    const index = list.findIndex((task) => task.id === id)
+    if (index !== -1) {
+      if (index === 0) return list as Todo[] // a first child cannot demote
+      changed = true
+      const demoted = list[index]!
+      return list
+        .filter((_, at) => at !== index)
+        .map((task, at) =>
+          // Removing `index` shifts nothing before it, so the previous
+          // sibling still sits at `index - 1`.
+          at === index - 1 ? { ...task, children: [...(task.children ?? []), demoted] } : task,
+        )
+    }
+    let next: Todo[] | null = null
+    for (let at = 0; at < list.length; at += 1) {
+      const task = list[at]!
+      if (task.children === undefined) continue
+      const children = walk(task.children)
+      if (children === task.children) continue
+      next = next ?? [...list]
+      next[at] = { ...task, children }
+      break // one id matches, so at most one subtree changes
+    }
+    return next ?? (list as Todo[])
+  }
+  const next = walk(todos)
+  return changed ? next : (todos as Todo[])
+}
+
+/**
+ * Promote a task out of its parent: it lands right after the parent, at the
+ * parent's own level, its whole subtree following. A root task stays put.
+ * @param todos - the forest.
+ * @param id - the task to promote.
+ * @returns the new forest.
+ */
+export function outdentTodoAt(todos: readonly Todo[], id: string): Todo[] {
+  let parentId: string | null = null
+  walkTodos(todos, (task, _depth, parents) => {
+    if (task.id === id && parents.length > 0) parentId = parents[parents.length - 1]!.id
+  })
+  if (parentId === null) return todos as Todo[]
+  const task = findTodo(todos, id)
+  if (task === null) return todos as Todo[]
+  const [without, removed] = removeTodoAt(todos, id)
+  if (!removed) return todos as Todo[]
+  return insertAfterTodoAt(without, parentId, task)
+}
+
+/**
+ * Swap a task with the sibling above (`dir` −1) or below (`dir` +1) it.
+ * @param todos - the forest.
+ * @param id - the task to move.
+ * @param dir - −1 up, +1 down.
+ * @returns the new forest; the original at the edge of the list.
+ */
+export function moveTodoAt(todos: readonly Todo[], id: string, dir: -1 | 1): Todo[] {
+  let changed = false
+  const walk = (list: readonly Todo[]): Todo[] => {
+    const index = list.findIndex((task) => task.id === id)
+    if (index !== -1) {
+      const other = index + dir
+      if (other < 0 || other >= list.length) return list as Todo[] // already at the edge
+      changed = true
+      const next = [...list]
+      next[index] = list[other]!
+      next[other] = list[index]!
+      return next
+    }
+    let next: Todo[] | null = null
+    for (let at = 0; at < list.length; at += 1) {
+      const task = list[at]!
+      if (task.children === undefined) continue
+      const children = walk(task.children)
+      if (children === task.children) continue
+      next = next ?? [...list]
+      next[at] = { ...task, children }
+      break // one id matches, so at most one subtree changes
+    }
+    return next ?? (list as Todo[])
+  }
+  const next = walk(todos)
+  return changed ? next : (todos as Todo[])
+}
+
+/**
  * Set one task's done state, cascading to its whole subtree — completing a
  * parent retires its subtasks with it; reopening one revives them.
  * @param todo - the task to change.

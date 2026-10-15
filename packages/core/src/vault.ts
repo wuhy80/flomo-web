@@ -40,7 +40,7 @@ import {
   CHECK_PLAINTEXT,
 } from './crypto.ts'
 import type { GitHubDirEntry } from './github.ts'
-import { findTodo, insertTodoAt, parseTodoDocument, parseTodoPlain, removeTodoAt, setTodoDone, stripCompleted, TODO_FILE, updateTodoAt } from './todos.ts'
+import { findTodo, indentTodoAt, insertTodoAt, moveTodoAt, outdentTodoAt, parseTodoDocument, parseTodoPlain, removeTodoAt, setTodoDone, stripCompleted, TODO_FILE, updateTodoAt } from './todos.ts'
 import type { TodoDocument } from './todos.ts'
 import { dayOf, monthOf } from './time.ts'
 import { parseTags } from './tags.ts'
@@ -554,6 +554,49 @@ export class FlomoVault {
    */
   editTodo(id: string, content: string): Todo {
     return this.updateTodo(id, { content })
+  }
+
+  /**
+   * Demote a task under the sibling above it, subtree riding along.
+   * @param id - the task to demote.
+   * @returns the updated task.
+   * @throws when the id is unknown.
+   */
+  indentTodo(id: string): Todo {
+    const existing = findTodo(this.todoItems, id)
+    if (existing === null) throw new Error(`找不到 todo：${id}`)
+    this.todoItems = indentTodoAt(this.todoItems, id)
+    this.touchTodos()
+    return findTodo(this.todoItems, id) ?? existing
+  }
+
+  /**
+   * Promote a task to its parent's level, right after the parent.
+   * @param id - the task to promote.
+   * @returns the updated task.
+   * @throws when the id is unknown.
+   */
+  outdentTodo(id: string): Todo {
+    const existing = findTodo(this.todoItems, id)
+    if (existing === null) throw new Error(`找不到 todo：${id}`)
+    this.todoItems = outdentTodoAt(this.todoItems, id)
+    this.touchTodos()
+    return findTodo(this.todoItems, id) ?? existing
+  }
+
+  /**
+   * Swap a task with the sibling above or below it.
+   * @param id - the task to move.
+   * @param dir - −1 up, +1 down.
+   * @returns the updated task.
+   * @throws when the id is unknown.
+   */
+  moveTodo(id: string, dir: -1 | 1): Todo {
+    const existing = findTodo(this.todoItems, id)
+    if (existing === null) throw new Error(`找不到 todo：${id}`)
+    this.todoItems = moveTodoAt(this.todoItems, id, dir)
+    this.touchTodos()
+    return findTodo(this.todoItems, id) ?? existing
   }
 
   /**

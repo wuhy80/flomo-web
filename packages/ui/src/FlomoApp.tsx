@@ -547,6 +547,9 @@ export function FlomoApp({
               onUpdate={session.updateTodo?.bind(session)}
               onToggle={session.toggleTodo?.bind(session)}
               onRemove={session.removeTodo?.bind(session)}
+              onIndent={session.indentTodo?.bind(session)}
+              onOutdent={session.outdentTodo?.bind(session)}
+              onMove={session.moveTodo?.bind(session)}
               onClearCompleted={session.clearCompletedTodos?.bind(session)}
             />
           ) : null}

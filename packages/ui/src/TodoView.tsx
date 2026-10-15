@@ -17,9 +17,10 @@
  */
 
 import type * as React from 'react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { QUADRANTS, flattenTodos, splitTodos, todoDueState, todoQuadrant } from '@flomo/core'
+import { QUADRANTS, findTodo, flattenTodos, splitTodos, todoDueState, todoQuadrant } from '@flomo/core'
+import { isTypingTarget } from './shortcuts.ts'
 import type { Todo, TodoPatch, TodoPriority } from '@flomo/core'
 
 import { MarkdownBody } from './MarkdownBody.tsx'
@@ -37,6 +38,12 @@ export interface TodoHandlers {
   onToggle?: (id: string, done?: boolean) => void
   /** Delete one task with its subtree. */
   onRemove?: (id: string) => void
+  /** Demote a task under the sibling above it. */
+  onIndent?: (id: string) => void
+  /** Promote a task to its parent's level. */
+  onOutdent?: (id: string) => void
+  /** Swap a task with the sibling above (−1) or below (+1). */
+  onMove?: (id: string, dir: -1 | 1) => void
   /** Drop every completed task. */
   onClearCompleted?: () => void
 }
@@ -214,6 +221,10 @@ function TodoDetail({
                 event.preventDefault()
                 commitNotes()
               }
+              if (event.key === 'Escape') {
+                commitNotes()
+                onClose()
+              }
             }}
           />
         )}
@@ -232,6 +243,7 @@ function TodoDetail({
           onChange={(event) => setSubDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') addSubtask()
+            if (event.key === 'Escape') onClose()
           }}
         />
       </div>
@@ -263,6 +275,10 @@ function TodoRow({
   editingId,
   openIds,
   detailId,
+  selected,
+  deleteArmed,
+  onArmRemove,
+  onConfirmRemove,
   onEditText,
   editText,
   onStartEdit,
@@ -277,6 +293,11 @@ function TodoRow({
   editingId: string | null
   openIds: ReadonlySet<string>
   detailId: string | null
+  selected: boolean
+  /** The id whose removal is armed, or null — passed down so children see it. */
+  deleteArmed: string | null
+  onArmRemove: (id: string) => void
+  onConfirmRemove: (id: string) => void
   editText: string
   onEditText: (text: string) => void
   onStartEdit: (todo: Todo) => void
@@ -293,8 +314,14 @@ function TodoRow({
   const editing = editingId === todo.id
   const open = openIds.has(todo.id)
   const detailOpen = detailId === todo.id
+  const deleteArmedHere = deleteArmed === todo.id
   return (
-    <li className="fl-todo-item" data-done={done ? 'true' : undefined}>
+    <li
+      className="fl-todo-item"
+      data-done={done ? 'true' : undefined}
+      data-todo-id={todo.id}
+      data-selected={selected ? 'true' : undefined}
+    >
       <div className="fl-todo-line">
         {hasChildren ? (
           <button
@@ -348,12 +375,15 @@ function TodoRow({
               </button>
               <button
                 type="button"
-                className="fl-todo-remove"
-                aria-label={`删除「${todo.content}」`}
-                title="删除"
-                onClick={() => onRemove?.(todo.id)}
+                className={deleteArmedHere ? 'fl-todo-remove fl-todo-remove-confirm' : 'fl-todo-remove'}
+                aria-label={deleteArmedHere ? `确认删除「${todo.content}」及其子任务` : `删除「${todo.content}」`}
+                title={deleteArmedHere ? '再次点击确认删除' : '删除'}
+                data-confirm={deleteArmedHere ? 'true' : undefined}
+                onClick={() =>
+                  deleteArmedHere ? onConfirmRemove(todo.id) : onArmRemove(todo.id)
+                }
               >
-                ×
+                {deleteArmedHere ? '确认删除？' : '×'}
               </button>
             </span>
           </>
@@ -380,6 +410,10 @@ function TodoRow({
               editingId={editingId}
               openIds={openIds}
               detailId={detailId}
+              selected={selected}
+              deleteArmed={deleteArmed}
+              onArmRemove={onArmRemove}
+              onConfirmRemove={onConfirmRemove}
               editText={editText}
               onEditText={onEditText}
               onStartEdit={onStartEdit}
@@ -409,6 +443,9 @@ export function TodoView({
   onUpdate,
   onToggle,
   onRemove,
+  onIndent,
+  onOutdent,
+  onMove,
   onClearCompleted,
 }: TodoViewProps): React.ReactElement {
   const [draft, setDraft] = useState('')
@@ -418,9 +455,11 @@ export function TodoView({
   const [mode, setMode] = useState<'list' | 'quadrant'>('list')
   const [openIds, setOpenIds] = useState<ReadonlySet<string>>(new Set())
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [deleteArmed, setDeleteArmed] = useState<string | null>(null)
   const draftInput = useRef<HTMLInputElement>(null)
 
-  const handlers: TodoHandlers = { onAdd, onEdit, onUpdate, onToggle, onRemove, onClearCompleted }
+  const handlers: TodoHandlers = { onAdd, onEdit, onUpdate, onToggle, onRemove, onIndent, onOutdent, onMove, onClearCompleted }
 
   const { active, completed } = splitTodos(todos)
 
@@ -492,6 +531,153 @@ export function TodoView({
     setEditingId(null)
   }
 
+  /** The ids of every task row on screen, in display order. */
+  const visibleIds = (): string[] =>
+    [...document.querySelectorAll('.fl-todo [data-todo-id]')]
+      .map((node) => node.getAttribute('data-todo-id'))
+      .filter((id): id is string => id !== null)
+
+  const armRemove = (id: string): void => setDeleteArmed(id)
+  const confirmRemove = (id: string): void => {
+    onRemove?.(id)
+    setDeleteArmed(null)
+    setSelectedId((current) => (current === id ? null : current))
+  }
+
+  // The keyboard layer. One document listener for as long as the panel is
+  // mounted — it bails out on typing targets and on every modified key it does
+  // not own, so the composer's accelerators and plain typing stay untouched.
+  // Rebound per render on purpose: every action closes over fresh state.
+  useEffect(() => {
+    const moveSelection = (delta: number): void => {
+      const ids = visibleIds()
+      if (ids.length === 0) return
+      const index = selectedId === null ? (delta > 0 ? -1 : 0) : ids.indexOf(selectedId)
+      const nextIndex = index === -1 ? 0 : Math.max(0, Math.min(index + delta, ids.length - 1))
+      setDeleteArmed(null)
+      setSelectedId(ids[nextIndex] ?? null)
+    }
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (isTypingTarget(event.target)) return
+      // Ctrl+↑/↓ moves the selected task; every other modified key belongs to
+      // the browser (and Ctrl+K stays the global search accelerator).
+      if (
+        (event.ctrlKey || event.altKey) &&
+        selectedId !== null &&
+        (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+      ) {
+        event.preventDefault()
+        onMove?.(selectedId, event.key === 'ArrowUp' ? -1 : 1)
+        return
+      }
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+
+      switch (event.key) {
+        case 'ArrowDown':
+        case 'j':
+        case 'J':
+          event.preventDefault()
+          moveSelection(1)
+          return
+        case 'ArrowUp':
+        case 'k':
+        case 'K':
+          event.preventDefault()
+          moveSelection(-1)
+          return
+        case 'a':
+        case 'A':
+          if (mode === 'list') {
+            event.preventDefault()
+            draftInput.current?.focus()
+          }
+          return
+      }
+
+      if (selectedId === null) return
+      const todo = findTodo(todos, selectedId)
+      if (todo === null) {
+        setSelectedId(null)
+        return
+      }
+
+      switch (event.key) {
+        case 'Enter':
+          event.preventDefault()
+          startEdit(todo)
+          return
+        case ' ':
+        case 'x':
+        case 'X':
+          event.preventDefault()
+          onToggle?.(selectedId)
+          return
+        case 's':
+        case 'S':
+          event.preventDefault()
+          expandTask(selectedId)
+          setDetailId(selectedId)
+          requestAnimationFrame(() => {
+            document.querySelector<HTMLInputElement>('.fl-todo-detail .fl-todo-subadd input')?.focus()
+          })
+          return
+        case 'd':
+        case 'D':
+          event.preventDefault()
+          toggleDetail(selectedId)
+          return
+        case '1':
+          onUpdate?.(selectedId, { priority: 'P1' })
+          return
+        case '2':
+          onUpdate?.(selectedId, { priority: 'P2' })
+          return
+        case '3':
+          onUpdate?.(selectedId, { priority: 'P3' })
+          return
+        case '0':
+          onUpdate?.(selectedId, { priority: null })
+          return
+        case 'Tab':
+          if (mode !== 'list') return
+          event.preventDefault()
+          if (event.shiftKey) {
+            onOutdent?.(selectedId)
+          } else {
+            const above = visibleIds()
+            const at = above.indexOf(selectedId)
+            if (at > 0) expandTask(above[at - 1] ?? '')
+            onIndent?.(selectedId)
+          }
+          return
+        case 'Delete':
+        case 'Backspace':
+          event.preventDefault()
+          if (deleteArmed === selectedId) confirmRemove(selectedId)
+          else setDeleteArmed(selectedId)
+          return
+        case 'Escape':
+          event.preventDefault()
+          if (deleteArmed !== null) setDeleteArmed(null)
+          else if (detailId !== null) setDetailId(null)
+          else setSelectedId(null)
+          return
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  })
+
+  // Keep the selection on screen as it walks.
+  useEffect(() => {
+    if (selectedId === null) return
+    document
+      .querySelector(`.fl-todo [data-todo-id="${selectedId}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [selectedId])
+
   if (onAdd === undefined) {
     return <div className="fl-empty">当前环境不支持 TODO，请在网页版使用。</div>
   }
@@ -558,10 +744,18 @@ export function TodoView({
                 onToggleOpen={toggleOpen}
                 onExpand={expandTask}
                 onToggleDetail={toggleDetail}
+                selected={selectedId === todo.id}
+                deleteArmed={deleteArmed}
+                onArmRemove={armRemove}
+                onConfirmRemove={confirmRemove}
                 handlers={handlers}
               />
             ))}
           </ul>
+
+          <div className="fl-todo-hints" aria-hidden="true">
+            ↑↓ 选中 · Enter 编辑 · x 完成 · s 子任务 · d 详情 · 1/2/3 优先级 · Tab 缩进 · Del 删除
+          </div>
 
           {completed.length > 0 ? (
             <div className="fl-todo-done">
@@ -605,6 +799,10 @@ export function TodoView({
                       onToggleOpen={toggleOpen}
                       onExpand={expandTask}
                       onToggleDetail={toggleDetail}
+                      selected={selectedId === todo.id}
+                      deleteArmed={deleteArmed}
+                      onArmRemove={armRemove}
+                      onConfirmRemove={confirmRemove}
                       handlers={handlers}
                     />
                   ))}
@@ -629,7 +827,12 @@ export function TodoView({
                 ) : (
                   <ul className="fl-quad-list">
                     {items.map(({ todo, parent }) => (
-                      <li key={todo.id} className="fl-quad-item">
+                      <li
+                        key={todo.id}
+                        className="fl-quad-item"
+                        data-todo-id={todo.id}
+                        data-selected={selectedId === todo.id ? 'true' : undefined}
+                      >
                         <div className="fl-todo-line">
                           <TodoCheck todo={todo} onToggle={onToggle} />
                           <button
@@ -661,12 +864,22 @@ export function TodoView({
                             </button>
                             <button
                               type="button"
-                              className="fl-todo-remove"
-                              aria-label={`删除「${todo.content}」`}
-                              title="删除"
-                              onClick={() => onRemove?.(todo.id)}
+                              className={
+                                deleteArmed === todo.id
+                                  ? 'fl-todo-remove fl-todo-remove-confirm'
+                                  : 'fl-todo-remove'
+                              }
+                              aria-label={
+                                deleteArmed === todo.id
+                                  ? `确认删除「${todo.content}」及其子任务`
+                                  : `删除「${todo.content}」`
+                              }
+                              title={deleteArmed === todo.id ? '再次点击确认删除' : '删除'}
+                              onClick={() =>
+                                deleteArmed === todo.id ? confirmRemove(todo.id) : armRemove(todo.id)
+                              }
                             >
-                              ×
+                              {deleteArmed === todo.id ? '确认删除？' : '×'}
                             </button>
                           </span>
                         </div>

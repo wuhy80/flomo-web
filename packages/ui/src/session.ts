@@ -145,6 +145,12 @@ export interface FlomoSession {
   toggleTodo?(id: string, done?: boolean): void
   /** Delete one task. */
   removeTodo?(id: string): void
+  /** Demote a task under the sibling above it. */
+  indentTodo?(id: string): void
+  /** Promote a task to its parent's level. */
+  outdentTodo?(id: string): void
+  /** Swap a task with the sibling above (−1) or below (+1). */
+  moveTodo?(id: string, dir: -1 | 1): void
   /** Drop every completed task. */
   clearCompletedTodos?(): void
 

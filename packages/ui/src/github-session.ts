@@ -319,6 +319,21 @@ export class GitHubVaultSession implements FlomoSession {
     this.mutate((vault) => vault.removeTodo(id))
   }
 
+  /** {@inheritDoc FlomoSession.indentTodo} */
+  indentTodo(id: string): void {
+    this.mutate((vault) => vault.indentTodo(id))
+  }
+
+  /** {@inheritDoc FlomoSession.outdentTodo} */
+  outdentTodo(id: string): void {
+    this.mutate((vault) => vault.outdentTodo(id))
+  }
+
+  /** {@inheritDoc FlomoSession.moveTodo} */
+  moveTodo(id: string, dir: -1 | 1): void {
+    this.mutate((vault) => vault.moveTodo(id, dir))
+  }
+
   /** {@inheritDoc FlomoSession.clearCompletedTodos} */
   clearCompletedTodos(): void {
     this.mutate((vault) => vault.clearCompletedTodos())
