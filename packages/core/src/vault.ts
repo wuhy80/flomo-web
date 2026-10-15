@@ -40,11 +40,11 @@ import {
   CHECK_PLAINTEXT,
 } from './crypto.ts'
 import type { GitHubDirEntry } from './github.ts'
-import { parseTodoDocument, parseTodoPlain, TODO_FILE } from './todos.ts'
+import { findTodo, insertTodoAt, parseTodoDocument, parseTodoPlain, removeTodoAt, setTodoDone, stripCompleted, TODO_FILE, updateTodoAt } from './todos.ts'
 import type { TodoDocument } from './todos.ts'
 import { dayOf, monthOf } from './time.ts'
 import { parseTags } from './tags.ts'
-import type { Memo, Shard, ShardIndex, Todo, VaultHeader } from './types.ts'
+import type { Memo, Shard, ShardIndex, Todo, TodoPatch, VaultHeader } from './types.ts'
 
 /** Default directory holding the monthly shards. */
 export const DATA_DIR = 'data'
@@ -500,78 +500,105 @@ export class FlomoVault {
   }
 
   /**
-   * Add a task at the top of the checklist — where Google Tasks puts a new
-   * entry, and where the next one belongs while the Enter key is still warm.
-   * @param content - the task text.
+   * Add a task — at the top of the checklist, or as the newest child of
+   * another task when a parent is given.
+   * @param content - the task title.
+   * @param parentId - the parent task's id, or null for the top level.
    * @returns the stored todo.
+   * @throws when the parent id is unknown.
    */
-  addTodo(content: string): Todo {
+  addTodo(content: string, parentId: string | null = null): Todo {
     const now = new Date().toISOString()
     const todo: Todo = { id: this.newId(), content, createdAt: now }
-    this.todoItems.unshift(todo)
+    this.todoItems = insertTodoAt(this.todoItems, todo, parentId)
     this.touchTodos()
     return todo
   }
 
   /**
-   * Replace a task's text.
+   * Rewrite a task's detail fields — title, markdown description, priority and
+   * due date. Clearing a field takes `null` in the patch.
+   * @param id - the todo to edit, anywhere in the tree.
+   * @param patch - the fields to change; omitted fields stay as they are.
+   * @returns the updated todo.
+   * @throws when the id is unknown.
+   */
+  updateTodo(id: string, patch: TodoPatch): Todo {
+    const existing = findTodo(this.todoItems, id)
+    if (existing === null) throw new Error(`找不到 todo：${id}`)
+    const updated: Todo = { ...existing }
+    if (patch.content !== undefined && patch.content.trim() !== '') updated.content = patch.content
+    if (patch.notes !== undefined) {
+      if (patch.notes === null || patch.notes.trim() === '') delete updated.notes
+      else updated.notes = patch.notes
+    }
+    if (patch.priority !== undefined) {
+      if (patch.priority === null) delete updated.priority
+      else updated.priority = patch.priority
+    }
+    if (patch.due !== undefined) {
+      if (patch.due === null || patch.due === '') delete updated.due
+      else updated.due = patch.due
+    }
+    this.todoItems = updateTodoAt(this.todoItems, id, () => updated)
+    this.touchTodos()
+    return updated
+  }
+
+  /**
+   * Replace a task's text — the one-field shape of {@linkcode updateTodo}.
    * @param id - the todo to edit.
    * @param content - the new text.
    * @returns the updated todo.
    * @throws when the id is unknown.
    */
   editTodo(id: string, content: string): Todo {
-    const todo = this.todoItems.find((item) => item.id === id)
-    if (!todo) throw new Error(`找不到 todo：${id}`)
-    const updated: Todo = { ...todo, content }
-    this.todoItems.splice(this.todoItems.indexOf(todo), 1, updated)
-    this.touchTodos()
-    return updated
+    return this.updateTodo(id, { content })
   }
 
   /**
-   * Complete or reopen a task.
+   * Complete or reopen a task. Completing a parent retires its whole subtree
+   * with it; reopening revives the subtree the same way.
    * @param id - the todo to change.
    * @param done - the new value; omitted toggles.
    * @returns the updated todo.
    * @throws when the id is unknown.
    */
   toggleTodo(id: string, done?: boolean): Todo {
-    const todo = this.todoItems.find((item) => item.id === id)
-    if (!todo) throw new Error(`找不到 todo：${id}`)
+    const todo = findTodo(this.todoItems, id)
+    if (todo === null) throw new Error(`找不到 todo：${id}`)
     const next = done ?? todo.completedAt === undefined
     if (next === (todo.completedAt !== undefined)) return todo
-    const updated: Todo = { ...todo }
-    if (next) updated.completedAt = new Date().toISOString()
-    else delete updated.completedAt
-    this.todoItems.splice(this.todoItems.indexOf(todo), 1, updated)
+    const updated = setTodoDone(todo, next, new Date().toISOString())
+    this.todoItems = updateTodoAt(this.todoItems, id, () => updated)
     this.touchTodos()
     return updated
   }
 
   /**
-   * Delete one task.
+   * Delete one task and its whole subtree, from any depth.
    * @param id - the todo to remove.
    * @returns true when something was removed.
    */
   removeTodo(id: string): boolean {
-    const index = this.todoItems.findIndex((item) => item.id === id)
-    if (index === -1) return false
-    this.todoItems.splice(index, 1)
+    const [next, removed] = removeTodoAt(this.todoItems, id)
+    if (!removed) return false
+    this.todoItems = next
     this.touchTodos()
     return true
   }
 
   /**
-   * Drop every completed task, as the checklist's own 清除已完成 does.
-   * @returns how many tasks were removed.
+   * Drop every completed task, completed parents taking their subtrees along.
+   * @returns how many tasks were removed, subtree members included.
    */
   clearCompletedTodos(): number {
-    const before = this.todoItems.length
-    this.todoItems = this.todoItems.filter((todo) => todo.completedAt === undefined)
-    const removed = before - this.todoItems.length
-    if (removed > 0) this.touchTodos()
-    return removed
+    const [next, dropped] = stripCompleted(this.todoItems)
+    if (dropped > 0) {
+      this.todoItems = next
+      this.touchTodos()
+    }
+    return dropped
   }
 
   /** @returns the shard months with unsaved changes. */

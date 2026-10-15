@@ -30,7 +30,10 @@ export {
 export type { KdfParams, NewVault, Sealed } from './crypto.ts'
 
 export { isInsideFence, parseBlocks, proseText } from './blocks.ts'
-export type { Block, ListItem } from './blocks.ts'
+export type { Block, ListItem, TableAlign } from './blocks.ts'
+
+export { stringifyTable, tableRangeAt } from './tables.ts'
+export type { TableRange } from './tables.ts'
 
 export { CachingTextStore, MemoryCacheArea } from './cache.ts'
 export type { CacheArea, CachingStoreOptions } from './cache.ts'
@@ -85,13 +88,33 @@ export {
 export type { CorpusStats } from './stats.ts'
 
 export {
+  NEAR_DAYS,
+  QUADRANTS,
   TODO_FILE,
   activeTodoCount,
+  findTodo,
+  flattenTodos,
+  insertTodoAt,
+  parseDateOnly,
   parseTodoDocument,
   parseTodoPlain,
+  removeTodoAt,
+  setTodoDone,
   splitTodos,
+  stripCompleted,
+  todoDueState,
+  todoQuadrant,
+  updateTodoAt,
+  walkTodos,
 } from './todos.ts'
-export type { TodoDocument, TodoGroups } from './todos.ts'
+export type {
+  FlatTodo,
+  TodoDocument,
+  TodoDueState,
+  TodoGroups,
+  TodoPriority,
+  TodoQuadrant,
+} from './todos.ts'
 
 export {
   hasTag,
@@ -126,4 +149,12 @@ export {
 } from './vault.ts'
 export type { CreatedVault, TextStore } from './vault.ts'
 
-export type { Memo, Shard, ShardIndex, ShardRef, Todo, VaultHeader } from './types.ts'
+export type {
+  Memo,
+  Shard,
+  ShardIndex,
+  ShardRef,
+  Todo,
+  TodoPatch,
+  VaultHeader,
+} from './types.ts'

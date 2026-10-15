@@ -29,6 +29,14 @@ export type { FormatTools, ListKind } from './format-tools.ts'
 export { GitHubVaultSession, DEFAULT_AUTOSAVE_MS } from './github-session.ts'
 export type { GitHubSessionOptions } from './github-session.ts'
 
+export {
+  TableEditor,
+  blankTableDraft,
+  tableDraftAt,
+  useTableTool,
+} from './TableEditor.tsx'
+export type { TableDraft, TableEditorProps, TableToolDialog } from './TableEditor.tsx'
+
 export { Heatmap, heatLevel } from './Heatmap.tsx'
 export type { HeatmapProps } from './Heatmap.tsx'
 

@@ -15,14 +15,20 @@ export interface FormatToolsBarProps {
   tools: FormatTools
   /** Rendered between the tag and divider — the composer parks its image picker there. */
   imageSlot?: React.ReactNode
+  /**
+   * The table button's host-driven action: a grid dialog opens whether the
+   * caret sits in a table (edit it) or in open air (a fresh 2×2 one). Absent,
+   * the button falls back to writing the plain 2-column skeleton text.
+   */
+  table?: { onClick: () => void }
 }
 
 /**
- * The button row: `#` image | Aa lists task table, flomo's arrangement.
- * @param props - the bound transforms and an optional image slot.
+ * The button row: `#` image | Aa lists task @ table, flomo's arrangement.
+ * @param props - the bound transforms, an optional image slot and table action.
  * @returns the toolbar element.
  */
-export function FormatToolsBar({ tools, imageSlot }: FormatToolsBarProps): React.ReactElement {
+export function FormatToolsBar({ tools, imageSlot, table }: FormatToolsBarProps): React.ReactElement {
   const [aaOpen, setAaOpen] = useState(false)
   const aaWrap = useRef<HTMLSpanElement>(null)
 
@@ -143,8 +149,12 @@ export function FormatToolsBar({ tools, imageSlot }: FormatToolsBarProps): React
       <button
         type="button"
         className="fl-tool"
-        title="插入表格"
-        onClick={() => tools.insertTemplate('| 列一 | 列二 |\n| --- | --- |\n|  |  |', 4)}
+        title={table !== undefined ? '插入或编辑表格' : '插入表格'}
+        aria-label={table !== undefined ? '插入或编辑表格' : '插入表格'}
+        onClick={() => {
+          if (table !== undefined) table.onClick()
+          else tools.insertTemplate('| 列一 | 列二 |\n| --- | --- |\n|  |  |', 4)
+        }}
       >
         <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
           <rect

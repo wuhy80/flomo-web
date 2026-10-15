@@ -544,6 +544,7 @@ export function FlomoApp({
               todos={snapshot.todos}
               onAdd={session.addTodo?.bind(session)}
               onEdit={session.editTodo?.bind(session)}
+              onUpdate={session.updateTodo?.bind(session)}
               onToggle={session.toggleTodo?.bind(session)}
               onRemove={session.removeTodo?.bind(session)}
               onClearCompleted={session.clearCompletedTodos?.bind(session)}

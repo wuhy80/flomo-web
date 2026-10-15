@@ -1209,15 +1209,23 @@ del { color: var(--flomo-text-faint); }
   flex-direction: column;
 }
 
+/* A task row now carries optional detail and subtasks, so the <li> is a
+   column and the visible line is a row of its own. */
 .fl-todo-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 2px;
+  display: block;
+  padding: 2px;
   border-radius: var(--flomo-radius-sm);
 }
 
-.fl-todo-item:hover { background: var(--flomo-hover); }
+.fl-todo-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 2px;
+  border-radius: var(--flomo-radius-sm);
+}
+
+.fl-todo-line:hover { background: var(--flomo-hover); }
 
 /* The round tick box: an outlined circle while open, the vault green filled
    with a white check once done — the one bit of colour on the panel. */
@@ -1335,6 +1343,305 @@ del { color: var(--flomo-text-faint); }
 }
 
 .fl-todo-clear:hover { color: var(--flomo-blue-strong); }
+/* ── todo tree, detail card, quadrant grid ─────────────────────────────── */
+
+/* The expand caret occupies its own column so childless tasks align with
+   parents; a button only when there is something to expand. */
+.fl-todo-caret {
+  flex: none;
+  width: 16px;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--flomo-text-faint);
+  cursor: pointer;
+  padding: 2px;
+  text-align: center;
+}
+
+button.fl-todo-caret:hover { color: var(--flomo-text); }
+
+.fl-todo-children {
+  list-style: none;
+  margin: 0 0 0 14px;
+  padding: 0 0 0 24px;
+  /* A quiet vertical rail shows the nesting without a background shift. */
+  border-left: 1px solid var(--flomo-border);
+}
+
+.fl-todo-priority {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 999px;
+}
+
+.fl-todo-priority[data-priority="P1"] { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.1); }
+.fl-todo-priority[data-priority="P2"] { color: var(--flomo-blue-strong); background: var(--flomo-blue-soft); }
+.fl-todo-priority[data-priority="P3"] { color: var(--flomo-text-soft); background: var(--flomo-input-bg); }
+
+.fl-todo-due {
+  flex: none;
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--flomo-text-soft);
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--flomo-input-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-todo-due[data-state="near"] { color: #b06a00; background: #fdf1dd; }
+.fl-todo-due[data-state="overdue"] { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.1); }
+
+.fl-todo-item[data-done="true"] .fl-todo-due { display: none; }
+
+.fl-todo-actions {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.fl-todo-item:hover .fl-todo-actions,
+.fl-quad-item:hover .fl-todo-actions,
+.fl-todo-actions:focus-within { opacity: 1; }
+
+.fl-todo-act {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--flomo-text-soft);
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.fl-todo-act:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+.fl-todo-act[aria-pressed="true"] { color: var(--flomo-green); }
+
+/* The detail card sits inside the row, indented to the title's left edge. */
+.fl-todo-detail {
+  margin: 6px 0 6px 26px;
+  padding: 10px 12px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius);
+  background: var(--flomo-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fl-todo-detail-fields {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.fl-todo-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fl-todo-field-label {
+  font-size: 12px;
+  color: var(--flomo-text-soft);
+}
+
+.fl-todo-detail-fields select,
+.fl-todo-detail-fields input[type="date"] {
+  font: inherit;
+  font-size: 13px;
+  color: var(--flomo-text);
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius-sm);
+  background: var(--flomo-bg);
+  padding: 4px 6px;
+  outline: 0;
+}
+
+.fl-todo-detail-fields select:focus,
+.fl-todo-detail-fields input[type="date"]:focus { border-color: var(--flomo-green); }
+
+.fl-todo-notes { display: flex; flex-direction: column; gap: 4px; }
+
+.fl-todo-notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fl-todo-notes-toggle {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--flomo-blue-strong);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.fl-todo-notes-toggle:hover { background: var(--flomo-hover); }
+
+.fl-todo-notes-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 58px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius-sm);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--flomo-text);
+  background: var(--flomo-bg);
+  padding: 7px 9px;
+  outline: 0;
+}
+
+.fl-todo-notes-input:focus { border-color: var(--flomo-green); }
+
+/* The rendered description reuses the memo body's classes at a smaller size. */
+.fl-todo-notes-body {
+  font-size: 13.5px;
+  border: 1px solid var(--flomo-border);
+  border-radius: var(--flomo-radius-sm);
+  padding: 8px 10px;
+  background: var(--flomo-bg-sunken);
+}
+
+.fl-todo-notes-empty { color: var(--flomo-text-faint); font-size: 13px; }
+
+.fl-todo-subadd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px dashed var(--flomo-border-strong);
+  border-radius: var(--flomo-radius-sm);
+}
+
+.fl-todo-subadd input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--flomo-text);
+  outline: 0;
+  padding: 0;
+}
+
+.fl-todo-subadd input::placeholder { color: var(--flomo-text-faint); }
+
+.fl-todo-detail-close {
+  align-self: flex-end;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--flomo-text-faint);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.fl-todo-detail-close:hover { color: var(--flomo-text); background: var(--flomo-hover); }
+
+/* The 列表/四象限 switch: quiet text tabs, the active one inked. */
+.fl-todo-modes {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--flomo-input-bg);
+  align-self: flex-start;
+}
+
+.fl-todo-modes button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--flomo-text-soft);
+  padding: 4px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.fl-todo-modes button[data-active="true"] {
+  background: var(--flomo-bg);
+  color: var(--flomo-text);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* The Eisenhower grid: two columns that collapse to one on a narrow screen. */
+.fl-quadrants {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .fl-quadrants { grid-template-columns: 1fr; }
+}
+
+.fl-quad {
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius);
+  padding: 10px 12px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fl-quad[data-quad="do"] { border-color: rgba(208, 48, 80, 0.35); }
+.fl-quad[data-quad="plan"] { border-color: rgba(74, 125, 240, 0.35); }
+.fl-quad[data-quad="delegate"] { border-color: rgba(176, 106, 0, 0.35); }
+
+.fl-quad-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.fl-quad-title { font-size: 13.5px; font-weight: 600; }
+
+.fl-quad-hint { font-size: 11.5px; color: var(--flomo-text-faint); }
+
+.fl-quad-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--flomo-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-quad-empty { font-size: 12.5px; color: var(--flomo-text-faint); padding: 4px 0; }
+
+.fl-quad-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fl-quad-item {
+  padding: 2px;
+  border-radius: var(--flomo-radius-sm);
+}
+
+.fl-quad-item:hover { background: var(--flomo-hover); }
+
+.fl-quad-parent { color: var(--flomo-text-faint); font-size: 12.5px; }
 
 /* ── heatmap ─────────────────────────────────────────────────────────── */
 
@@ -1499,6 +1806,115 @@ button.fl-heatmap-cell:hover { filter: brightness(0.9); }
 }
 
 .fl-modal-close:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+
+/* ── table grid editor ──────────────────────────────────────────────────── */
+
+/* The table dialog is sized to its grid, not to the stats board the shared
+   modal classes were drawn for. */
+.fl-table-modal {
+  width: min(640px, 100%);
+  padding: 16px 16px 14px;
+}
+
+.fl-table-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.fl-table-grid th,
+.fl-table-grid td {
+  border: 1px solid var(--flomo-border-strong);
+  padding: 0;
+  vertical-align: top;
+}
+
+.fl-table-grid thead th { background: var(--flomo-bg-sunken); }
+
+.fl-table-cell {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: inherit;
+  padding: 8px 9px;
+  outline: 0;
+}
+
+/* The focused cell lights up inside its own borders; a heavy caret ring would
+   fight the grid lines already around it. */
+.fl-table-cell:focus { background: var(--flomo-green-soft); }
+
+.fl-table-coltools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 0 3px 3px 5px;
+}
+
+.fl-table-coltools select {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--flomo-text-soft);
+  outline: 0;
+  cursor: pointer;
+  max-width: 56px;
+}
+
+.fl-table-x {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--flomo-text-faint);
+  padding: 2px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.fl-table-x:hover { background: var(--flomo-hover); color: var(--flomo-danger); }
+.fl-table-x:disabled { opacity: 0.35; cursor: default; }
+.fl-table-x:disabled:hover { background: transparent; color: var(--flomo-text-faint); }
+
+/* The right-hand gutter column holds nothing but per-row delete buttons. */
+.fl-table-gutter {
+  width: 30px;
+  text-align: center;
+}
+
+.fl-table-gutter .fl-table-x { padding: 8px 6px; }
+
+.fl-table-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.fl-table-adds { display: flex; gap: 6px; }
+
+.fl-table-add {
+  border: 1px dashed var(--flomo-border-strong);
+  border-radius: var(--flomo-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--flomo-text-soft);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.fl-table-add:hover { border-color: var(--flomo-green); color: var(--flomo-green); background: var(--flomo-green-soft); }
+
+.fl-table-actions { display: flex; gap: 8px; }
 
 /* The 月/年 pill: a quiet grey track with the active side lifted onto white. */
 .fl-seg {

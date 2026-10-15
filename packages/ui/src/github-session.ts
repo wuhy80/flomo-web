@@ -22,7 +22,7 @@ import {
   tagStats,
   WrongPasswordError,
 } from '@flomo/core'
-import type { CacheArea, Memo, TagStat, TextStore, Todo } from '@flomo/core'
+import type { CacheArea, Memo, TagStat, TextStore, Todo, TodoPatch } from '@flomo/core'
 
 import { clearTrust, loadTrust, saveTrust } from './device-trust.ts'
 import { describeError } from './session.ts'
@@ -295,8 +295,13 @@ export class GitHubVaultSession implements FlomoSession {
   }
 
   /** {@inheritDoc FlomoSession.addTodo} */
-  addTodo(content: string): void {
-    this.mutate((vault) => vault.addTodo(content))
+  addTodo(content: string, parentId?: string | null): void {
+    this.mutate((vault) => vault.addTodo(content, parentId ?? null))
+  }
+
+  /** {@inheritDoc FlomoSession.updateTodo} */
+  updateTodo(id: string, patch: TodoPatch): void {
+    this.mutate((vault) => vault.updateTodo(id, patch))
   }
 
   /** {@inheritDoc FlomoSession.editTodo} */

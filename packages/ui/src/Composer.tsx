@@ -18,6 +18,7 @@ import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react'
 
 import { FormatToolsBar } from './FormatTools.tsx'
 import { continueListOnEnter, createFormatTools } from './format-tools.ts'
+import { TableEditor, useTableTool } from './TableEditor.tsx'
 
 import { dayOf, memoFragmentAtCaret, suggestTags, tagFragmentAtCaret } from '@flomo/core'
 import type { Memo, TagFragment, TagStat } from '@flomo/core'
@@ -285,6 +286,7 @@ export function Composer({
     [syncFragment, resize],
   )
   const tools = useMemo(() => createFormatTools(() => textarea.current, commitValue), [commitValue])
+  const tableTool = useTableTool(() => textarea.current, commitValue)
 
   const submit = useCallback(async () => {
     const text = value.trim()
@@ -505,6 +507,7 @@ export function Composer({
       <div className="fl-composer-bar">
         <FormatToolsBar
           tools={tools}
+          table={{ onClick: tableTool.openTable }}
           imageSlot={
             <button
               type="button"
@@ -558,6 +561,15 @@ export function Composer({
           </button>
         </div>
       </div>
+
+      {tableTool.dialog !== null ? (
+        <TableEditor
+          draft={tableTool.dialog.draft}
+          replacing={tableTool.dialog.range !== null}
+          onApply={tableTool.applyTable}
+          onClose={tableTool.closeTable}
+        />
+      ) : null}
     </div>
   )
 }

@@ -14,7 +14,7 @@
  * @module @flomo/ui/session
  */
 
-import type { Memo, TagStat, Todo } from '@flomo/core'
+import type { Memo, TagStat, Todo, TodoPatch } from '@flomo/core'
 
 /** Where the session currently is in its lifecycle. */
 export type SessionStatus =
@@ -136,8 +136,10 @@ export interface FlomoSession {
    * say so rather than stub five throwing functions. Views check for the
    * methods and show a pointer to the web app in their absence.
    */
-  addTodo?(content: string): void
-  /** Replace a task's text. */
+  addTodo?(content: string, parentId?: string | null): void
+  /** Rewrite a task's detail fields; null clears one. */
+  updateTodo?(id: string, patch: TodoPatch): void
+  /** Replace a task's title. */
   editTodo?(id: string, content: string): void
   /** Complete or reopen a task; omitted toggles. */
   toggleTodo?(id: string, done?: boolean): void

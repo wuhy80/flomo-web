@@ -58,23 +58,51 @@ export interface Shard {
   updatedAt: string
 }
 
+/** A task's priority. P1 is the hottest; absent means the task carries none. */
+export type TodoPriority = 'P1' | 'P2' | 'P3'
+
 /**
- * One entry of the standalone TODO list.
+ * One entry of the standalone TODO list — a task that may carry subtasks.
  *
  * Todos deliberately share nothing with {@link Memo}: no tags, no shards, no
  * feed. They live in their own encrypted document so the checklist stays a
  * checklist, and completion is carried by `completedAt` rather than a boolean —
  * the field's presence *is* the done state, the same trick `pinned` uses.
+ *
+ * A task is a tree node: `children` nests subtasks to any depth, each with the
+ * same shape. The detail fields are all optional so a checklist raised on the
+ * older flat format reads back without any migration — a bare id/content/createdAt
+ * entry is still a complete task.
  */
 export interface Todo {
   /** Stable unique id, minted client-side. */
   id: string
-  /** The task text, plain — no tag or link syntax is parsed out of it. */
+  /** The task title, plain — no tag or link syntax is parsed out of it. */
   content: string
+  /** The task description, markdown rendered like a memo body. */
+  notes?: string
+  /** How hot the task is; absent when the user has not ranked it. */
+  priority?: TodoPriority
+  /** The desired end date, `YYYY-MM-DD`. */
+  due?: string
+  /** Subtasks, in display order; a task with none omits the field. */
+  children?: Todo[]
   /** ISO-8601 creation timestamp. */
   createdAt: string
   /** ISO-8601 completion timestamp; absent while the task is open. */
   completedAt?: string
+}
+
+/**
+ * The fields an edit may rewrite. Identity and timestamps are not editable;
+ * `undefined` leaves a field untouched, `null` clears it — a patch that only
+ * ever set values could never un-set a description or a date.
+ */
+export type TodoPatch = {
+  content?: string
+  notes?: string | null
+  priority?: TodoPriority | null
+  due?: string | null
 }
 
 /** A memo plus the bookkeeping needed to know which shard owns it. */

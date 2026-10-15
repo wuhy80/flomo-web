@@ -13,6 +13,7 @@ import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { FormatToolsBar } from './FormatTools.tsx'
 import { continueListOnEnter, createFormatTools, flipTaskLine } from './format-tools.ts'
+import { TableEditor, useTableTool } from './TableEditor.tsx'
 
 import { clockOf, dayOf } from '@flomo/core'
 import type { Memo } from '@flomo/core'
@@ -156,19 +157,14 @@ export function MemoItem({
 
   // The editor shares the capture box's toolbar: same transforms, bound to the
   // edit textarea, with the draft as the value they rewrite.
-  const tools = useMemo(
-    () =>
-      createFormatTools(
-        () => editArea.current,
-        (next, caret) => {
-          setDraft(next)
-          requestAnimationFrame(() => {
-            editArea.current?.setSelectionRange(caret, caret)
-          })
-        },
-      ),
-    [],
-  )
+  const commitDraft = useCallback((next: string, caret: number) => {
+    setDraft(next)
+    requestAnimationFrame(() => {
+      editArea.current?.setSelectionRange(caret, caret)
+    })
+  }, [])
+  const tools = useMemo(() => createFormatTools(() => editArea.current, commitDraft), [commitDraft])
+  const tableTool = useTableTool(() => editArea.current, commitDraft)
 
   const beginEdit = useCallback(() => {
     setDraft(memo.content)
@@ -250,7 +246,7 @@ export function MemoItem({
             aria-label="编辑 MEMO"
           />
           <div className="fl-memo-edit-bar">
-            <FormatToolsBar tools={tools} />
+            <FormatToolsBar tools={tools} table={{ onClick: tableTool.openTable }} />
             <span className="fl-edit-count" aria-hidden="true">
               {draft.length} 字
             </span>
@@ -268,6 +264,14 @@ export function MemoItem({
             </span>
           </div>
         </div>
+        {tableTool.dialog !== null ? (
+          <TableEditor
+            draft={tableTool.dialog.draft}
+            replacing={tableTool.dialog.range !== null}
+            onApply={tableTool.applyTable}
+            onClose={tableTool.closeTable}
+          />
+        ) : null}
       </article>
     )
   }
