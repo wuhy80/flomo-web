@@ -1,4 +1,7 @@
 # flomo-sim
+[![部署状态](https://github.com/wuhy80/flomo-web/actions/workflows/deploy.yml/badge.svg)](https://github.com/wuhy80/flomo-web/actions/workflows/deploy.yml)
+[![在线访问](https://img.shields.io/badge/%E5%9C%A8%E7%BA%BF%E8%AE%BF%E9%97%AE-wuhy80.github.io-2ea44f?logo=github&logoColor=white)](https://wuhy80.github.io/flomo-web/)
+[![端到端加密](https://img.shields.io/badge/%E7%AB%AF%E5%88%B0%E7%AB%AF%E5%8A%A0%E5%AF%86-AES--256--GCM-0969da?logo=lock&logoColor=white)](https://github.com/wuhy80/flomo-web#readme)
 
 一个参考 [flomo](https://flomoapp.com) 的极简笔记应用：**数据端到端加密后存在你自己的 GitHub 私有仓库**，既能当静态网站用，也能作为 DeepSeek Harness 的侧边栏面板直接查看和记录。
 
@@ -152,6 +155,31 @@ GitHub Pages 是纯静态托管，**没有服务端，因此做不了真正的�
   但那正是重点：**每次猜测都要跑满 60 万次 PBKDF2**，攻击者付的代价和你一样；
   而一个裸的 SHA-256 哈希会便宜好几个数量级。所以这里没有"额外的"廉价 oracle 可打
 
+### 「用 GitHub 登录」登录的是什么
+
+站点支持用 GitHub 账号登录，**但它登录的是「存储」，不是「笔记」**：
+
+```
+GitHub 登录 ──▶ 拿到 token ──▶ 能读写那个私有仓库（里面全是密文）
+                                   │
+你仍然要输密码 ──▶ 派生密钥 ──▶ 才看得到明文
+```
+
+两件事互相独立。登录省掉的是**粘贴 PAT**；它既不能解密，也不改变加密模型。
+即使登录中转被攻陷，攻击者拿到的仍然是密文。
+
+它需要一个小中转（Cloudflare Worker，免费额度足够），因为 GitHub 的
+授权码换令牌接口**不支持 CORS**，纯静态页面发不出那个请求 —— 详见
+[relay/README.md](relay/README.md)。**不配置中转时，站点行为和以前完全一样**：
+手动填 PAT。
+
+> ⚠️ 代价要说清楚：OAuth App 的权限是 `repo`，即**该账号所有私有仓库**的读写，
+> 比原来只限 `flomo-data` 的细粒度 PAT 大一圈。想保持最小权限，就继续用手动 PAT。
+
+「只允许 wuhy80」是在**中转里**执行的，而且是先验证、后返回：token 只有在
+GitHub 确认它属于该账号之后才会被写进响应。放在前端做没有意义 —— token 一旦
+出现在响应体里，它就已经在浏览器里了。
+
 ### 安全性质
 
 > **PAT 泄露 ≠ 笔记泄露。**
@@ -278,6 +306,10 @@ push 到 `main` 会自动重新构建发布，也可以随时手动 Run workflow
 访问你的站点，首次会看到连接表单：
 
 ![首次打开：连接你的数据仓库](docs/guide-01-setup.png)
+
+> **如果你的站点配置了 OAuth 中转**，这里首先出现的是「**用 GitHub 登录**」按钮 ——
+> 点一下授权即可，不用手填下面这些。配置方法见 [relay/README.md](relay/README.md)。
+> 没有配置中转（或者想用最小权限的 PAT）时，点「改用手动令牌」回到下面的流程。
 
 | 字段 | 填什么 |
 |---|---|
@@ -408,7 +440,7 @@ plugin_manager install_bundle  target = link:D:\code\flomo-sim\packages\dsh-plug
 | `pnpm build:plugin` | 构建 DSH 插件两半 |
 | `pnpm watch:plugin` | 监听模式重建插件 |
 | `pnpm mcp` | 启动 MCP 服务器（stdio，凭据走环境变量，见 [packages/mcp](packages/mcp/README.md)） |
-| `pnpm test` | 跑 core / ui / mcp / 插件 / web 的测试 |
+| `pnpm test` | 跑 core / ui / mcp / 插件 / web / relay 的测试 |
 | `pnpm typecheck` | 全仓类型检查 |
 | `pnpm --filter @flomo/web shots` | 截图（需要 dev server，见上） |
 | `pnpm --filter @flomo/web interact` | 真实浏览器交互检查（需要 dev server，见上） |
@@ -431,6 +463,8 @@ packages/
 │  └─ build.mjs         两半的打包（含模块加载器封装）
 └─ mcp/         MCP 服务器：stdio 上暴露 flomo_add / 查看类工具，
                 任何 MCP 客户端的大模型都能读写同一个加密保险库
+
+relay/          可选的 OAuth 中转（Cloudflare Worker），只为 GitHub 登录而存在
 ```
 
 ### 一个刻意的设计
