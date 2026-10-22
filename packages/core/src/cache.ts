@@ -227,6 +227,27 @@ export class CachingTextStore implements TextStore {
   }
 
   /**
+   * Delete a file, evicting its cached copies on the way out.
+   *
+   * Deleting is how re-initialization moves the previous vault's shards aside.
+   * The cache has to follow: a stale entry would otherwise let an offline client
+   * keep reading a file that no longer exists upstream.
+   * @param path - repository path.
+   * @param options - the blob sha being deleted, and the commit message.
+   */
+  async deleteText(path: string, options: { sha: string; message: string }): Promise<void> {
+    if (this.inner.deleteText === undefined) {
+      throw new Error('该存储不支持删除文件。')
+    }
+    await this.inner.deleteText(path, options)
+    this.forget(this.fileKey(path))
+    // The parent directory listing now names a file that is gone.
+    const slash = path.lastIndexOf('/')
+    if (slash > 0) this.forget(this.dirKey(path.slice(0, slash)))
+    this.setOffline(false)
+  }
+
+  /**
    * Media passes straight through, never cached: the ciphertext of a photo is
    * far past what `localStorage` can hold, and an `CachingTextStore` that
    * silently dropped images to satisfy a quota would be worse than one that

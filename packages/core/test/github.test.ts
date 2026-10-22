@@ -116,7 +116,8 @@ class FakeGitHub {
     })
 
     if (/^\/repos\/[^/]+\/[^/]+$/.test(url.pathname)) {
-      return json(res, 200, { default_branch: 'trunk', private: true })
+      const owner = url.pathname.split('/')[2]
+      return json(res, 200, { default_branch: 'trunk', private: true, owner: { login: owner } })
     }
 
     const match = /^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/.exec(url.pathname)
@@ -300,11 +301,62 @@ describe('contents client', () => {
     assert.equal((write?.body as { branch?: string }).branch, 'notes')
   })
 
-  it('reads repository metadata for the access check', async () => {
-    assert.deepEqual(await client().verifyAccess(), {
-      defaultBranch: 'trunk',
-      private: true,
+  it('checks repository access at connect time', async () => {
+    const check = await client().verifyAccess()
+    assert.deepEqual(check, { ok: true })
+    const meta = github.requests.find((r) => r.url.endsWith('/repos/me/flomo-data'))
+    assert.ok(meta !== undefined, 'the metadata call happened')
+    assert.ok(!meta.url.includes('ref='), 'no branch ref on the repo endpoint')
+    assert.equal(meta.auth, 'Bearer ghp_secret')
+  })
+
+  it('explains a bad token instead of throwing it at the user', async () => {
+    const failing = client({
+      fetchImpl: (async () =>
+        new Response(JSON.stringify({ message: 'Bad credentials' }), {
+          status: 401,
+        })) as unknown as typeof fetch,
     })
+    const check = await failing.verifyAccess()
+    assert.equal(check.ok, false)
+    assert.equal(check.reason, 'bad-token')
+    assert.match(check.message ?? '', /重新生成/)
+  })
+
+  it('tells a missing repository from a bad token', async () => {
+    const failing = client({
+      fetchImpl: (async () =>
+        new Response(JSON.stringify({ message: 'Not Found' }), {
+          status: 404,
+        })) as unknown as typeof fetch,
+    })
+    const check = await failing.verifyAccess()
+    assert.equal(check.ok, false)
+    assert.equal(check.reason, 'no-repo')
+  })
+
+  it('refuses a repository that belongs to somebody else', async () => {
+    const impostor = client({
+      fetchImpl: (async () =>
+        new Response(JSON.stringify({ owner: { login: 'someone-else' } }), {
+          status: 200,
+        })) as unknown as typeof fetch,
+    })
+    const check = await impostor.verifyAccess()
+    assert.equal(check.ok, false)
+    assert.equal(check.reason, 'owner-mismatch')
+    assert.match(check.message ?? '', /someone-else/)
+  })
+
+  it('reports an unreachable GitHub as a network problem', async () => {
+    const offline = client({
+      fetchImpl: (async () => {
+        throw new TypeError('fetch failed')
+      }) as unknown as typeof fetch,
+    })
+    const check = await offline.verifyAccess()
+    assert.equal(check.ok, false)
+    assert.equal(check.reason, 'network')
   })
 
   it('surfaces the API message rather than only the status', async () => {

@@ -47,7 +47,7 @@ import { useShortcuts } from './shortcuts.ts'
 import type { ShortcutAction } from './shortcuts.ts'
 import { showsComposer, sameView, viewTitle, diaryTagOf } from './views.ts'
 import type { FlomoView } from './views.ts'
-import type { FlomoSession } from './session.ts'
+import type { FlomoSession, UnlockOptions } from './session.ts'
 
 export interface FlomoAppProps {
   /** The data backend. */
@@ -400,6 +400,10 @@ export function FlomoApp({
   }
 
   if (snapshot.status !== 'unlocked') {
+    // The reset path is offered only when the backend can actually rewrite its
+    // vault; a host whose protocol cannot would otherwise promise a button that
+    // fails after the user has committed to it.
+    const reinitialize = session.reinitialize?.bind(session)
     return (
       <UnlockGate
         hasVault={snapshot.status !== 'empty'}
@@ -411,6 +415,9 @@ export function FlomoApp({
         onUnlock={(password, options) => void session.unlock(password, options)}
         onUnlockWithRecovery={(code, options) => void session.unlockWithRecovery(code, options)}
         onDismissRecovery={() => session.dismissRecovery()}
+        {...(reinitialize === undefined
+          ? {}
+          : { onReinitialize: (password: string, options: UnlockOptions) => void reinitialize(password, options) })}
       />
     )
   }

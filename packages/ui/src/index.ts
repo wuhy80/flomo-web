@@ -57,6 +57,9 @@ export { FLOMO_CSS, STYLE_ELEMENT_ID, injectFlomoStyles } from './styles.ts'
 export { UnlockGate } from './UnlockGate.tsx'
 export type { UnlockGateProps } from './UnlockGate.tsx'
 
+export { MIN_PASSWORD_LENGTH, canSubmitUnlock, checkNewPassword } from './password-policy.ts'
+export type { PasswordRule, PasswordVerdict } from './password-policy.ts'
+
 export { useFlomoSession } from './useFlomoSession.ts'
 
 export { describeError } from './session.ts'

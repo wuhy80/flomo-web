@@ -241,6 +241,34 @@ export class GitHubVaultSession implements FlomoSession {
     }
   }
 
+  /** {@inheritDoc FlomoSession.resetLocal} */
+  resetLocal(): void {
+    clearTrust()
+    this.caching?.clear()
+  }
+
+  /** {@inheritDoc FlomoSession.reinitialize} */
+  async reinitialize(password: string, options?: UnlockOptions): Promise<void> {
+    this.update({ status: 'unlocking', error: null })
+    try {
+      // Local state first: a trusted key from the previous vault must not
+      // outlive it, or the next refresh would try to open the new vault with
+      // the old key and quietly fall back to the password form anyway.
+      this.resetLocal()
+      const { vault, recoveryCode } = await FlomoVault.reinitialize(this.store, password)
+      // A brand-new vault, so nothing is expected to load; the previous shards
+      // have been moved into the backup directory, which is why this does not
+      // throw on ciphertext it cannot decrypt.
+      await vault.loadAll()
+      if (options?.remember) saveTrust(vault.rawKeyBase64)
+      this.vault = vault
+      this.syncFromVault({ status: 'unlocked', error: null, recoveryCode })
+    } catch (error) {
+      this.vault = null
+      this.update({ status: 'locked', error: `重新初始化失败：${describeError(error)}` })
+    }
+  }
+
   /** {@inheritDoc FlomoSession.dismissRecovery} */
   dismissRecovery(): void {
     this.update({ recoveryCode: null })

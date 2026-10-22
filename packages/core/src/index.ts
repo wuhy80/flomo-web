@@ -50,6 +50,7 @@ export type {
   GitHubContentsOptions,
   GitHubDirEntry,
   GitHubFile,
+  RepoAccessCheck,
 } from './github.ts'
 
 export {
@@ -151,7 +152,7 @@ export {
   VaultHeaderError,
   WrongPasswordError,
 } from './vault.ts'
-export type { CreatedVault, TextStore } from './vault.ts'
+export type { CreatedVault, ReinitializedVault, TextStore } from './vault.ts'
 
 export type {
   Memo,

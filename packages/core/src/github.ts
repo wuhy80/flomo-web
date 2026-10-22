@@ -69,6 +69,16 @@ export interface GitHubBlob {
   sha: string
 }
 
+/** The outcome of a connect-time token check. */
+export interface RepoAccessCheck {
+  /** Whether the token may read this repository. */
+  ok: boolean
+  /** Why the check failed, in the categories the connect form can explain. */
+  reason?: 'bad-token' | 'no-repo' | 'owner-mismatch' | 'http' | 'network'
+  /** The explanation, ready to show under the form. */
+  message?: string
+}
+
 /** Connection settings for one repository. */
 export interface GitHubContentsOptions {
   /** Fine-grained PAT. */
@@ -208,6 +218,73 @@ export class GitHubContentsStore {
   }
 
   /**
+   * Connect-time check: one metadata read of the repository, so a wrong or
+   * expired token is refused at the connect form instead of haunting the user
+   * at unlock with a `Bad credentials` that looks like a password problem.
+   *
+   * The metadata endpoint is the one call every fine-grained token can make
+   * against its selected repositories (Metadata: read is built in), so this
+   * works with the minimal Contents-only token the connect form asks for.
+   *
+   * The response's repository owner is compared against the configured owner,
+   * which ties the authorization to one account: a token from anybody else —
+   * or a repository that is not theirs — fails the check.
+   * @returns whether the token may read this repository, and why not.
+   */
+  async verifyAccess(): Promise<RepoAccessCheck> {
+    let response: Response
+    try {
+      // The repo endpoint takes no ref: build the URL directly rather than
+      // through url(), which appends the branch.
+      response = await this.doFetch(`${this.apiBase}/repos/${this.owner}/${this.repo}`, {
+        headers: this.headers(),
+      })
+    } catch {
+      return {
+        ok: false,
+        reason: 'network',
+        message: '无法连接 GitHub，请检查网络后重试。',
+      }
+    }
+    if (response.ok) {
+      let owner: string | undefined
+      try {
+        const body = (await response.json()) as { owner?: { login?: string } }
+        owner = body.owner?.login
+      } catch {
+        /* body was not JSON; the ownership check simply skips */
+      }
+      if (owner !== undefined && owner.toLowerCase() !== this.owner.toLowerCase()) {
+        return {
+          ok: false,
+          reason: 'owner-mismatch',
+          message: `这个仓库属于 ${owner}，不属于 ${this.owner}，请检查 GitHub 用户名与仓库名。`,
+        }
+      }
+      return { ok: true }
+    }
+    if (response.status === 401) {
+      return {
+        ok: false,
+        reason: 'bad-token',
+        message: '令牌无效或已过期，请在 GitHub 重新生成后填入。',
+      }
+    }
+    if (response.status === 404) {
+      return {
+        ok: false,
+        reason: 'no-repo',
+        message: '仓库不存在，或令牌没有访问这个仓库的权限。',
+      }
+    }
+    return {
+      ok: false,
+      reason: 'http',
+      message: `GitHub 校验失败（HTTP ${response.status}）：${await this.describe(response)}`,
+    }
+  }
+
+  /**
    * Read a file's text and blob sha.
    * @param path - repository path, e.g. `vault.json`.
    * @returns the file, or `null` when it does not exist yet.
@@ -275,6 +352,37 @@ export class GitHubContentsStore {
     const sha = body.content?.sha
     if (!sha) throw new GitHubError('写入成功但响应缺少 sha。', response.status, path)
     return sha
+  }
+
+  /**
+   * Delete a file.
+   *
+   * Only {@link FlomoVault.reinitialize} needs this: it moves the previous
+   * vault's shards aside by copying them to a backup directory and deleting the
+   * originals. The `sha` is required by the Contents API and is also what makes
+   * the delete refuse to remove a file another device changed meanwhile.
+   * @param path - repository path.
+   * @param options - the blob sha being deleted, and the commit message.
+   * @throws {GitHubConflictError} when the file changed under us.
+   * @throws {GitHubError} on any other failure.
+   */
+  async deleteText(path: string, options: { sha: string; message: string }): Promise<void> {
+    const payload: Record<string, unknown> = {
+      message: options.message,
+      sha: options.sha,
+    }
+    if (this.branch) payload.branch = this.branch
+
+    const response = await this.doFetch(
+      `${this.apiBase}/repos/${this.owner}/${this.repo}/contents/${path}`,
+      { method: 'DELETE', headers: this.headers(), body: JSON.stringify(payload) },
+    )
+    if (response.status === 409 || response.status === 422) {
+      throw new GitHubConflictError('删除冲突：远端文件已被其他设备修改。', response.status, path)
+    }
+    if (!response.ok) {
+      throw new GitHubError(await this.describe(response), response.status, path)
+    }
   }
 
   /**
@@ -363,24 +471,6 @@ export class GitHubContentsStore {
     })
   }
 
-  /**
-   * Confirm the token can actually reach this repository.
-   * @returns the repository's default branch and whether it is private.
-   */
-  async verifyAccess(): Promise<{ defaultBranch: string; private: boolean }> {
-    const response = await this.doFetch(
-      `${this.apiBase}/repos/${this.owner}/${this.repo}`,
-      { headers: this.headers() },
-    )
-    if (!response.ok) {
-      throw new GitHubError(await this.describe(response), response.status, this.slug)
-    }
-    const body = (await response.json()) as { default_branch?: string; private?: boolean }
-    return {
-      defaultBranch: body.default_branch ?? 'main',
-      private: body.private === true,
-    }
-  }
 }
 
 /** How to create a repository. */

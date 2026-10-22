@@ -1,0 +1,28 @@
+# Deployment settings for the flomo OAuth relay.
+#
+# Publish it with, from this directory:
+#
+#   wrangler deploy
+#
+# The two credentials are *secrets* and are never written here — a client secret
+# in a repository is a client secret that has to be rotated:
+#
+#   wrangler secret put GITHUB_CLIENT_ID
+#   wrangler secret put GITHUB_CLIENT_SECRET
+#
+# Both values come from the OAuth App you create at
+# https://github.com/settings/applications/new — see README.md in this
+# directory for the exact settings.
+
+name = "flomo-oauth-relay"
+main = "src/worker.ts"
+compatibility_date = "2026-10-19"
+
+[vars]
+# The exact origin allowed to call this relay. Must match the site, with no
+# trailing slash and no wildcard: it is compared as a whole string.
+ALLOWED_ORIGIN = "https://wuhy80.github.io"
+
+# The only GitHub account this relay will hand a token to. Anyone else who
+# completes the OAuth dance is told which account they used and gets nothing.
+ALLOWED_LOGIN = "wuhy80"

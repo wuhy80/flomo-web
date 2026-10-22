@@ -229,6 +229,18 @@ class FakeGitHub {
       return json({ content: { sha, path } })
     }
 
+    if (method === 'DELETE') {
+      const body = JSON.parse(String(init?.body)) as { sha?: string }
+      const current = this.shas.get(path)
+      if (body.sha !== undefined && current !== undefined && body.sha !== current) {
+        return new Response('conflict', { status: 409 })
+      }
+      this.files.delete(path)
+      this.shas.delete(path)
+      this.writes.push(`DELETE ${path}`)
+      return json({ commit: { message: 'deleted' } })
+    }
+
     return new Response('method not allowed', { status: 405 })
   }
 }
@@ -649,5 +661,76 @@ describe('device trust', () => {
 
     assert.equal(reopened.getSnapshot().status, 'locked', 'a foreign key does not open the vault')
     assert.equal(loadTrust(), null, 'and it was cleared rather than retried forever')
+  })
+})
+
+describe('re-initializing through the session', () => {
+  /**
+   * Install a `localStorage` stand-in for this block.
+   *
+   * The device-trust suite has its own copy scoped to that describe; this block
+   * needs the same thing but must not depend on a helper declared there.
+   * @returns the backing map, for assertions.
+   */
+  function stubStorage(): Map<string, string> {
+    const backing = new Map<string, string>()
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      writable: true,
+      value: {
+        getItem: (key: string) => backing.get(key) ?? null,
+        setItem: (key: string, value: string) => void backing.set(key, value),
+        removeItem: (key: string) => void backing.delete(key),
+      },
+    })
+    return backing
+  }
+
+  it('archives the old shard, keeps the repository usable, and surfaces the new recovery code', async () => {
+    stubStorage()
+    const api = new FakeGitHub()
+    globalThis.fetch = api.fetch as unknown as typeof fetch
+    const area = new MemoryCacheArea()
+
+    const session = new GitHubVaultSession({
+      owner: 'me',
+      repo: 'flomo-data',
+      token: 'ghp_x',
+      autoSaveMs: 60_000,
+      // The cache is the point: it wraps the store, and a delete that did not
+      // reach through it would leave re-initialization unable to move anything.
+      cache: area,
+    })
+    liveSessions.push(session)
+
+    await session.create('old password 123', { remember: true })
+    assert.ok(loadTrust(), 'the first vault remembered its key')
+    session.add('旧笔记 #before')
+    await session.save()
+
+    await session.reinitialize('new password 456', { remember: false })
+
+    const snapshot = session.getSnapshot()
+    assert.equal(snapshot.status, 'unlocked')
+    assert.equal(snapshot.memos.length, 0, 'the new vault starts empty')
+    assert.ok(snapshot.recoveryCode, 'the new recovery code is shown once')
+    assert.equal(loadTrust(), null, 'the old trusted key was dropped')
+
+    // The previous ciphertext is still in the repository, under a backup dir.
+    const archived = [...api.files.keys()].filter((path) => path.startsWith('data/bak-'))
+    assert.ok(archived.length >= 1, 'the old shard was archived, not deleted outright')
+    const liveShards = [...api.files.keys()].filter((path) =>
+      /^data\/(?!bak-)\d{4}-\d{2}\.json$/.test(path),
+    )
+    assert.deepEqual(liveShards, [], 'and it is no longer on the live path')
+
+    // The vault really is a new one: the old password no longer opens it.
+    await session.refresh()
+    assert.equal(session.getSnapshot().status, 'locked')
+    await session.unlock('old password 123')
+    assert.equal(session.getSnapshot().status, 'locked', 'the old password is refused')
+
+    await session.unlock('new password 456')
+    assert.equal(session.getSnapshot().status, 'unlocked', 'the new password works')
   })
 })

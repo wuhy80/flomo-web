@@ -1117,6 +1117,38 @@ del { color: var(--flomo-text-faint); }
 
 .fl-gate-switch:hover { color: var(--flomo-green); }
 
+/* The live password checklist: quiet by default, green once satisfied. */
+.fl-gate-rules {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--flomo-text-soft);
+}
+
+.fl-gate-rules li[data-ok='true'] { color: var(--flomo-green); }
+
+/* A destructive explanation, not an error: the user has not done anything wrong yet. */
+.fl-gate-warning {
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  border-radius: var(--flomo-radius-sm);
+  background: #fff8e8;
+  color: #8a5a00;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.fl-gate-submit-danger {
+  border-color: transparent;
+  background: var(--flomo-danger);
+  color: #fff;
+}
+
+.fl-gate-submit-danger:hover:not(:disabled) { background: #b4405c; }
+
+
 .fl-recovery {
   margin-top: 18px;
   padding: 14px;

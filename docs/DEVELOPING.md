@@ -198,6 +198,76 @@ DSH 自己的 `defineTool` **还会展开 `{ type: 'json' }` 这个 output 简�
 **但插件自己注册的路由不需要** —— 它们只要求回环 + 同源标记。这就是插件路由可以被
 `Invoke-WebRequest` 直接检查的原因，也是为什么诊断信息应该放在插件自己的状态路由里。
 
+### 9. 这台机器上有透明加密（DLP），`.ts` / `.js` / `.css` 落盘会被加密
+
+写 `.ts` 文件后，**git 和 harness 的读取工具看到的是密文**（`%TSD-Header-###%`
+开头，长度补齐到 4096 的整数倍），而 `node` / `tsc` 看到的是明文。表现是：
+
+- `read` / `edit` 工具报 `binary file`，`git diff` 显示 `Bin 14878 -> 24576 bytes`
+- 但 `pnpm typecheck`、`pnpm test`、`pnpm build` 全都正常
+
+**按扩展名，不是按路径**（实测）：
+
+| 会被加密 | 不会 |
+|---|---|
+| `.ts` `.js` `.css` | `.tsx` `.mjs` `.json` `.md` `.yml` `.txt` `.png` |
+
+**这会真的毁掉一次提交**：加密的源文件进仓库，CI 和 Pages 上就是乱码。
+
+三条规矩：
+
+1. **源码用文件工具写，不要用 shell 写。** harness 的 `write` / `edit` 落盘是明文
+   （实测 `git hash-object` 与 `dotnet` 哈希一致），而 `[IO.File]::WriteAllBytes`、
+   `Set-Content`、`Out-File` 写出来是密文。
+2. **发现某文件被加密了，别用 shell 修。** 用临时索引 + `git checkout-index`
+   让 git 去写那个文件 —— git 写出来是明文：
+   ```powershell
+   $env:GIT_INDEX_FILE = "$env:TEMP\idx"
+   git read-tree HEAD
+   git update-index --add --cacheinfo "100644,<blob>,<path>"
+   git -c core.autocrlf=false checkout-index -f -- <path>
+   Remove-Item Env:\GIT_INDEX_FILE
+   ```
+3. **提交前自查**：下面这条命令应当输出 `same=True`。不一致就是密文。
+   ```powershell
+   $b=[IO.File]::ReadAllBytes($f)
+   $h=[Text.Encoding]::ASCII.GetBytes("blob $($b.Length)`0")
+   $d=[BitConverter]::ToString([Security.Cryptography.SHA1]::Create().ComputeHash($h+$b)).Replace('-','').ToLower()
+   $d -eq (git hash-object --no-filters -- $f).Trim()
+   ```
+
+### 10. 这台机器到 github.com 的 HTTPS 被 TLS 层拖慢，SSH 正常
+
+实测（同一时刻、同一台机器）：
+
+| 目标 | TCP 443 | 实际 HTTP / 握手 | 稳定性 |
+|---|---|---|---|
+| `github.com` | 103 ms | **17.9 – 22.7 s** | 稳定地慢 |
+| `git ls-remote`（HTTPS） | — | **2.6 – 23.5 s** | **抖动极大** |
+| `api.github.com` | 1112 ms | **209 ms**（热连接） | 稳定 |
+| `ssh.github.com:443` | — | **2.8 s** 握手完成 | 稳定 |
+| `*.github.io` | — | 6.4 s | — |
+| `*.workers.dev` | DNS → 31.13.64.7（Facebook 的 IP，即污染） | 完全不通 | — |
+
+结论：**TCP 没问题，慢在 HTTPS 的 TLS 握手**。但要注意 **HTTPS 的耗时抖动极大**
+（同一台机器相隔 40 分钟，`git ls-remote` 从 23.5 s 变成 2.6 s），所以**不要把这个
+数字写死在任何地方** —— 要下结论就现测。真正稳定的是 SSH（约 3 s，没有几十秒的尾部）。
+
+绕法不是换线路，而是**换协议**。另外镜像前缀（`ghfast.top` 之类）的 remote 推送失败
+与速度无关：只读镜像本来就不接受 push。
+
+- git 的修法见 `scripts/setup-github-ssh.ps1`：`~/.ssh/config` 里
+  `Host github.com` → `ssh.github.com:443`，再加
+  `git config --global url."git@github.com:".insteadOf "https://github.com/"`。
+  这两条对**所有仓库**生效，不需要逐仓库配置。
+- `api.github.com` 很快，所以**应用运行时不需要任何中转** —— 保险库读写是 200 ms 级。
+- `*.workers.dev` 被污染，意味着 **OAuth 中转不能部署在那里**，得用
+  Pages Functions（`*.pages.dev` 通）或自定义域名。
+
+> 写 `.ps1` 时注意：Windows PowerShell 5.1 把 **UTF-8 无 BOM** 的脚本按 GBK 读，
+> 一个 `—` 就会变成乱码，所以 `setup-github-ssh.ps1` 里**全是 ASCII**。
+> 另外它给原生命令传空参数时用的是 `-N '""'` 而不是 `-N ''` —— 后者会被 5.1 丢掉。
+
 ---
 
 ## 加一个功能：一条走过的路

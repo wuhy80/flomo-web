@@ -94,6 +94,19 @@ export class MemoryStore implements TextStore {
   }
 
   /**
+   * Delete a file, honouring the same optimistic-concurrency contract.
+   * @param path - repository path.
+   * @param options - the blob sha being deleted, and the commit message.
+   */
+  async deleteText(path: string, options: { sha: string; message: string }): Promise<void> {
+    const existing = this.files.get(path)
+    if (!existing || existing.sha !== options.sha) {
+      throw new GitHubConflictError('删除冲突：远端文件已被其他设备修改。', 409, path)
+    }
+    this.files.delete(path)
+  }
+
+  /**
    * List the immediate children of a directory.
    * @param dir - directory path.
    * @returns matching entries.

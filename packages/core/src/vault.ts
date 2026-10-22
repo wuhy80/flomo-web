@@ -70,6 +70,15 @@ export interface TextStore {
     options: { sha?: string; message: string },
   ): Promise<string>
   listDir(dir: string): Promise<GitHubDirEntry[]>
+  /**
+   * Delete a file.
+   *
+   * Optional because it is only needed by {@link FlomoVault.reinitialize}: the
+   * normal lifecycle never removes anything from the repository. A store that
+   * cannot delete simply cannot re-initialize, which the vault reports rather
+   * than half-doing.
+   */
+  deleteText?(path: string, options: { sha: string; message: string }): Promise<void>
   /** Media support. Omitted by simple stores; the vault reads media only when asked. */
   readBlob?(path: string): Promise<{ bytes: Uint8Array; sha: string } | null>
   writeBlob?(path: string, bytes: Uint8Array, options: { sha?: string; message: string }): Promise<string>
@@ -144,6 +153,24 @@ export interface CreatedVault {
   vault: FlomoVault
   /** Base64 of the raw key. Show once; it is the only password-loss escape hatch. */
   recoveryCode: string
+}
+
+/** Result of {@link FlomoVault.reinitialize}. */
+export interface ReinitializedVault extends CreatedVault {
+  /** How many files were moved into {@link ReinitializedVault.archiveDir}. */
+  archived: number
+  /** Repository directory that now holds the previous vault's ciphertext. */
+  archiveDir: string
+}
+
+/**
+ * Name an archive directory so repeated resets never collide and sort in time
+ * order: `20261022-090134` (UTC, second resolution).
+ * @param now - the instant to stamp.
+ * @returns the stamp.
+ */
+function archiveStamp(now: Date): string {
+  return now.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)
 }
 
 /** An unlocked vault bound to one repository. */
@@ -275,6 +302,83 @@ export class FlomoVault {
    */
   static async exists(store: TextStore): Promise<boolean> {
     return (await store.readText(HEADER_FILE)) !== null
+  }
+
+  /**
+   * Replace the repository's vault with a brand-new one.
+   *
+   * This is the escape hatch for a first initialization that went wrong — a
+   * password typed into the wrong field, an IME swallowing a character — where
+   * nobody knows the key any more and there is nothing to lose yet.
+   *
+   * It is deliberately **not** a delete: every existing shard, and `todo.json`,
+   * is first copied into `data/bak-<timestamp>/` and only then removed from its
+   * live path, so the old ciphertext stays in the repository for anyone who
+   * still has the old password or recovery code. The header is replaced last,
+   * with the sha it was read under, so a race with another device surfaces as a
+   * conflict instead of silently clobbering a vault that was just created.
+   * @param store - the backing repository.
+   * @param password - the password for the new vault.
+   * @param iterations - PBKDF2 work factor; override only for tests.
+   * @param now - reference instant for the archive directory name.
+   * @returns the new vault, its recovery code, and what was archived.
+   * @throws {VaultHeaderError} when there is no vault to replace.
+   * @throws when the backing store cannot delete files.
+   */
+  static async reinitialize(
+    store: TextStore,
+    password: string,
+    iterations?: number,
+    now: Date = new Date(),
+  ): Promise<ReinitializedVault> {
+    const file = await store.readText(HEADER_FILE)
+    if (!file) throw new VaultHeaderError('仓库里没有 vault.json，无法重新初始化。')
+    if (store.deleteText === undefined) {
+      throw new Error('当前存储不支持删除文件，无法重新初始化保险库。')
+    }
+
+    const archiveDir = `${DATA_DIR}/bak-${archiveStamp(now)}`
+    const archivedFiles: Array<{ path: string; name: string }> = [{ path: TODO_FILE, name: 'todo.json' }]
+    for (const entry of await store.listDir(DATA_DIR)) {
+      if (/^\d{4}-\d{2}\.json$/.test(entry.name)) {
+        archivedFiles.push({ path: entry.path, name: entry.name })
+      }
+    }
+
+    let archived = 0
+    for (const item of archivedFiles) {
+      const original = await store.readText(item.path)
+      if (!original) continue
+      // Copy first, delete second: at no instant does the ciphertext exist in
+      // neither place, so a failed run leaves something to recover from.
+      await store.writeText(`${archiveDir}/${item.name}`, original.text, {
+        message: `flomo: archive ${item.name}`,
+      })
+      await store.deleteText(item.path, {
+        sha: original.sha,
+        message: `flomo: archive ${item.name} (reinitialize)`,
+      })
+      archived += 1
+    }
+
+    const minted = await createVault(password, iterations)
+    const header: VaultHeader = {
+      v: 1,
+      kdf: minted.params,
+      check: minted.check,
+      createdAt: now.toISOString(),
+    }
+    await store.writeText(HEADER_FILE, `${JSON.stringify(header, null, 2)}\n`, {
+      sha: file.sha,
+      message: 'flomo: reinitialize vault',
+    })
+
+    return {
+      vault: new FlomoVault(store, header, minted.key, minted.raw),
+      recoveryCode: minted.recoveryCode,
+      archived,
+      archiveDir,
+    }
   }
 
   /** @returns the public header, safe to display in a settings panel. */

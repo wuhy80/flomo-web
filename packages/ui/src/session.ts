@@ -83,6 +83,26 @@ export interface FlomoSession {
   unlock(password: string, options?: UnlockOptions): Promise<void>
   /** Open the existing vault with the recovery code. */
   unlockWithRecovery(code: string, options?: UnlockOptions): Promise<void>
+  /**
+   * Replace the vault with a new one under a new password.
+   *
+   * The way out of a vault nobody can open — a first initialization that went in
+   * wrong, a password typed with an IME, a forgotten recovery code. Backends
+   * that cannot rewrite their repository leave this undefined, and the gate
+   * then does not offer the path at all.
+   *
+   * Implementations must preserve the old ciphertext somewhere recoverable (a
+   * backup directory) rather than deleting it: the old password may still be the
+   * only way back into notes that were written before the reset.
+   * @param password - the new password.
+   * @param options - whether to remember the new key on this device.
+   */
+  reinitialize?(password: string, options?: UnlockOptions): Promise<void>
+  /**
+   * Forget everything this device remembers about the vault: the trusted key,
+   * the offline ciphertext cache. No repository change, no data loss.
+   */
+  resetLocal?(): void
   /** Clear the just-created recovery code after the user has stored it. */
   dismissRecovery(): void
   /** Re-probe the remote, e.g. after fixing credentials. */
