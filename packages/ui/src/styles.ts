@@ -1148,6 +1148,22 @@ del { color: var(--flomo-text-faint); }
 
 .fl-gate-submit-danger:hover:not(:disabled) { background: #b4405c; }
 
+/* The "this browser only" escape hatches: separated so they never read as part
+   of the normal way in. */
+.fl-gate-local {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--flomo-border);
+}
+
+.fl-gate-local-title {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--flomo-text);
+}
+
+
 
 .fl-recovery {
   margin-top: 18px;

@@ -194,6 +194,18 @@ export function App(): React.ReactElement {
     setEditing(false)
   }, [session])
 
+  /**
+   * The same teardown, offered from the unlock gate.
+   *
+   * A wrong repository name or an expired token strands the user on a gate whose
+   * settings panel is on the other side of the unlock — so the connection has to
+   * be forgettable from the gate itself.
+   */
+  const handleResetConnection = useCallback(() => {
+    handleDisconnect()
+    setNotice(null)
+  }, [handleDisconnect])
+
   if (callback === 'pending' || renewing) {
     return (
       <div className="fl-root">
@@ -225,6 +237,7 @@ export function App(): React.ReactElement {
   return (
     <FlomoApp
       session={session}
+      onResetConnection={handleResetConnection}
       renderSettingsExtra={() => {
         // Re-checked here rather than relying on the narrowing above, which
         // does not survive into a closure that runs after this render.

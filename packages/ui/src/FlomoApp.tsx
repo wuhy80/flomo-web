@@ -66,6 +66,14 @@ export interface FlomoAppProps {
    * connection form here.
    */
   renderUnconfigured?: () => React.ReactNode
+  /**
+   * Forget this browser's connection and return to the host's first-run form.
+   *
+   * Supplied by the web shell, whose connection lives in `localStorage`; the DSH
+   * panel owns its connection on the host side and leaves it undefined, which
+   * hides the button.
+   */
+  onResetConnection?: () => void
   /** Inject the stylesheet on mount. */
   injectStyles?: boolean
 }
@@ -103,6 +111,7 @@ export function FlomoApp({
   showSettings = true,
   renderSettingsExtra,
   renderUnconfigured,
+  onResetConnection,
   injectStyles = true,
 }: FlomoAppProps): React.ReactElement {
   const snapshot = useFlomoSession(session)
@@ -418,6 +427,7 @@ export function FlomoApp({
         {...(reinitialize === undefined
           ? {}
           : { onReinitialize: (password: string, options: UnlockOptions) => void reinitialize(password, options) })}
+        {...(onResetConnection === undefined ? {} : { onResetConnection })}
       />
     )
   }

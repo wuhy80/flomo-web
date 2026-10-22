@@ -60,6 +60,15 @@ export interface UnlockGateProps {
    * simply not offered.
    */
   onReinitialize?: (password: string, options: UnlockOptions) => void
+  /**
+   * Forget this browser's connection: the stored owner/repo/token and the
+   * ciphertext cache, then go back to the first-run connection form.
+   *
+   * This is the only way out when the *connection* is what is wrong — a typo in
+   * the repository name, an expired token — because the settings panel that
+   * normally offers it sits behind the unlock that cannot succeed.
+   */
+  onResetConnection?: () => void
 }
 
 /**
@@ -78,6 +87,7 @@ export function UnlockGate({
   onUnlockWithRecovery,
   onDismissRecovery,
   onReinitialize,
+  onResetConnection,
 }: UnlockGateProps): React.ReactElement {
   const [mode, setMode] = useState<GateMode>(hasVault ? 'unlock' : 'create')
   const [password, setPassword] = useState('')
@@ -321,18 +331,44 @@ export function UnlockGate({
             </button>
           ) : null}
 
-          {/* The escape hatch sits last and out of the way: it is for the day the
-              password stops working, not a button to press on the way in. */}
-          {hasVault && mode === 'unlock' && onReinitialize !== undefined ? (
-            <button type="button" className="fl-gate-switch" onClick={() => go('reinitialize')}>
-              密码始终不对？清除本机记录并重新初始化
-            </button>
-          ) : null}
-
           {mode === 'reinitialize' ? (
             <button type="button" className="fl-gate-switch" onClick={() => go('unlock')}>
               取消，回到解锁
             </button>
+          ) : null}
+
+          {/* Everything below is about *this browser*, not about the notes: the
+              connection it remembers, and the key it remembers. Both are things
+              a stuck user can fix without touching the repository — and both are
+              otherwise unreachable, because the settings panel lives on the far
+              side of the unlock they cannot pass. */}
+          {onResetConnection !== undefined || onReinitialize !== undefined ? (
+            <div className="fl-gate-local">
+              <p className="fl-gate-local-title">连不上，或密码始终不对？</p>
+              <p className="fl-recovery-hint" style={{ marginTop: 0 }}>
+                下面两项都只影响这台浏览器，仓库里的笔记不会因此消失。
+              </p>
+              {onResetConnection !== undefined ? (
+                <button
+                  type="button"
+                  className="fl-gate-switch"
+                  style={{ marginTop: 8 }}
+                  onClick={onResetConnection}
+                >
+                  清除这台浏览器保存的仓库与令牌，回到初始连接界面
+                </button>
+              ) : null}
+              {hasVault && onReinitialize !== undefined ? (
+                <button
+                  type="button"
+                  className="fl-gate-switch"
+                  style={{ marginTop: 4 }}
+                  onClick={() => go('reinitialize')}
+                >
+                  密码想不起来了？用新密码重新初始化保险库
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </form>
       </div>
