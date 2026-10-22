@@ -11,7 +11,31 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { formatProblem, looksLikeToken } from '../src/connection-rules.ts'
+import {
+  TOKEN_CREATE_URL,
+  TOKEN_MANAGE_URL,
+  formatProblem,
+  looksLikeToken,
+} from '../src/connection-rules.ts'
+
+describe('token links', () => {
+  it('points at the fine-grained token form with contents:write pre-filled', () => {
+    const url = new URL(TOKEN_CREATE_URL)
+    assert.equal(url.origin, 'https://github.com')
+    assert.equal(url.pathname, '/settings/personal-access-tokens/new')
+    assert.equal(url.searchParams.get('contents'), 'write')
+    assert.equal(url.searchParams.get('name'), 'flomo-data')
+    // `target_name` would default to the signed-in user; sending a guessed owner
+    // is what produces GitHub's "Cannot find the specified resource owner".
+    assert.equal(url.searchParams.has('target_name'), false)
+  })
+
+  it('sends existing-token management to the fine-grained list, not the classic one', () => {
+    const url = new URL(TOKEN_MANAGE_URL)
+    assert.equal(url.pathname, '/settings/tokens')
+    assert.equal(url.searchParams.get('type'), 'beta')
+  })
+})
 
 describe('looksLikeToken', () => {
   it('accepts a fine-grained token', () => {

@@ -28,6 +28,30 @@ const REPO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 const TOKEN_RE = /^(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,})$/
 
 /**
+ * Where to send someone who does not have a token yet.
+ *
+ * GitHub's fine-grained token page accepts query parameters that pre-fill the
+ * form (documented as "Pre-filling personal access token details using URL
+ * parameters"). `contents=write` also grants `read`, and `metadata: read` comes
+ * with it, so this lands on a page where the only remaining decisions are the
+ * resource owner and the repository — which is exactly the part the user has to
+ * make, and the part a link must not guess.
+ *
+ * `target_name` is deliberately omitted: it defaults to the signed-in user, and
+ * a stale or mistyped value turns the page into "Cannot find the specified
+ * resource owner".
+ */
+export const TOKEN_CREATE_URL =
+  'https://github.com/settings/personal-access-tokens/new' +
+  '?name=flomo-data' +
+  '&description=' +
+  encodeURIComponent('flomo 笔记的加密数据仓库（Contents: Read and write）') +
+  '&contents=write'
+
+/** Where to manage or rotate tokens that already exist. */
+export const TOKEN_MANAGE_URL = 'https://github.com/settings/tokens?type=beta'
+
+/**
  * Whether a token at least looks like one of GitHub's.
  * @param token - the token field, already trimmed.
  * @returns true when the shape is plausible.

@@ -291,6 +291,8 @@ push 到 `main` 会自动重新构建发布，也可以随时手动 Run workflow
 
 打开 **<https://github.com/settings/personal-access-tokens/new>**
 （头像 → Settings → Developer settings → Fine-grained tokens → Generate new token）：
+连接表单的「细粒度访问令牌」旁边也有一枚「还没有？去创建 ↗」，点它会带着名称、说明和
+`Contents: Read and write` 预先打开同一个页面 —— 你只需要选仓库、生成、复制。
 
 | 配置项 | 填什么 |
 |---|---|

@@ -12,7 +12,7 @@ import { createPrivateRepo, GitHubContentsStore } from '@flomo/core'
 import { injectFlomoStyles } from '@flomo/ui'
 
 import type { WebConfig } from './config.ts'
-import { formatProblem, looksLikeToken } from './connection-rules.ts'
+import { TOKEN_CREATE_URL, TOKEN_MANAGE_URL, formatProblem, looksLikeToken } from './connection-rules.ts'
 import { beginLogin, oauthConfigured } from './oauth.ts'
 
 export interface SetupFormProps {
@@ -227,7 +227,21 @@ export function SetupForm({
               </label>
 
               <label className="fl-field">
-                <span className="fl-field-label">细粒度访问令牌（PAT）</span>
+                <span
+                  className="fl-field-label"
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}
+                >
+                  <span>细粒度访问令牌（PAT）</span>
+                  <a
+                    className="fl-md-a"
+                    style={{ fontSize: 12 }}
+                    href={TOKEN_CREATE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    还没有？去创建 ↗
+                  </a>
+                </span>
                 <input
                   className="fl-input"
                   type="password"
@@ -237,6 +251,11 @@ export function SetupForm({
                   placeholder="github_pat_…"
                   onChange={(event) => setToken(event.target.value)}
                 />
+                <span className="fl-recovery-hint" style={{ display: 'block', marginTop: 5 }}>
+                  创建时的三件事：<strong>Repository access</strong> 选「Only select repositories」
+                  并勾上这个笔记仓库；权限里只勾 <strong>Contents: Read and write</strong>；
+                  其它一律不用给。上面那个链接会把名称、说明和这项权限预先填好。
+                </span>
               </label>
 
               <label className="fl-field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -271,16 +290,15 @@ export function SetupForm({
               </button>
 
               <p className="fl-recovery-hint" style={{ marginTop: 18, textAlign: 'left' }}>
-                令牌权限只需 <code>Contents: Read and write</code>，范围限定在这一个仓库。
-                在 GitHub 的 Settings → Developer settings → Fine-grained tokens 创建。
+                令牌过期或需要换一个时，到同一个页面删旧建新；换好后回到这里重新连接即可。
               </p>{' '}
               <a
                 className="fl-md-a"
-                href="https://github.com/settings/personal-access-tokens/new"
+                href={TOKEN_MANAGE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                去 GitHub 创建或续期令牌 ↗
+                管理或续期已创建的令牌 ↗
               </a>
             </>
           ) : null}
