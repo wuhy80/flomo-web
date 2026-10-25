@@ -42,6 +42,7 @@ import { AI_PRESETS, loadAiConfig, saveAiConfig } from './ai-insights.ts'
 import type { AiConfig } from './ai-insights.ts'
 import { UnlockGate } from './UnlockGate.tsx'
 import { injectFlomoStyles } from './styles.ts'
+import { GITHUB_TOKEN_URL, describeTokenExpiry } from './token-status.ts'
 import { useFlomoSession } from './useFlomoSession.ts'
 import { useShortcuts } from './shortcuts.ts'
 import type { ShortcutAction } from './shortcuts.ts'
@@ -74,6 +75,13 @@ export interface FlomoAppProps {
    * hides the button.
    */
   onResetConnection?: () => void
+  /** ISO date (`YYYY-MM-DD`) the PAT expires on, when the host recorded one. */
+  tokenExpiresAt?: string | null
+  /**
+   * Open the host's connection form, so a token banner can offer a one-click
+   * route to re-entering the credentials. Omit to hide that button.
+   */
+  onEditConnection?: () => void
   /** Inject the stylesheet on mount. */
   injectStyles?: boolean
 }
@@ -112,6 +120,8 @@ export function FlomoApp({
   renderSettingsExtra,
   renderUnconfigured,
   onResetConnection,
+  tokenExpiresAt = null,
+  onEditConnection,
   injectStyles = true,
 }: FlomoAppProps): React.ReactElement {
   const snapshot = useFlomoSession(session)
@@ -219,6 +229,10 @@ export function FlomoApp({
     () => corpusStats(snapshot.memos, snapshot.tags.length),
     [snapshot.memos, snapshot.tags.length],
   )
+
+  // The expiry banner only matters before the cliff; once the token has actually
+  // been rejected, the auth-failed banner tells the whole story on its own.
+  const tokenExpiry = useMemo(() => describeTokenExpiry(tokenExpiresAt), [tokenExpiresAt])
 
   // Narrowed to plain values before the hooks, so the memo dependencies are the
   // link target and the memo id rather than the whole view object.
@@ -519,12 +533,65 @@ export function FlomoApp({
             </div>
           ) : null}
 
-          {snapshot.error ? (
+          {snapshot.authFailed ? (
+            <div className="fl-notice fl-notice-error">
+              <span>
+                GitHub 拒绝了这个令牌，可能已过期或被撤销。笔记仍安全地存在仓库里，换一个新令牌就能恢复；换之前，请先把还没保存成功的改动复制出去。
+              </span>
+              <span className="fl-notice-actions">
+                <a
+                  className="fl-button"
+                  href={GITHUB_TOKEN_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  去 GitHub 创建新令牌
+                </a>
+                {onEditConnection ? (
+                  <button type="button" className="fl-button" onClick={onEditConnection}>
+                    修改连接
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="fl-button fl-button-ghost"
+                  onClick={() => void session.save()}
+                >
+                  重试保存
+                </button>
+              </span>
+            </div>
+          ) : snapshot.error ? (
             <div className="fl-notice fl-notice-error">
               <span>{snapshot.error}</span>
               <button type="button" className="fl-button fl-button-ghost" onClick={() => void session.save()}>
                 重试保存
               </button>
+            </div>
+          ) : null}
+
+          {tokenExpiry && !snapshot.authFailed ? (
+            <div
+              className={
+                tokenExpiry.level === 'expired' ? 'fl-notice fl-notice-error' : 'fl-notice'
+              }
+            >
+              <span>{tokenExpiry.label}建议提前创建新令牌，再在「修改连接」里更新。</span>
+              <span className="fl-notice-actions">
+                <a
+                  className="fl-button"
+                  href={GITHUB_TOKEN_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  去 GitHub 创建新令牌
+                </a>
+                {onEditConnection ? (
+                  <button type="button" className="fl-button" onClick={onEditConnection}>
+                    修改连接
+                  </button>
+                ) : null}
+              </span>
             </div>
           ) : null}
 

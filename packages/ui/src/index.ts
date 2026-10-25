@@ -52,6 +52,9 @@ export type { StatsModalProps } from './StatsModal.tsx'
 export { TodoView } from './TodoView.tsx'
 export type { TodoHandlers, TodoViewProps } from './TodoView.tsx'
 
+export { GITHUB_TOKEN_URL, describeTokenExpiry, tokenDaysLeft } from './token-status.ts'
+export type { TokenExpiry } from './token-status.ts'
+
 export { FLOMO_CSS, STYLE_ELEMENT_ID, injectFlomoStyles } from './styles.ts'
 
 export { UnlockGate } from './UnlockGate.tsx'

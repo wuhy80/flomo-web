@@ -25,6 +25,14 @@ export interface WebConfig {
   repo: string
   branch?: string
   token: string
+  /**
+   * The date the token expires, `YYYY-MM-DD`, as shown on GitHub's token page.
+   *
+   * Optional: GitHub offers no API to read a PAT's expiry back, so the only
+   * moment anyone knows it is while creating the token — the form asks for it
+   * there and the UI turns it into a warning banner as the date approaches.
+   */
+  tokenExpiresAt?: string
   /** Persist across browser restarts, versus only for this tab session. */
   remember: boolean
   /**
@@ -140,6 +148,9 @@ export function loadConfig(): WebConfig | null {
             ? { branch: parsed.branch }
             : {}),
           token: parsed.token,
+          ...(typeof parsed.tokenExpiresAt === 'string' && parsed.tokenExpiresAt.length > 0
+            ? { tokenExpiresAt: parsed.tokenExpiresAt }
+            : {}),
           remember,
           // Carried through only when well formed: a half-written OAuth entry
           // must degrade to "a PAT config", not to a broken one.

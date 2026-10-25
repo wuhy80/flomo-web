@@ -30,6 +30,9 @@ const INITIAL: SessionSnapshot = {
   // The host process owns the network and the ciphertext, so the panel never
   // has an offline mode of its own to report.
   offline: false,
+  // Nor does the host currently report which side of a failure went wrong, so
+  // the panel has no token banner to show either.
+  authFailed: false,
   lastSavedAt: null,
   recoveryCode: null,
 }

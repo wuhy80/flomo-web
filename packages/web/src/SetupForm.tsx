@@ -52,6 +52,7 @@ export function SetupForm({
   const [repo, setRepo] = useState(initial?.repo ?? 'flomo-data')
   const [branch, setBranch] = useState(initial?.branch ?? '')
   const [token, setToken] = useState(initial?.token ?? '')
+  const [expires, setExpires] = useState(initial?.tokenExpiresAt ?? '')
   const [remember, setRemember] = useState(initial?.remember ?? true)
   const [creating, setCreating] = useState(false)
   const [createNote, setCreateNote] = useState<string | null>(null)
@@ -128,6 +129,7 @@ export function SetupForm({
       repo: repo.trim(),
       ...(branch.trim() ? { branch: branch.trim() } : {}),
       token: token.trim(),
+      ...(expires.trim() ? { tokenExpiresAt: expires.trim() } : {}),
       remember,
     })
   }
@@ -256,6 +258,16 @@ export function SetupForm({
                   并勾上这个笔记仓库；权限里只勾 <strong>Contents: Read and write</strong>；
                   其它一律不用给。上面那个链接会把名称、说明和这项权限预先填好。
                 </span>
+              </label>
+
+              <label className="fl-field">
+                <span className="fl-field-label">令牌到期日（可选，填了会提前提醒）</span>
+                <input
+                  className="fl-input"
+                  type="date"
+                  value={expires}
+                  onChange={(event) => setExpires(event.target.value)}
+                />
               </label>
 
               <label className="fl-field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

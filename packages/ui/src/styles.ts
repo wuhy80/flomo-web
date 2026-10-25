@@ -1015,6 +1015,21 @@ del { color: var(--flomo-text-faint); }
 
 .fl-notice-error { background: #fdf0f3; color: var(--flomo-danger); }
 
+/* A notice's buttons live in their own cluster so several can sit on one side. */
+.fl-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+a.fl-button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 /* ── unlock gate ─────────────────────────────────────────────────────── */
 
 .fl-gate {

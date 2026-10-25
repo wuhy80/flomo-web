@@ -147,6 +147,20 @@ describe('stored config', () => {
     assert.ok(!('branch' in loaded), 'an empty branch must not be carried through')
   })
 
+  it('keeps the token expiry date for the reminder banner', () => {
+    const local = fakeStorage()
+    useWindow(local.storage, fakeStorage().storage)
+
+    saveConfig({ ...SAMPLE, tokenExpiresAt: '2027-06-30' })
+    assert.deepEqual(loadConfig(), { ...SAMPLE, tokenExpiresAt: '2027-06-30' })
+
+    // The field is optional: leaving it blank must not leave a phantom date.
+    saveConfig({ ...SAMPLE, tokenExpiresAt: '' })
+    const loaded = loadConfig()
+    assert.ok(loaded)
+    assert.ok(!('tokenExpiresAt' in loaded), 'an empty expiry must not be carried through')
+  })
+
   it('survives having no window at all', () => {
     delete (globalThis as { window?: unknown }).window
     assert.equal(loadConfig(), null)

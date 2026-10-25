@@ -14,6 +14,7 @@
  * @module @flomo/ui/session
  */
 
+import { GitHubError } from '@flomo/core'
 import type { Memo, TagStat, Todo, TodoPatch } from '@flomo/core'
 
 /** Where the session currently is in its lifecycle. */
@@ -55,6 +56,12 @@ export interface SessionSnapshot {
   offline: boolean
   /** ISO timestamp of the last successful save. */
   lastSavedAt: string | null
+  /**
+   * True when the last failure was GitHub rejecting the token — expired, revoked
+   * or simply wrong. Retrying cannot help; only a new token can, so the UI
+   * renders an action banner instead of the usual retry button.
+   */
+  authFailed: boolean
   /**
    * The recovery code, present only in the window between creating a vault and
    * the user acknowledging it. It is never persisted anywhere.
@@ -187,6 +194,10 @@ export interface FlomoSession {
  * @returns a readable message.
  */
 export function describeError(error: unknown): string {
+  if (error instanceof GitHubError) {
+    if (error.status === 401) return 'GitHub 令牌无效：可能已过期或被撤销，请更换令牌。'
+    if (error.status === 404) return '找不到该仓库：请检查用户名与仓库名，或令牌是否被授权访问它。'
+  }
   if (error instanceof Error) {
     if (error.name === 'TypeError' && /fetch/i.test(error.message)) {
       return '网络请求失败，请检查网络连接后重试。'

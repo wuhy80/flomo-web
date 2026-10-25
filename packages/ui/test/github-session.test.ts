@@ -177,11 +177,19 @@ class FakeGitHub {
   readonly writes: string[] = []
   /** When true, every write answers 500. */
   failWrites = false
+  /** When true, every request answers 401, the way GitHub rejects a dead token. */
+  failAuth = false
 
   private readonly shas = new Map<string, string>()
 
   /** A `fetch` bound to this server. */
   readonly fetch = async (input: unknown, init?: RequestInit): Promise<Response> => {
+    if (this.failAuth) {
+      return new Response(JSON.stringify({ message: 'Bad credentials' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
     const url = new URL(String(input))
     const match = /\/contents\/(.+)$/.exec(url.pathname)
     if (match === null) return new Response('not found', { status: 404 })
@@ -377,6 +385,44 @@ describe('editing through the session', () => {
     api.failWrites = false
     await session.save()
     assert.equal(session.getSnapshot().error, null, 'a retry clears the banner')
+    session.dispose()
+  })
+
+  it('points at the token, not the network, when GitHub answers 401', async () => {
+    const { api, session } = await unlockedSession()
+    session.add('一条')
+    api.failAuth = true
+
+    await session.save()
+
+    const snapshot = session.getSnapshot()
+    assert.equal(snapshot.saving, false)
+    assert.equal(
+      snapshot.authFailed,
+      true,
+      'an expired token is the one failure a retry cannot fix, so the UI must say so',
+    )
+    assert.match(snapshot.error ?? '', /令牌/)
+    assert.equal(snapshot.memos.length, 1, 'the edit is still pending, exactly as with any failure')
+
+    api.failAuth = false
+    await session.save()
+    assert.equal(session.getSnapshot().authFailed, false, 'a success clears the flag')
+    assert.equal(session.getSnapshot().error, null)
+    session.dispose()
+  })
+
+  it('keeps the ordinary retry banner for failures that are not about auth', async () => {
+    const { api, session } = await unlockedSession()
+    session.add('一条')
+    api.failWrites = true
+
+    await session.save()
+
+    // A 500 is transient; the generic banner with its retry button is the right
+    // answer, so only a 401 may raise the flag.
+    assert.equal(session.getSnapshot().authFailed, false)
+    assert.match(session.getSnapshot().error ?? '', /保存失败/)
     session.dispose()
   })
 

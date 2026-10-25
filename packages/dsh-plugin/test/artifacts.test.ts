@@ -280,6 +280,7 @@ function fakeSession(overrides: Partial<SessionSnapshot> = {}): {
     error: null,
     saving: false,
     offline: false,
+    authFailed: false,
     lastSavedAt: null,
     recoveryCode: null,
     ...overrides,

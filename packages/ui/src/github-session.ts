@@ -17,6 +17,7 @@ import {
   CachingTextStore,
   FlomoVault,
   GitHubContentsStore,
+  GitHubError,
   describeImportResult,
   parseMemosJson,
   tagStats,
@@ -49,6 +50,17 @@ export interface GitHubSessionOptions {
 export const DEFAULT_AUTOSAVE_MS = 1500
 
 /**
+ * Whether an error means GitHub rejected the token itself — expired, revoked or
+ * mistyped. Only a 401 names the credentials; a 404 on a vault path would be an
+ * absent file, and everything else is network or server trouble.
+ * @param error - whatever was thrown.
+ * @returns true when the token is the culprit.
+ */
+function isAuthFailure(error: unknown): boolean {
+  return error instanceof GitHubError && error.status === 401
+}
+
+/**
  * A {@link FlomoSession} backed by a git repository.
  */
 export class GitHubVaultSession implements FlomoSession {
@@ -67,6 +79,7 @@ export class GitHubVaultSession implements FlomoSession {
     error: null,
     saving: false,
     offline: false,
+    authFailed: false,
     lastSavedAt: null,
     recoveryCode: null,
   }
@@ -154,7 +167,7 @@ export class GitHubVaultSession implements FlomoSession {
 
   /** {@inheritDoc FlomoSession.refresh} */
   async refresh(): Promise<void> {
-    this.update({ status: 'probing', error: null })
+    this.update({ status: 'probing', error: null, authFailed: false })
     try {
       const exists = await FlomoVault.exists(this.store)
       this.vault = null
@@ -170,7 +183,12 @@ export class GitHubVaultSession implements FlomoSession {
             const vault = await FlomoVault.openWithRecovery(this.store, trust.key)
             await vault.loadAll()
             this.vault = vault
-            this.syncFromVault({ status: 'unlocked', error: null, lastSavedAt: null })
+            this.syncFromVault({
+              status: 'unlocked',
+              error: null,
+              authFailed: false,
+              lastSavedAt: null,
+            })
             return
           } catch {
             clearTrust()
@@ -184,7 +202,7 @@ export class GitHubVaultSession implements FlomoSession {
         lastSavedAt: null,
       })
     } catch (error) {
-      this.update({ status: 'error', error: describeError(error) })
+      this.update({ status: 'error', error: describeError(error), authFailed: isAuthFailure(error) })
     }
   }
 
@@ -195,7 +213,7 @@ export class GitHubVaultSession implements FlomoSession {
       const { vault, recoveryCode } = await FlomoVault.create(this.store, password)
       if (options?.remember) saveTrust(vault.rawKeyBase64)
       this.vault = vault
-      this.syncFromVault({ status: 'unlocked', error: null, recoveryCode })
+      this.syncFromVault({ status: 'unlocked', error: null, authFailed: false, recoveryCode })
     } catch (error) {
       this.vault = null
       // Re-probe rather than assuming `empty`. The likeliest failure is that a vault
@@ -217,11 +235,11 @@ export class GitHubVaultSession implements FlomoSession {
       await vault.loadAll()
       if (options?.remember) saveTrust(vault.rawKeyBase64)
       this.vault = vault
-      this.syncFromVault({ status: 'unlocked', error: null })
+      this.syncFromVault({ status: 'unlocked', error: null, authFailed: false })
     } catch (error) {
       const message =
         error instanceof WrongPasswordError ? error.message : describeError(error)
-      this.update({ status: 'locked', error: message })
+      this.update({ status: 'locked', error: message, authFailed: isAuthFailure(error) })
     }
   }
 
@@ -233,11 +251,11 @@ export class GitHubVaultSession implements FlomoSession {
       await vault.loadAll()
       if (options?.remember) saveTrust(vault.rawKeyBase64)
       this.vault = vault
-      this.syncFromVault({ status: 'unlocked', error: null })
+      this.syncFromVault({ status: 'unlocked', error: null, authFailed: false })
     } catch (error) {
       const message =
         error instanceof WrongPasswordError ? '恢复码与该保险库不匹配。' : describeError(error)
-      this.update({ status: 'locked', error: message })
+      this.update({ status: 'locked', error: message, authFailed: isAuthFailure(error) })
     }
   }
 
@@ -400,9 +418,14 @@ export class GitHubVaultSession implements FlomoSession {
     this.update({ saving: true })
     try {
       await this.vault.flush()
-      this.update({ saving: false, error: null, lastSavedAt: new Date().toISOString() })
+      this.update({
+        saving: false,
+        error: null,
+        authFailed: false,
+        lastSavedAt: new Date().toISOString(),
+      })
     } catch (error) {
-      this.update({ saving: false, error: `保存失败：${describeError(error)}` })
+      this.update({ saving: false, authFailed: isAuthFailure(error), error: `保存失败：${describeError(error)}` })
     }
   }
 

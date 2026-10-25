@@ -7,10 +7,11 @@
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { FlomoApp, GitHubVaultSession, browserCacheArea } from '@flomo/ui'
+import { FlomoApp, GitHubVaultSession, browserCacheArea, tokenDaysLeft } from '@flomo/ui'
 
 import { clearConfig, configFromLogin, loadConfig, saveConfig } from './config.ts'
 import type { WebConfig } from './config.ts'
+import { TOKEN_CREATE_URL } from './connection-rules.ts'
 import {
   beginLogin,
   clearCallbackFromUrl,
@@ -238,10 +239,23 @@ export function App(): React.ReactElement {
     <FlomoApp
       session={session}
       onResetConnection={handleResetConnection}
+      tokenExpiresAt={config?.tokenExpiresAt ?? null}
+      onEditConnection={() => setEditing(true)}
       renderSettingsExtra={() => {
         // Re-checked here rather than relying on the narrowing above, which
         // does not survive into a closure that runs after this render.
         if (!config) return null
+        // The expiry banner is about the pasted PAT; an OAuth token renews
+        // itself before it lapses, so a date on file would only worry people.
+        const days = config.auth === 'oauth' ? null : tokenDaysLeft(config.tokenExpiresAt)
+        const expiryNote =
+          days === null
+            ? null
+            : days <= 0
+              ? '，已过期'
+              : days === 1
+                ? '，明天到期'
+                : `，剩余 ${days} 天`
         return (
           <div className="fl-card-lg" style={{ marginTop: 16 }}>
             <div className="fl-recovery-title" style={{ color: 'var(--flomo-text)' }}>
@@ -251,12 +265,18 @@ export function App(): React.ReactElement {
               {config.owner}/{config.repo}
               {config.branch ? ` @ ${config.branch}` : ''}
             </p>
+            {config.auth !== 'oauth' && config.tokenExpiresAt ? (
+              <p className="fl-review-note" style={{ marginTop: 6 }}>
+                令牌到期日：{config.tokenExpiresAt}
+                {expiryNote}
+              </p>
+            ) : null}
             <p className="fl-recovery-hint">
               {config.auth === 'oauth'
                 ? `已用 GitHub 账号 ${config.login ?? config.owner} 登录。`
                 : '使用手动填写的访问令牌。'}
             </p>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
               <button type="button" className="fl-button" onClick={() => setEditing(true)}>
                 修改连接
               </button>
@@ -270,7 +290,16 @@ export function App(): React.ReactElement {
                 >
                   重新用 GitHub 登录
                 </button>
-              ) : null}
+              ) : (
+                <a
+                  className="fl-button"
+                  href={TOKEN_CREATE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  去 GitHub 创建新令牌
+                </a>
+              )}
               <button
                 type="button"
                 className="fl-button fl-button-danger"
