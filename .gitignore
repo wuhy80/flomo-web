@@ -19,3 +19,8 @@ Thumbs.db
 .env
 .env.local
 .credentials.yaml
+
+# Local dev artifacts: ad-hoc browser probes and their screenshots.
+.shots/
+/browser-screenshots/
+/out/
