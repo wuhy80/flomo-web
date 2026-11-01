@@ -9,6 +9,7 @@
  */
 
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { afterEach, describe, it } from 'node:test'
 
 import { configFromLogin } from '../src/config.ts'
@@ -245,13 +246,16 @@ describe('configuration from a login', () => {
 })
 
 describe('availability', () => {
-  it('is off until a client id and a relay are configured', () => {
-    // The shipped defaults are empty, so a fork gets the PAT form and no dead
-    // button. Filling these in is what turns the login on.
-    assert.equal(
-      oauthConfigured(),
-      false,
-      'unconfigured builds must not offer a login that cannot work',
-    )
+  it('agrees with the two constants it is defined by', async () => {
+    // The contract matters, not whichever way this deployment happens to be
+    // set: a fork ships empty constants and must get the PAT form with no dead
+    // button; a configured deployment ships both and must get the login button.
+    // So the source is read here and the function is held to it, rather than
+    // the test pinning a value that filling in the relay deliberately changes.
+    const source = await readFile(new URL('../src/oauth.ts', import.meta.url), 'utf8')
+    const clientId = /export const GITHUB_CLIENT_ID = '([^']*)'/.exec(source)?.[1] ?? ''
+    const relayUrl = /export const RELAY_URL = '([^']*)'/.exec(source)?.[1] ?? ''
+
+    assert.equal(oauthConfigured(), clientId !== '' && relayUrl !== '')
   })
 })

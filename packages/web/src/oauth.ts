@@ -31,14 +31,14 @@
  * "no GitHub login configured", and the setup form then behaves exactly as it
  * did before this existed.
  */
-export const GITHUB_CLIENT_ID = ''
+export const GITHUB_CLIENT_ID = 'Ov23liJzBN8zEffTXnxQ'
 
 /**
  * Where the relay is deployed, with no trailing slash.
  *
  * `wrangler deploy` prints this. See `relay/README.md`.
  */
-export const RELAY_URL = ''
+export const RELAY_URL = 'https://flomo-oauth-relay.wuhy80.workers.dev'
 
 /** GitHub's authorization screen. */
 const AUTHORIZE_URL = 'https://github.com/login/oauth/authorize'
