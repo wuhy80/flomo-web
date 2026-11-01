@@ -345,9 +345,31 @@ describe('routing', () => {
     const response = await handleRequest(relayRequest('/', undefined, null), envWith(new FakeGitHub()))
 
     assert.equal(response.status, 200)
-    const body = (await response.json()) as { allowedLogin?: string; allowedOrigin?: string }
+    const body = (await response.json()) as {
+      allowedLogin?: string
+      allowedOrigin?: string
+      secrets?: { clientId?: boolean; clientSecret?: boolean }
+    }
     assert.equal(body.allowedLogin, DEFAULT_ALLOWED_LOGIN)
     assert.equal(body.allowedOrigin, ORIGIN)
+    assert.deepEqual(body.secrets, { clientId: true, clientSecret: true })
+  })
+
+  it('reports which secrets are missing, as presence only', async () => {
+    // The values must never appear here. But a deploy that forgot a
+    // `wrangler secret put` is otherwise undiagnosable from the outside:
+    // GitHub answers every exchange with a bare "Not Found" that explains
+    // nothing, which is the exact failure this field exists to preempt.
+    const response = await handleRequest(
+      relayRequest('/', undefined, null),
+      envWith(new FakeGitHub(), { GITHUB_CLIENT_ID: undefined }),
+    )
+
+    assert.equal(response.status, 200)
+    const body = (await response.json()) as {
+      secrets?: { clientId?: boolean; clientSecret?: boolean }
+    }
+    assert.deepEqual(body.secrets, { clientId: false, clientSecret: true })
   })
 
   it('reports a method it does not implement', async () => {

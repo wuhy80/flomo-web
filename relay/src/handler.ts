@@ -372,12 +372,19 @@ export async function handleRequest(request: Request, env: RelayEnv): Promise<Re
 
   // Deliberately readable without credentials: it is how you confirm a deploy
   // landed and which account it is configured for, without needing a code.
+  // The secret booleans are presence only — a missing secret is invisible to
+  // every check from the outside until a login dies with GitHub's unhelpful
+  // "Not Found", which is exactly the failure this field exists to preempt.
   if (request.method === 'GET' && url.pathname === '/') {
     return json(
       {
         service: 'flomo-oauth-relay',
         allowedLogin: env.ALLOWED_LOGIN ?? DEFAULT_ALLOWED_LOGIN,
         allowedOrigin: env.ALLOWED_ORIGIN,
+        secrets: {
+          clientId: Boolean(env.GITHUB_CLIENT_ID),
+          clientSecret: Boolean(env.GITHUB_CLIENT_SECRET),
+        },
       },
       200,
       env,

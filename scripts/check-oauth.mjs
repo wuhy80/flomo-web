@@ -157,6 +157,26 @@ async function main() {
           `是 "${allowedOrigin}"，而站点是 ${EXPECTED_ORIGIN}。改 relay/wrangler.toml 的 ALLOWED_ORIGIN 后重新部署。`,
         )
       }
+
+      // Presence only — the values are unreadable by design. A missing secret
+      // is invisible everywhere else: GitHub answers the exchange with a bare
+      // "Not Found", which is a dead end from the page and from here.
+      const secrets = probe.body['secrets'] ?? {}
+      const secretChecks = [
+        ['clientId', '中转的 GITHUB_CLIENT_ID', 'echo "<你的 Client ID>" | npx wrangler secret put GITHUB_CLIENT_ID'],
+        ['clientSecret', '中转的 GITHUB_CLIENT_SECRET', 'npx wrangler secret put GITHUB_CLIENT_SECRET'],
+      ]
+      for (const [key, label, fix] of secretChecks) {
+        if (secrets[key] === true) {
+          record(true, label, '已设置。')
+        } else {
+          record(
+            false,
+            label,
+            `中转上没有这个 secret（在 relay/ 目录执行：${fix}）。`,
+          )
+        }
+      }
     }
   } else {
     record(false, '中转在线', '地址无效，跳过。')
