@@ -1234,20 +1234,150 @@ a.fl-button {
 
 .fl-todo { display: flex; flex-direction: column; }
 
+/* The hero band: today at a glance. The ring reads its sweep from --pct, set
+   inline by the component from the done/total counts. */
+.fl-todo-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 20px 22px 18px;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(120deg, var(--flomo-green) 0%, #4cbb80 100%);
+}
+
+.fl-todo-hero::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  top: -55px;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.fl-todo-hero::before {
+  content: "";
+  position: absolute;
+  right: 60px;
+  bottom: -75px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.fl-todo-hero-text { position: relative; z-index: 1; }
+
+.fl-todo-hero-text h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.fl-todo-hero-text p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.92;
+}
+
+.fl-todo-ring {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: conic-gradient(#fff var(--pct), rgba(255, 255, 255, 0.28) 0);
+  display: grid;
+  place-items: center;
+}
+
+.fl-todo-ring span {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .fl-todo-hero { flex-direction: column; align-items: flex-start; }
+}
+
+/* Time sections, derived from the due field the way the quadrant grid is. */
+.fl-todo-section { margin-top: 16px; }
+
+.fl-todo-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--flomo-text-soft);
+}
+
+.fl-todo-section-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.fl-todo-section-dot[data-tone="overdue"] { background: var(--flomo-danger); }
+.fl-todo-section-dot[data-tone="today"] { background: var(--flomo-green); }
+.fl-todo-section-dot[data-tone="upcoming"] { background: #b06a00; }
+.fl-todo-section-dot[data-tone="someday"] { background: var(--flomo-text-faint); }
+
+.fl-todo-section-count {
+  color: var(--flomo-text-faint);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-todo-empty {
+  padding: 22px 4px;
+  font-size: 13.5px;
+  color: var(--flomo-text-faint);
+}
+
+/* The composer sits at the bottom — writing a task is the panel's punchline,
+   not its preamble. The gradient plus is the one loud element on purpose. */
 .fl-todo-add {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 2px 12px;
-  border-bottom: 1px solid var(--flomo-border);
-  margin-bottom: 6px;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 9px 12px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius);
+  background: var(--flomo-bg);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
 }
 
 .fl-todo-add-icon {
   flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--flomo-green), #43b97e);
+  color: #fff;
   font-size: 15px;
   line-height: 1;
-  color: var(--flomo-text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(24, 160, 88, 0.35);
 }
 
 .fl-todo-add input {
@@ -1264,27 +1394,86 @@ a.fl-button {
 
 .fl-todo-add input::placeholder { color: var(--flomo-text-faint); }
 
+.fl-todo-add-kbd {
+  flex: none;
+  font-size: 11px;
+  color: var(--flomo-text-faint);
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.fl-todo-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0 2px;
+}
+
+.fl-todo-quick button {
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--flomo-text-soft);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.fl-todo-quick button:hover {
+  border-color: var(--flomo-green);
+  color: var(--flomo-green);
+  background: var(--flomo-green-soft);
+}
+
+.fl-todo-quick button[data-active="true"] {
+  border-color: var(--flomo-green);
+  color: var(--flomo-green);
+  background: var(--flomo-green-soft);
+  font-weight: 600;
+}
+
+.fl-todo-quick .fl-todo-quick-clear {
+  border-color: transparent;
+  color: var(--flomo-text-faint);
+}
+
+.fl-todo-quick .fl-todo-quick-clear:hover {
+  color: var(--flomo-danger);
+  background: transparent;
+  border-color: transparent;
+}
+
 .fl-todo-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 2px;
   display: flex;
   flex-direction: column;
+  background: var(--flomo-bg);
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 /* A task row now carries optional detail and subtasks, so the <li> is a
    column and the visible line is a row of its own. */
 .fl-todo-item {
   display: block;
-  padding: 2px;
+  padding: 3px;
   border-radius: var(--flomo-radius-sm);
 }
+
+.fl-todo-item + .fl-todo-item { border-top: 1px solid var(--flomo-border); }
 
 .fl-todo-line {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 5px 2px;
+  padding: 7px 8px;
   border-radius: var(--flomo-radius-sm);
 }
 
@@ -1371,6 +1560,34 @@ a.fl-button {
 }
 
 .fl-todo-remove-confirm:hover { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.18); }
+
+/* Subtask progress under a parent's line: a count and a hairline track, quiet
+   unless the number moves. */
+.fl-todo-subprogress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0 4px 40px;
+  font-size: 12px;
+  color: var(--flomo-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-todo-subprogress-track {
+  width: 110px;
+  max-width: 40%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--flomo-input-bg);
+  overflow: hidden;
+}
+
+.fl-todo-subprogress-track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--flomo-green);
+}
 
 /* 键盘选中态：一行淡绿，和焦点格同一族颜色。 */
 .fl-todo-item[data-selected="true"] > .fl-todo-line,
@@ -1460,30 +1677,43 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
 
 .fl-todo-priority {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
-  padding: 3px 5px;
+  padding: 3px 8px 3px 7px;
   border-radius: 999px;
 }
 
-.fl-todo-priority[data-priority="P1"] { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.1); }
-.fl-todo-priority[data-priority="P2"] { color: var(--flomo-blue-strong); background: var(--flomo-blue-soft); }
-.fl-todo-priority[data-priority="P3"] { color: var(--flomo-text-soft); background: var(--flomo-input-bg); }
+.fl-todo-priority::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.fl-todo-priority[data-priority="P1"] { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.12); }
+.fl-todo-priority[data-priority="P2"] { color: #b06a00; background: #fdf1dd; }
+.fl-todo-priority[data-priority="P3"] { color: var(--flomo-blue-strong); background: var(--flomo-blue-soft); }
 
 .fl-todo-due {
   flex: none;
   font-size: 11.5px;
+  font-weight: 500;
   line-height: 1;
   color: var(--flomo-text-soft);
-  padding: 3px 6px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: var(--flomo-input-bg);
   font-variant-numeric: tabular-nums;
 }
 
-.fl-todo-due[data-state="near"] { color: #b06a00; background: #fdf1dd; }
-.fl-todo-due[data-state="overdue"] { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.1); }
+.fl-todo-due[data-state="near"] { color: #b06a00; background: #fdf1dd; font-weight: 600; }
+.fl-todo-due[data-state="overdue"] { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.1); font-weight: 600; }
+.fl-todo-due[data-state="today"] { color: var(--flomo-green); background: var(--flomo-green-soft); font-weight: 600; }
 
 .fl-todo-item[data-done="true"] .fl-todo-due { display: none; }
 
@@ -1689,11 +1919,13 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
   display: flex;
   flex-direction: column;
   gap: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-.fl-quad[data-quad="do"] { border-color: rgba(208, 48, 80, 0.35); }
-.fl-quad[data-quad="plan"] { border-color: rgba(74, 125, 240, 0.35); }
-.fl-quad[data-quad="delegate"] { border-color: rgba(176, 106, 0, 0.35); }
+.fl-quad[data-quad="do"] { border-top: 3px solid var(--flomo-danger); }
+.fl-quad[data-quad="plan"] { border-top: 3px solid var(--flomo-blue); }
+.fl-quad[data-quad="delegate"] { border-top: 3px solid #b06a00; }
+.fl-quad[data-quad="later"] { border-top: 3px solid var(--flomo-text-faint); }
 
 .fl-quad-head {
   display: flex;

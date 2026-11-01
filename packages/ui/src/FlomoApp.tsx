@@ -627,6 +627,7 @@ export function FlomoApp({
             <TodoView
               todos={snapshot.todos}
               onAdd={session.addTodo?.bind(session)}
+              onAddFields={session.addTodoFields?.bind(session)}
               onEdit={session.editTodo?.bind(session)}
               onUpdate={session.updateTodo?.bind(session)}
               onToggle={session.toggleTodo?.bind(session)}

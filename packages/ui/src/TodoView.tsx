@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { QUADRANTS, findTodo, flattenTodos, splitTodos, todoDueState, todoQuadrant } from '@flomo/core'
 import { isTypingTarget } from './shortcuts.ts'
 import type { Todo, TodoPatch, TodoPriority } from '@flomo/core'
+import type { TodoQuickFields } from './session.ts'
 
 import { MarkdownBody } from './MarkdownBody.tsx'
 
@@ -30,6 +31,11 @@ import { MarkdownBody } from './MarkdownBody.tsx'
 export interface TodoHandlers {
   /** Add a task at the top, or as a child when a parent is given. */
   onAdd?: (content: string, parentId?: string | null) => void
+  /**
+   * Add a task with the composer chips' fields — shown only when present, so a
+   * backend that speaks plain {@linkcode onAdd} never sees a chip it cannot honour.
+   */
+  onAddFields?: (fields: TodoQuickFields, parentId?: string | null) => void
   /** Replace a task's title. */
   onEdit?: (id: string, content: string) => void
   /** Rewrite a task's detail fields; null clears one. */
@@ -60,6 +66,29 @@ const PRIORITY_OPTIONS: ReadonlyArray<{ value: TodoPriority | ''; label: string 
   { value: 'P2', label: 'P2 中' },
   { value: 'P3', label: 'P3 低' },
 ]
+
+/**
+ * Local `YYYY-MM-DD`, the exact shape the due field stores. Due dates carry no
+ * timezone, so "today" for grouping and chips must be cut from the same cloth.
+ * @param date - the day to key.
+ * @returns the key.
+ */
+function dateKeyOf(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * 「11月5日」 from `"2026-11-05"` — chips stay short, the title carries the rest.
+ * @param due - the stored date-only string.
+ * @returns the label.
+ */
+function dueLabel(due: string): string {
+  const [, m, d] = due.split('-')
+  return `${Number(m)}月${Number(d)}日`
+}
 
 /**
  * One row's checkbox, round like Google Tasks' and green once ticked.
@@ -98,12 +127,16 @@ function PriorityChip({ priority }: { priority: TodoPriority }): React.ReactElem
   )
 }
 
-/** The due-date badge: plain when far out, orange inside three days, red past. */
+/** The due-date chip: green when due today, orange inside three days, red past. */
 function DueBadge({ due, done }: { due: string; done: boolean }): React.ReactElement | null {
   const state = todoDueState(due)
+  const isToday = due === dateKeyOf(new Date())
+  const kind = done ? 'later' : isToday ? 'today' : state
+  const text =
+    kind === 'today' ? '今天' : kind === 'overdue' ? `逾期 ${dueLabel(due)}` : dueLabel(due)
   return (
-    <span className="fl-todo-due" data-state={done ? 'later' : state} title={`期望结束 ${due}`}>
-      {due.slice(5)}
+    <span className="fl-todo-due" data-state={kind} title={`期望结束 ${due}`}>
+      {text}
     </span>
   )
 }
@@ -310,7 +343,9 @@ function TodoRow({
 }): React.ReactElement {
   const { onToggle, onRemove, onUpdate, onAdd } = handlers
   const done = todo.completedAt !== undefined
-  const hasChildren = (todo.children?.length ?? 0) > 0
+  const children = todo.children ?? []
+  const hasChildren = children.length > 0
+  const subDone = children.filter((child) => child.completedAt !== undefined).length
   const editing = editingId === todo.id
   const open = openIds.has(todo.id)
   const detailOpen = detailId === todo.id
@@ -390,6 +425,15 @@ function TodoRow({
         )}
       </div>
 
+      {hasChildren && !done ? (
+        <div className="fl-todo-subprogress" aria-hidden="true">
+          子任务 {subDone}/{children.length}
+          <span className="fl-todo-subprogress-track">
+            <i style={{ width: `${Math.round((subDone / children.length) * 100)}%` }} />
+          </span>
+        </div>
+      ) : null}
+
       {detailOpen ? (
         <TodoDetail
           key={todo.id}
@@ -432,6 +476,45 @@ onExpand={onExpand}
 }
 
 /**
+ * The hero band: today's date, a greeting, and a progress ring for the whole
+ * checklist. Pure display — everything it shows is derived from the counts the
+ * panel already holds, so it can never disagree with the sections below.
+ * @param props - completed and total task counts.
+ * @returns the hero element.
+ */
+function TodoHero({ done, total }: { done: number; total: number }): React.ReactElement {
+  const now = new Date()
+  const hour = now.getHours()
+  const greet = hour < 6 ? '夜深了' : hour < 12 ? '上午好' : hour < 18 ? '下午好' : '晚上好'
+  const week = '日一二三四五六'[now.getDay()]
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100)
+  const left = total - done
+  return (
+    <div className="fl-todo-hero">
+      <div className="fl-todo-hero-text">
+        <h2>今天</h2>
+        <p>
+          {now.getMonth() + 1}月{now.getDate()}日 星期{week} · {greet}
+          {total === 0
+            ? '，从一件小事开始'
+            : left > 0
+              ? `，还有 ${left} 件事`
+              : '，全部完成 🎉'}
+        </p>
+      </div>
+      <div
+        className="fl-todo-ring"
+        role="img"
+        aria-label={`已完成 ${done} / ${total}，${pct}%`}
+        style={{ '--pct': `${pct}%` } as React.CSSProperties}
+      >
+        <span>{pct}%</span>
+      </div>
+    </div>
+  )
+}
+
+/**
  * The TODO panel.
  * @param props - the forest and its mutation callbacks.
  * @returns the panel element.
@@ -439,6 +522,7 @@ onExpand={onExpand}
 export function TodoView({
   todos,
   onAdd,
+  onAddFields,
   onEdit,
   onUpdate,
   onToggle,
@@ -449,6 +533,7 @@ export function TodoView({
   onClearCompleted,
 }: TodoViewProps): React.ReactElement {
   const [draft, setDraft] = useState('')
+  const [quick, setQuick] = useState<{ due?: string; priority?: TodoPriority | null }>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [showCompleted, setShowCompleted] = useState(true)
@@ -459,13 +544,41 @@ export function TodoView({
   const [deleteArmed, setDeleteArmed] = useState<string | null>(null)
   const draftInput = useRef<HTMLInputElement>(null)
 
-  const handlers: TodoHandlers = { onAdd, onEdit, onUpdate, onToggle, onRemove, onIndent, onOutdent, onMove, onClearCompleted }
+  const handlers: TodoHandlers = { onAdd, onAddFields, onEdit, onUpdate, onToggle, onRemove, onIndent, onOutdent, onMove, onClearCompleted }
 
   const { active, completed } = splitTodos(todos)
 
   // One reference day per render: the quadrant grid and the due badges must
   // agree on what "overdue" means this morning.
   const today = useMemo(() => new Date(), [])
+
+  const todayKey = dateKeyOf(today)
+  const tomorrowKey = dateKeyOf(new Date(today.getTime() + 86_400_000))
+
+  /**
+   * The active top-level tasks, cut into time sections.
+   *
+   * Grouping is derived from the due field, never stored — the same rule the
+   * quadrant grid follows — and within a section the stored order stands, so
+   * Ctrl+↑/↓ keeps meaning what it meant. A parent without a due stays put even
+   * when its children are due today; the chips carry the urgency.
+   */
+  const sections = useMemo(() => {
+    const buckets: Array<{ key: string; label: string; tone: string; items: Todo[] }> = [
+      { key: 'overdue', label: '逾期', tone: 'overdue', items: [] },
+      { key: 'today', label: '今天', tone: 'today', items: [] },
+      { key: 'upcoming', label: '即将到来', tone: 'upcoming', items: [] },
+      { key: 'someday', label: '无日期', tone: 'someday', items: [] },
+    ]
+    const byKey = new Map(buckets.map((bucket) => [bucket.key, bucket]))
+    for (const todo of active) {
+      if (todo.due === undefined) byKey.get('someday')?.items.push(todo)
+      else if (todo.due === todayKey) byKey.get('today')?.items.push(todo)
+      else if (todoDueState(todo.due, today) === 'overdue') byKey.get('overdue')?.items.push(todo)
+      else byKey.get('upcoming')?.items.push(todo)
+    }
+    return buckets.filter((bucket) => bucket.items.length > 0)
+  }, [active, today, todayKey])
 
   /** The quadrant columns, computed once per render of the grid. */
   const quadrants = useMemo(() => {
@@ -504,9 +617,21 @@ export function TodoView({
   const submitDraft = (): void => {
     const content = draft.trim()
     if (content === '') return
-    onAdd?.(content)
+    if (onAddFields && (quick.due !== undefined || quick.priority !== undefined)) {
+      onAddFields({ content, due: quick.due ?? null, priority: quick.priority ?? null })
+    } else {
+      onAdd?.(content)
+    }
     setDraft('')
     draftInput.current?.focus()
+  }
+
+  /** Toggle one composer chip's field on and off. */
+  const toggleQuick = (patch: { due?: string; priority?: TodoPriority | null }): void => {
+    setQuick((current) => {
+      if (patch.due !== undefined) return { ...current, due: current.due === patch.due ? undefined : patch.due }
+      return { ...current, priority: current.priority === patch.priority ? undefined : patch.priority }
+    })
   }
 
   /** Open a row for editing with its current text. */
@@ -684,6 +809,8 @@ export function TodoView({
 
   return (
     <div className="fl-todo">
+      <TodoHero done={completed.length} total={active.length + completed.length} />
+
       <div className="fl-todo-modes" role="tablist" aria-label="视图">
         <button
           type="button"
@@ -707,55 +834,43 @@ export function TodoView({
 
       {mode === 'list' ? (
         <>
-          <div className="fl-todo-add">
-            <span className="fl-todo-add-icon" aria-hidden="true">
-              ＋
-            </span>
-            <input
-              ref={draftInput}
-              type="text"
-              value={draft}
-              placeholder="添加任务"
-              aria-label="添加任务"
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') submitDraft()
-              }}
-            />
-          </div>
-
           {todos.length === 0 ? (
-            <div className="fl-empty">还没有任务，在上面输入并回车添加一条吧。</div>
-          ) : null}
-
-          <ul className="fl-todo-list">
-            {active.map((todo) => (
-              <TodoRow
-                key={todo.id}
-                todo={todo}
-                editingId={editingId}
-                editText={editText}
-                onEditText={setEditText}
-                onStartEdit={startEdit}
-                onCommitEdit={commitEdit}
-                onCancelEdit={cancelEdit}
-                openIds={openIds}
-                detailId={detailId}
-                onToggleOpen={toggleOpen}
-                onExpand={expandTask}
-                onToggleDetail={toggleDetail}
-                selected={selectedId === todo.id}
-                deleteArmed={deleteArmed}
-                onArmRemove={armRemove}
-                onConfirmRemove={confirmRemove}
-                handlers={handlers}
-              />
-            ))}
-          </ul>
-
-          <div className="fl-todo-hints" aria-hidden="true">
-            ↑↓ 选中 · Enter 编辑 · x 完成 · s 子任务 · d 详情 · 1/2/3 优先级 · Tab 缩进 · Del 删除
-          </div>
+            <div className="fl-todo-empty">还没有任务，在下方输入并回车添加一条。</div>
+          ) : (
+            sections.map((section) => (
+              <div className="fl-todo-section" key={section.key}>
+                <div className="fl-todo-section-head">
+                  <span className="fl-todo-section-dot" data-tone={section.tone} aria-hidden="true" />
+                  {section.label}
+                  <span className="fl-todo-section-count">{section.items.length}</span>
+                </div>
+                <ul className="fl-todo-list">
+                  {section.items.map((todo) => (
+                    <TodoRow
+                      key={todo.id}
+                      todo={todo}
+                      editingId={editingId}
+                      editText={editText}
+                      onEditText={setEditText}
+                      onStartEdit={startEdit}
+                      onCommitEdit={commitEdit}
+                      onCancelEdit={cancelEdit}
+                      openIds={openIds}
+                      detailId={detailId}
+                      onToggleOpen={toggleOpen}
+                      onExpand={expandTask}
+                      onToggleDetail={toggleDetail}
+                      selected={selectedId === todo.id}
+                      deleteArmed={deleteArmed}
+                      onArmRemove={armRemove}
+                      onConfirmRemove={confirmRemove}
+                      handlers={handlers}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
 
           {completed.length > 0 ? (
             <div className="fl-todo-done">
@@ -810,6 +925,61 @@ export function TodoView({
               ) : null}
             </div>
           ) : null}
+
+          <div className="fl-todo-add">
+            <span className="fl-todo-add-icon" aria-hidden="true">
+              ＋
+            </span>
+            <input
+              ref={draftInput}
+              type="text"
+              value={draft}
+              placeholder="添加任务，回车确认"
+              aria-label="添加任务"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') submitDraft()
+              }}
+            />
+            <span className="fl-todo-add-kbd" aria-hidden="true">
+              Enter
+            </span>
+          </div>
+
+          {onAddFields ? (
+            <div className="fl-todo-quick" aria-label="快速添加">
+              <button
+                type="button"
+                data-active={quick.due === todayKey ? 'true' : undefined}
+                onClick={() => toggleQuick({ due: todayKey })}
+              >
+                今天
+              </button>
+              <button
+                type="button"
+                data-active={quick.due === tomorrowKey ? 'true' : undefined}
+                onClick={() => toggleQuick({ due: tomorrowKey })}
+              >
+                明天
+              </button>
+              <button
+                type="button"
+                data-active={quick.priority === 'P1' ? 'true' : undefined}
+                onClick={() => toggleQuick({ priority: 'P1' })}
+              >
+                ⚡ P1
+              </button>
+              {quick.due !== undefined || quick.priority !== undefined ? (
+                <button type="button" className="fl-todo-quick-clear" onClick={() => setQuick({})}>
+                  清除
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="fl-todo-hints" aria-hidden="true">
+            ↑↓ 选中 · Enter 编辑 · x 完成 · s 子任务 · d 详情 · 1/2/3 优先级 · Tab 缩进 · Del 删除
+          </div>
         </>
       ) : (
         <div className="fl-quadrants">

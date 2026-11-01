@@ -66,7 +66,7 @@ export type { PasswordRule, PasswordVerdict } from './password-policy.ts'
 export { useFlomoSession } from './useFlomoSession.ts'
 
 export { describeError } from './session.ts'
-export type { FlomoSession, SessionSnapshot, SessionStatus } from './session.ts'
+export type { FlomoSession, SessionSnapshot, SessionStatus, TodoQuickFields } from './session.ts'
 
 export {
   bindShortcuts,

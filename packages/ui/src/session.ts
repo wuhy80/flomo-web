@@ -15,7 +15,18 @@
  */
 
 import { GitHubError } from '@flomo/core'
-import type { Memo, TagStat, Todo, TodoPatch } from '@flomo/core'
+import type { Memo, TagStat, Todo, TodoPatch, TodoPriority } from '@flomo/core'
+
+/**
+ * The fields a quick add can set in the same breath as the title — the
+ * composer's 「今天 / 明天 / ⚡P1」 chips. Absent fields leave the task's
+ * defaults, exactly as the plain `addTodo` does.
+ */
+export type TodoQuickFields = {
+  content: string
+  due?: string | null
+  priority?: TodoPriority | null
+}
 
 /** Where the session currently is in its lifecycle. */
 export type SessionStatus =
@@ -164,6 +175,12 @@ export interface FlomoSession {
    * methods and show a pointer to the web app in their absence.
    */
   addTodo?(content: string, parentId?: string | null): void
+  /**
+   * Add a task with composer chips' fields baked in — one entry, one undo of
+   * attention. Optional and separate from {@linkcode addTodo} so a backend can
+   * support the plain row without the chips; the view hides what it cannot do.
+   */
+  addTodoFields?(fields: TodoQuickFields, parentId?: string | null): void
   /** Rewrite a task's detail fields; null clears one. */
   updateTodo?(id: string, patch: TodoPatch): void
   /** Replace a task's title. */

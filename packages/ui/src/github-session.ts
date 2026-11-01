@@ -27,7 +27,12 @@ import type { CacheArea, Memo, TagStat, TextStore, Todo, TodoPatch } from '@flom
 
 import { clearTrust, loadTrust, saveTrust } from './device-trust.ts'
 import { describeError } from './session.ts'
-import type { FlomoSession, SessionSnapshot, UnlockOptions } from './session.ts'
+import type {
+  FlomoSession,
+  SessionSnapshot,
+  TodoQuickFields,
+  UnlockOptions,
+} from './session.ts'
 
 /** How to reach the data repository. */
 export interface GitHubSessionOptions {
@@ -343,6 +348,22 @@ export class GitHubVaultSession implements FlomoSession {
   /** {@inheritDoc FlomoSession.addTodo} */
   addTodo(content: string, parentId?: string | null): void {
     this.mutate((vault) => vault.addTodo(content, parentId ?? null))
+  }
+
+  /** {@inheritDoc FlomoSession.addTodoFields} */
+  addTodoFields(
+    fields: TodoQuickFields,
+    parentId?: string | null,
+  ): void {
+    this.mutate((vault) => {
+      const todo = vault.addTodo(fields.content, parentId ?? null)
+      // One dirty shard either way — the debounce coalesces the add and the
+      // patch into the same write, so the chips cost nothing on the wire.
+      const patch: TodoPatch = {}
+      if (fields.due !== undefined) patch.due = fields.due
+      if (fields.priority !== undefined) patch.priority = fields.priority
+      if (Object.keys(patch).length > 0) vault.updateTodo(todo.id, patch)
+    })
   }
 
   /** {@inheritDoc FlomoSession.updateTodo} */
