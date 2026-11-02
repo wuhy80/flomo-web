@@ -16,6 +16,7 @@
  */
 
 import type { Todo, TodoPriority } from './types.ts'
+import { dayLabel, dayOf } from './time.ts'
 
 export type { TodoPriority }
 
@@ -466,6 +467,78 @@ function latestCompletion(todo: Todo): string | null {
     if (latest === null || stamp > latest) latest = stamp
   }
   return latest
+}
+
+/** How many days of completed work stay recent before the rest is archived. */
+export const COMPLETED_ARCHIVE_AFTER_DAYS = 3
+
+/** One day of completed work, newest tick first inside the day. */
+export interface CompletedDayGroup {
+  /** `YYYY-MM-DD` in local time. */
+  day: string
+  /** `今天`, `昨天`, or a dated label such as `10月30日 周五`. */
+  label: string
+  /** Completed roots whose newest tick fell on this day. */
+  items: Todo[]
+}
+
+/** Completed work split into the last few days and the archive. */
+export interface CompletedByDay {
+  /** Days inside the archive window, newest first. */
+  recent: CompletedDayGroup[]
+  /** Days past the window, newest first. */
+  archived: CompletedDayGroup[]
+  /** How many roots sit in {@link archived}. */
+  archivedCount: number
+}
+
+/**
+ * Group completed roots by the local day they were ticked off.
+ *
+ * The day comes from the row's own `completedAt` — the click that ticked that
+ * task — rather than from the newest tick buried anywhere in its subtree. Only
+ * when the row itself was never clicked (every subtask was ticked one by one)
+ * does it fall back to the newest descendant tick, which is the moment the
+ * tree actually became complete.
+ *
+ * Days newer than {@link COMPLETED_ARCHIVE_AFTER_DAYS} stay in `recent`; the
+ * rest go to `archived`, which the view keeps collapsed by default rather than
+ * deleting. Input order is preserved inside a day, so a newest-first list from
+ * {@link splitTodos} stays newest-first here.
+ * @param completed - completed roots, in display order.
+ * @param today - reference instant for the retention window and the labels.
+ * @param archiveAfterDays - how many days stay recent, counting today.
+ * @returns the recent days, the archived days, and the archived total.
+ */
+export function groupCompletedByDay(
+  completed: readonly Todo[],
+  today: Date = new Date(),
+  archiveAfterDays: number = COMPLETED_ARCHIVE_AFTER_DAYS,
+): CompletedByDay {
+  const cutoff = dayOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() - archiveAfterDays))
+  const buckets = new Map<string, Todo[]>()
+  for (const todo of completed) {
+    const stamp = todo.completedAt ?? latestCompletion(todo)
+    if (stamp === null) continue
+    const day = dayOf(stamp)
+    const bucket = buckets.get(day)
+    if (bucket === undefined) buckets.set(day, [todo])
+    else bucket.push(todo)
+  }
+  const days = [...buckets.keys()].sort((a, b) => (a < b ? 1 : -1))
+  const recent: CompletedDayGroup[] = []
+  const archived: CompletedDayGroup[] = []
+  for (const day of days) {
+    const group: CompletedDayGroup = {
+      day,
+      label: dayLabel(day, today),
+      items: buckets.get(day) ?? [],
+    }
+    if (day <= cutoff) archived.push(group)
+    else recent.push(group)
+  }
+  const archivedCount = archived.reduce((total, group) => total + group.items.length, 0)
+  return { recent, archived, archivedCount }
 }
 
 /** @returns how many tasks — subtasks included — are still open. */

@@ -1637,6 +1637,126 @@ a.fl-button {
 
 .fl-todo-done-caret { font-size: 10px; line-height: 1; }
 
+/* Completed days: a quiet date header per bucket; the older days sit behind a
+   collapsed archive instead of leaving the list. */
+.fl-todo-done-day { margin-top: 10px; }
+
+.fl-todo-done-day:first-of-type { margin-top: 4px; }
+
+.fl-todo-done-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 4px;
+  font-size: 11.5px;
+  color: var(--flomo-text-faint);
+}
+
+.fl-todo-done-day-count { font-variant-numeric: tabular-nums; }
+
+.fl-todo-done-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fl-todo-archive-link {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--flomo-blue);
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.fl-todo-archive-link:hover { color: var(--flomo-blue-strong); }
+
+/* The archive page: a month-first index over everything past the three-day
+   window, with a search over task text and subtasks. */
+.fl-archive { padding-top: 2px; }
+
+.fl-archive-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 2px 8px;
+}
+
+.fl-archive-back {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--flomo-blue);
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.fl-archive-back:hover { color: var(--flomo-blue-strong); }
+
+.fl-archive-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--flomo-text);
+}
+
+.fl-archive-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--flomo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-archive-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--flomo-border);
+  border-radius: 8px;
+  background: var(--flomo-input-bg);
+  font: inherit;
+  font-size: 13px;
+  color: var(--flomo-text);
+}
+
+.fl-archive-search:focus {
+  outline: none;
+  border-color: var(--flomo-green);
+}
+
+.fl-archive-month { margin-top: 4px; }
+
+.fl-archive-month-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--flomo-border);
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--flomo-text-soft);
+  cursor: pointer;
+  padding: 8px 2px;
+}
+
+.fl-archive-month:first-of-type .fl-archive-month-head { border-top: 0; }
+
+.fl-archive-month-head:hover { color: var(--flomo-text); }
+
+.fl-archive-month-count {
+  margin-left: auto;
+  color: var(--flomo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-archive .fl-todo-done-day { margin-top: 8px; }
+
 .fl-todo-clear {
   border: 0;
   background: transparent;

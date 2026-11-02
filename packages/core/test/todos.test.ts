@@ -13,6 +13,7 @@ import {
   FlomoVault,
   findTodo,
   flattenTodos,
+  groupCompletedByDay,
   indentTodoAt,
   insertAfterTodoAt,
   insertTodoAt,
@@ -223,6 +224,78 @@ describe('splitTodos', () => {
     const { active, completed } = splitTodos([tree, doneTree])
     assert.deepEqual(active.map((item) => item.id), ['root'])
     assert.deepEqual(completed.map((item) => item.id), ['root2'])
+  })
+})
+
+describe('groupCompletedByDay', () => {
+  /** A local-time ISO stamp, so day buckets match the viewer's calendar. */
+  const at = (y: number, m: number, d: number, h = 9): string =>
+    new Date(y, m - 1, d, h).toISOString()
+
+  const done = (id: string, completedAt: string): Todo => ({
+    id,
+    content: `task ${id}`,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    completedAt,
+  })
+
+  const today = new Date(2026, 10, 2, 12) // 2026-11-02 local noon
+
+  it('buckets by day, newest day first, and archives three-day-old work', () => {
+    const { recent, archived, archivedCount } = groupCompletedByDay(
+      [
+        done('today', at(2026, 11, 2)),
+        done('yesterday-a', at(2026, 11, 1, 8)),
+        done('yesterday-b', at(2026, 11, 1, 18)),
+        done('three-days', at(2026, 10, 30)),
+        done('last-week', at(2026, 10, 20)),
+      ],
+      today,
+    )
+
+    assert.deepEqual(recent.map((group) => group.day), ['2026-11-02', '2026-11-01'])
+    assert.deepEqual(recent.map((group) => group.items.length), [1, 2])
+    assert.deepEqual(archived.map((group) => group.day), ['2026-10-30', '2026-10-20'])
+    assert.equal(archivedCount, 2)
+  })
+
+  it('labels the two newest days and keeps input order inside a day', () => {
+    const { recent } = groupCompletedByDay(
+      [done('a', at(2026, 11, 2, 10)), done('b', at(2026, 11, 2, 9)), done('c', at(2026, 11, 1))],
+      today,
+    )
+
+    assert.equal(recent[0]?.label, '今天')
+    assert.equal(recent[1]?.label, '昨天')
+    assert.deepEqual(recent[0]?.items.map((todo) => todo.id), ['a', 'b'])
+  })
+
+  it('honours a custom retention window and handles empty input', () => {
+    const groups = groupCompletedByDay([done('one', at(2026, 10, 31))], today, 5)
+    assert.deepEqual(groups.archived, [])
+    assert.deepEqual(groupCompletedByDay([], today), { recent: [], archived: [], archivedCount: 0 })
+  })
+
+  it('groups by the row\'s own click time, not a newer tick in its subtree', () => {
+    const tree: Todo = {
+      ...done('tree', at(2026, 10, 20)),
+      children: [{ ...done('child', at(2026, 11, 2)), children: [] }],
+    }
+    const { recent, archived } = groupCompletedByDay([tree], today)
+    assert.deepEqual(recent, [])
+    assert.deepEqual(archived.map((group) => group.day), ['2026-10-20'])
+  })
+
+  it('falls back to the newest descendant when the row itself was never clicked', () => {
+    const tree: Todo = {
+      id: 'tree',
+      content: 'task tree',
+      createdAt: '2026-10-01T00:00:00.000Z',
+      children: [{ ...done('child', at(2026, 11, 1)), children: [] }],
+    }
+    const { recent, archived } = groupCompletedByDay([tree], today)
+    assert.deepEqual(recent.map((group) => group.day), ['2026-11-01'])
+    assert.deepEqual(archived, [])
   })
 })
 

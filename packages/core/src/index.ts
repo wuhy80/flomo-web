@@ -89,12 +89,14 @@ export {
 export type { CorpusStats } from './stats.ts'
 
 export {
+  COMPLETED_ARCHIVE_AFTER_DAYS,
   NEAR_DAYS,
   QUADRANTS,
   TODO_FILE,
   activeTodoCount,
   findTodo,
   flattenTodos,
+  groupCompletedByDay,
   indentTodoAt,
   insertAfterTodoAt,
   insertTodoAt,
@@ -113,6 +115,8 @@ export {
   walkTodos,
 } from './todos.ts'
 export type {
+  CompletedByDay,
+  CompletedDayGroup,
   FlatTodo,
   TodoDocument,
   TodoDueState,

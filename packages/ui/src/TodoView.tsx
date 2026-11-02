@@ -19,12 +19,13 @@
 import type * as React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { QUADRANTS, findTodo, flattenTodos, splitTodos, todoDueState, todoQuadrant } from '@flomo/core'
+import { QUADRANTS, findTodo, flattenTodos, groupCompletedByDay, splitTodos, todoDueState, todoQuadrant } from '@flomo/core'
 import { isTypingTarget } from './shortcuts.ts'
-import type { Todo, TodoPatch, TodoPriority } from '@flomo/core'
+import type { CompletedDayGroup, Todo, TodoPatch, TodoPriority } from '@flomo/core'
 import type { TodoQuickFields } from './session.ts'
 
 import { MarkdownBody } from './MarkdownBody.tsx'
+import { groupArchivedByMonth } from './archive.ts'
 
 /** The checklist's mutation callbacks, all optional so a backend without todo
  * support can render the panel as a pointer to the web app instead. */
@@ -537,6 +538,9 @@ export function TodoView({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [showCompleted, setShowCompleted] = useState(true)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [archiveQuery, setArchiveQuery] = useState('')
+  const [openMonths, setOpenMonths] = useState<ReadonlySet<string>>(new Set())
   const [mode, setMode] = useState<'list' | 'quadrant'>('list')
   const [openIds, setOpenIds] = useState<ReadonlySet<string>>(new Set())
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -547,6 +551,12 @@ export function TodoView({
   const handlers: TodoHandlers = { onAdd, onAddFields, onEdit, onUpdate, onToggle, onRemove, onIndent, onOutdent, onMove, onClearCompleted }
 
   const { active, completed } = splitTodos(todos)
+
+  // Completed work grouped by the day it was ticked off. Anything older than
+  // the three-day window moves to the archive page, which buckets those days
+  // by month and can be searched.
+  const { recent, archived, archivedCount } = groupCompletedByDay(completed)
+  const archiveMonths = groupArchivedByMonth(archived, archiveQuery)
 
   // One reference day per render: the quadrant grid and the due badges must
   // agree on what "overdue" means this morning.
@@ -807,6 +817,123 @@ export function TodoView({
     return <div className="fl-empty">当前环境不支持 TODO，请在网页版使用。</div>
   }
 
+  /** The rows of one completed day, wired the same way as the open rows. */
+  const doneRows = (items: readonly Todo[]): React.ReactElement => (
+    <ul className="fl-todo-list">
+      {items.map((todo) => (
+        <TodoRow
+          key={todo.id}
+          todo={todo}
+          editingId={editingId}
+          editText={editText}
+          onEditText={setEditText}
+          onStartEdit={startEdit}
+          onCommitEdit={commitEdit}
+          onCancelEdit={cancelEdit}
+          openIds={openIds}
+          detailId={detailId}
+          onToggleOpen={toggleOpen}
+          onExpand={expandTask}
+          onToggleDetail={toggleDetail}
+          selected={selectedId === todo.id}
+          deleteArmed={deleteArmed}
+          onArmRemove={armRemove}
+          onConfirmRemove={confirmRemove}
+          handlers={handlers}
+        />
+      ))}
+    </ul>
+  )
+
+  /** One completed day with its date header. */
+  const doneDay = (group: CompletedDayGroup): React.ReactElement => (
+    <section className="fl-todo-done-day" key={group.day}>
+      <header className="fl-todo-done-day-head">
+        <span>{group.label}</span>
+        <span className="fl-todo-done-day-count">{group.items.length}</span>
+      </header>
+      {doneRows(group.items)}
+    </section>
+  )
+
+  /** Enter the archive page with its newest month already expanded. */
+  const openArchive = (): void => {
+    setArchiveOpen(true)
+    setOpenMonths(archived.length > 0 ? new Set([archived[0]!.day.slice(0, 7)]) : new Set())
+  }
+
+  const toggleMonth = (key: string): void => {
+    setOpenMonths((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  if (archiveOpen) {
+    return (
+      <div className="fl-todo">
+        <div className="fl-archive">
+          <header className="fl-archive-head">
+            <button type="button" className="fl-archive-back" onClick={() => setArchiveOpen(false)}>
+              ← 返回
+            </button>
+            <h2 className="fl-archive-title">归档</h2>
+            <span className="fl-archive-count">{archivedCount} 条</span>
+          </header>
+
+          <input
+            type="search"
+            className="fl-archive-search"
+            value={archiveQuery}
+            placeholder="搜索归档任务…"
+            aria-label="搜索归档任务"
+            onChange={(event) => setArchiveQuery(event.target.value)}
+          />
+
+          {archiveMonths.length === 0 ? (
+            <div className="fl-empty">
+              {archiveQuery.trim() === '' ? '还没有归档任务。' : '没有匹配的归档任务。'}
+            </div>
+          ) : (
+            archiveMonths.map((month, index) => {
+              const open =
+                archiveQuery.trim() !== '' || openMonths.has(month.key) || (openMonths.size === 0 && index === 0)
+              return (
+                <section className="fl-archive-month" key={month.key}>
+                  <button
+                    type="button"
+                    className="fl-archive-month-head"
+                    aria-expanded={open}
+                    onClick={() => toggleMonth(month.key)}
+                  >
+                    <span className="fl-todo-done-caret" aria-hidden="true">
+                      {open ? '▾' : '▸'}
+                    </span>
+                    <span>{month.label}</span>
+                    <span className="fl-archive-month-count">{month.count}</span>
+                  </button>
+                  {open
+                    ? month.days.map((group) => (
+                        <div className="fl-todo-done-day" key={group.day}>
+                          <header className="fl-todo-done-day-head">
+                            <span>{group.label}</span>
+                            <span className="fl-todo-done-day-count">{group.items.length}</span>
+                          </header>
+                          {doneRows(group.items)}
+                        </div>
+                      ))
+                    : null}
+                </section>
+              )
+            })
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fl-todo">
       <TodoHero done={completed.length} total={active.length + completed.length} />
@@ -886,43 +1013,25 @@ export function TodoView({
                   </span>
                   已完成 {completed.length}
                 </button>
-                {onClearCompleted !== undefined ? (
-                  <button
-                    type="button"
-                    className="fl-todo-clear"
-                    onClick={onClearCompleted}
-                    title="删除全部已完成任务"
-                  >
-                    清除已完成
-                  </button>
-                ) : null}
+                <span className="fl-todo-done-actions">
+                  {archivedCount > 0 ? (
+                    <button type="button" className="fl-todo-archive-link" onClick={openArchive}>
+                      查看归档 {archivedCount} →
+                    </button>
+                  ) : null}
+                  {onClearCompleted !== undefined ? (
+                    <button
+                      type="button"
+                      className="fl-todo-clear"
+                      onClick={onClearCompleted}
+                      title="删除全部已完成任务"
+                    >
+                      清除已完成
+                    </button>
+                  ) : null}
+                </span>
               </div>
-              {showCompleted ? (
-                <ul className="fl-todo-list">
-                  {completed.map((todo) => (
-                    <TodoRow
-                      key={todo.id}
-                      todo={todo}
-                      editingId={editingId}
-                      editText={editText}
-                      onEditText={setEditText}
-                      onStartEdit={startEdit}
-                      onCommitEdit={commitEdit}
-                      onCancelEdit={cancelEdit}
-                      openIds={openIds}
-                      detailId={detailId}
-                      onToggleOpen={toggleOpen}
-                      onExpand={expandTask}
-                      onToggleDetail={toggleDetail}
-                      selected={selectedId === todo.id}
-                      deleteArmed={deleteArmed}
-                      onArmRemove={armRemove}
-                      onConfirmRemove={confirmRemove}
-                      handlers={handlers}
-                    />
-                  ))}
-                </ul>
-              ) : null}
+              {showCompleted ? <>{recent.map(doneDay)}</> : null}
             </div>
           ) : null}
 
