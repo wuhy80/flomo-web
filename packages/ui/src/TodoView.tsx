@@ -534,7 +534,8 @@ export function TodoView({
   onClearCompleted,
 }: TodoViewProps): React.ReactElement {
   const [draft, setDraft] = useState('')
-  const [quick, setQuick] = useState<{ due?: string; priority?: TodoPriority | null }>({})
+  const [quick, setQuick] = useState<{ due?: string; priority?: TodoPriority | null; notes?: string }>({})
+  const [composeDetailOpen, setComposeDetailOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [showCompleted, setShowCompleted] = useState(true)
@@ -564,6 +565,14 @@ export function TodoView({
 
   const todayKey = dateKeyOf(today)
   const tomorrowKey = dateKeyOf(new Date(today.getTime() + 86_400_000))
+
+  /** What the chips currently promise, phrased for the row under them. */
+  const quickHint = (() => {
+    const picked: string[] = []
+    if (quick.due !== undefined) picked.push(`结束 ${dueLabel(quick.due)}`)
+    if (quick.priority) picked.push(quick.priority)
+    return picked.length > 0 ? `将保存：${picked.join(' · ')}` : '选中的会随任务一起保存'
+  })()
 
   /**
    * The active top-level tasks, cut into time sections.
@@ -623,16 +632,24 @@ export function TodoView({
     setDetailId((current) => (current === id ? null : id))
   }
 
-  /** Commit the add row, keeping focus for the next entry — Enter chains tasks. */
+  /** Commit the add row, keeping focus for the next entry — Enter chains tasks.
+   * The chips and the expanded detail are spent with the task, then reset. */
   const submitDraft = (): void => {
     const content = draft.trim()
     if (content === '') return
-    if (onAddFields && (quick.due !== undefined || quick.priority !== undefined)) {
-      onAddFields({ content, due: quick.due ?? null, priority: quick.priority ?? null })
+    const notes = quick.notes?.trim()
+    if (onAddFields) {
+      onAddFields({
+        content,
+        due: quick.due ?? null,
+        priority: quick.priority ?? null,
+        ...(notes ? { notes } : {}),
+      })
     } else {
       onAdd?.(content)
     }
     setDraft('')
+    setQuick({})
     draftInput.current?.focus()
   }
 
@@ -961,6 +978,133 @@ export function TodoView({
 
       {mode === 'list' ? (
         <>
+          <div className="fl-todo-add">
+            <span className="fl-todo-add-icon" aria-hidden="true">
+              ＋
+            </span>
+            <input
+              ref={draftInput}
+              type="text"
+              value={draft}
+              placeholder="添加任务，回车确认"
+              aria-label="添加任务"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') submitDraft()
+              }}
+            />
+            {onAddFields ? (
+              <button
+                type="button"
+                className="fl-todo-detail-toggle"
+                aria-expanded={composeDetailOpen}
+                aria-controls="fl-todo-compose-detail"
+                onClick={() => setComposeDetailOpen((open) => !open)}
+              >
+                详情<span className="fl-todo-detail-caret" aria-hidden="true">{composeDetailOpen ? '▴' : '▾'}</span>
+              </button>
+            ) : null}
+          </div>
+
+          {onAddFields ? (
+            <>
+              <div className="fl-todo-quick" aria-label="快速设置">
+                <div className="fl-todo-quick-set">
+                  <button
+                    type="button"
+                    className="fl-todo-chip"
+                    data-active={quick.due === todayKey ? 'true' : undefined}
+                    onClick={() => toggleQuick({ due: todayKey })}
+                  >
+                    今天
+                  </button>
+                  <button
+                    type="button"
+                    className="fl-todo-chip"
+                    data-active={quick.due === tomorrowKey ? 'true' : undefined}
+                    onClick={() => toggleQuick({ due: tomorrowKey })}
+                  >
+                    明天
+                  </button>
+                </div>
+                <span className="fl-todo-quick-sep" aria-hidden="true" />
+                <div className="fl-todo-quick-set">
+                  {(['P1', 'P2', 'P3'] as const).map((priority) => (
+                    <button
+                      key={priority}
+                      type="button"
+                      className="fl-todo-chip fl-todo-chip-p"
+                      data-p={priority}
+                      data-active={quick.priority === priority ? 'true' : undefined}
+                      onClick={() => toggleQuick({ priority })}
+                    >
+                      {priority}
+                    </button>
+                  ))}
+                </div>
+                <span className="fl-todo-quick-sep" aria-hidden="true" />
+                <span className="fl-todo-compose-hint">{quickHint}</span>
+              </div>
+
+              {composeDetailOpen ? (
+                <div className="fl-todo-compose-detail" id="fl-todo-compose-detail">
+                  <textarea
+                    value={quick.notes ?? ''}
+                    rows={3}
+                    placeholder="任务描述，支持与笔记相同的格式"
+                    aria-label="新任务的描述"
+                    onChange={(event) =>
+                      setQuick((current) => ({ ...current, notes: event.target.value }))
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) submitDraft()
+                      if (event.key === 'Escape') setComposeDetailOpen(false)
+                    }}
+                  />
+                  <div className="fl-todo-compose-fields">
+                    <label className="fl-todo-compose-field">
+                      优先级
+                      <select
+                        value={quick.priority ?? ''}
+                        aria-label="新任务的优先级"
+                        onChange={(event) =>
+                          setQuick((current) => ({
+                            ...current,
+                            priority:
+                              event.target.value === ''
+                                ? undefined
+                                : (event.target.value as TodoPriority),
+                          }))
+                        }
+                      >
+                        {PRIORITY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="fl-todo-compose-field">
+                      期望结束
+                      <input
+                        type="date"
+                        value={quick.due ?? ''}
+                        aria-label="新任务的期望结束日期"
+                        onChange={(event) =>
+                          setQuick((current) => ({
+                            ...current,
+                            due: event.target.value === '' ? undefined : event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <span className="fl-todo-compose-hint">Ctrl+Enter 提交</span>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
           {todos.length === 0 ? (
             <div className="fl-todo-empty">还没有任务，在下方输入并回车添加一条。</div>
           ) : (
@@ -1032,57 +1176,6 @@ export function TodoView({
                 </span>
               </div>
               {showCompleted ? <>{recent.map(doneDay)}</> : null}
-            </div>
-          ) : null}
-
-          <div className="fl-todo-add">
-            <span className="fl-todo-add-icon" aria-hidden="true">
-              ＋
-            </span>
-            <input
-              ref={draftInput}
-              type="text"
-              value={draft}
-              placeholder="添加任务，回车确认"
-              aria-label="添加任务"
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') submitDraft()
-              }}
-            />
-            <span className="fl-todo-add-kbd" aria-hidden="true">
-              Enter
-            </span>
-          </div>
-
-          {onAddFields ? (
-            <div className="fl-todo-quick" aria-label="快速添加">
-              <button
-                type="button"
-                data-active={quick.due === todayKey ? 'true' : undefined}
-                onClick={() => toggleQuick({ due: todayKey })}
-              >
-                今天
-              </button>
-              <button
-                type="button"
-                data-active={quick.due === tomorrowKey ? 'true' : undefined}
-                onClick={() => toggleQuick({ due: tomorrowKey })}
-              >
-                明天
-              </button>
-              <button
-                type="button"
-                data-active={quick.priority === 'P1' ? 'true' : undefined}
-                onClick={() => toggleQuick({ priority: 'P1' })}
-              >
-                ⚡ P1
-              </button>
-              {quick.due !== undefined || quick.priority !== undefined ? (
-                <button type="button" className="fl-todo-quick-clear" onClick={() => setQuick({})}>
-                  清除
-                </button>
-              ) : null}
             </div>
           ) : null}
 

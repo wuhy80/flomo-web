@@ -19,13 +19,14 @@ import type { Memo, TagStat, Todo, TodoPatch, TodoPriority } from '@flomo/core'
 
 /**
  * The fields a quick add can set in the same breath as the title — the
- * composer's 「今天 / 明天 / ⚡P1」 chips. Absent fields leave the task's
- * defaults, exactly as the plain `addTodo` does.
+ * composer's chips and its expandable detail editor. Absent fields leave the
+ * task's defaults, exactly as the plain `addTodo` does.
  */
 export type TodoQuickFields = {
   content: string
   due?: string | null
   priority?: TodoPriority | null
+  notes?: string | null
 }
 
 /** Where the session currently is in its lifecycle. */

@@ -1313,6 +1313,8 @@ a.fl-button {
 
 @media (max-width: 560px) {
   .fl-todo-hero { flex-direction: column; align-items: flex-start; }
+  .fl-todo-quick { padding-left: 2px; }
+  .fl-todo-compose-detail { margin-left: 2px; }
 }
 
 /* Time sections, derived from the due field the way the quadrant grid is. */
@@ -1351,13 +1353,13 @@ a.fl-button {
   color: var(--flomo-text-faint);
 }
 
-/* The composer sits at the bottom — writing a task is the panel's punchline,
-   not its preamble. The gradient plus is the one loud element on purpose. */
+/* The composer sits at the top, before the sections — write first, file
+   second. The gradient plus is the one loud element on purpose. */
 .fl-todo-add {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 2px;
   padding: 9px 12px;
   border: 1px solid var(--flomo-border-strong);
   border-radius: var(--flomo-radius);
@@ -1394,14 +1396,31 @@ a.fl-button {
 
 .fl-todo-add input::placeholder { color: var(--flomo-text-faint); }
 
-.fl-todo-add-kbd {
+/* The 详情 toggle at the input row's end: quiet until opened, then green. */
+.fl-todo-detail-toggle {
   flex: none;
-  font-size: 11px;
-  color: var(--flomo-text-faint);
-  border: 1px solid var(--flomo-border-strong);
-  border-radius: 6px;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--flomo-text-soft);
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
 }
+
+.fl-todo-detail-toggle:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+
+.fl-todo-detail-toggle[aria-expanded="true"] {
+  background: var(--flomo-green-soft);
+  color: var(--flomo-green);
+  font-weight: 600;
+}
+
+.fl-todo-detail-caret { font-size: 10px; line-height: 1; }
 
 .fl-todo-quick {
   display: flex;
@@ -1409,7 +1428,23 @@ a.fl-button {
   align-items: center;
   gap: 6px;
   margin-top: 8px;
-  padding: 0 2px;
+  padding: 0 2px 0 54px;
+}
+
+.fl-todo-quick-set { display: inline-flex; gap: 6px; }
+
+.fl-todo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fl-todo-quick-sep {
+  align-self: center;
+  width: 1px;
+  height: 16px;
+  background: var(--flomo-border-strong);
+  margin: 0 2px;
 }
 
 .fl-todo-quick button {
@@ -1436,16 +1471,98 @@ a.fl-button {
   font-weight: 600;
 }
 
-.fl-todo-quick .fl-todo-quick-clear {
-  border-color: transparent;
+/* Priority chips carry the heat dot, and light in their own colour when picked
+   — red for P1, amber for P2, blue for P3 — instead of the green every other
+   chip shares. */
+.fl-todo-quick .fl-todo-chip-p::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.fl-todo-quick .fl-todo-chip-p[data-p="P1"][data-active="true"] {
+  border-color: rgba(208, 48, 80, 0.45);
+  color: var(--flomo-danger);
+  background: rgba(208, 48, 80, 0.1);
+}
+
+.fl-todo-quick .fl-todo-chip-p[data-p="P2"][data-active="true"] {
+  border-color: rgba(176, 106, 0, 0.45);
+  color: #b06a00;
+  background: #fdf1dd;
+}
+
+.fl-todo-quick .fl-todo-chip-p[data-p="P3"][data-active="true"] {
+  border-color: var(--flomo-blue);
+  color: var(--flomo-blue-strong);
+  background: var(--flomo-blue-soft);
+}
+
+.fl-todo-compose-hint {
+  font-size: 11.5px;
   color: var(--flomo-text-faint);
 }
 
-.fl-todo-quick .fl-todo-quick-clear:hover {
-  color: var(--flomo-danger);
-  background: transparent;
-  border-color: transparent;
+/* The draft's detail editor, expanded in place under the chips — the same
+   fields a task's own detail card edits, bound to the task about to be born. */
+.fl-todo-compose-detail {
+  margin: 8px 2px 0 54px;
+  border: 1px dashed var(--flomo-border-strong);
+  border-radius: var(--flomo-radius);
+  background: var(--flomo-bg-sunken);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
 }
+
+.fl-todo-compose-detail textarea {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius-sm);
+  background: var(--flomo-bg);
+  color: var(--flomo-text);
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 9px;
+  outline: 0;
+}
+
+.fl-todo-compose-detail textarea:focus { border-color: var(--flomo-green); }
+
+.fl-todo-compose-fields {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fl-todo-compose-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--flomo-text-soft);
+}
+
+.fl-todo-compose-fields select,
+.fl-todo-compose-fields input[type="date"] {
+  font: inherit;
+  font-size: 13px;
+  color: var(--flomo-text);
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: var(--flomo-radius-sm);
+  background: var(--flomo-bg);
+  padding: 4px 6px;
+  outline: 0;
+}
+
+.fl-todo-compose-fields select:focus,
+.fl-todo-compose-fields input[type="date"]:focus { border-color: var(--flomo-green); }
 
 .fl-todo-list {
   list-style: none;

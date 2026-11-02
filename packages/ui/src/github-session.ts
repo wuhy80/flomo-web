@@ -362,6 +362,7 @@ export class GitHubVaultSession implements FlomoSession {
       const patch: TodoPatch = {}
       if (fields.due !== undefined) patch.due = fields.due
       if (fields.priority !== undefined) patch.priority = fields.priority
+      if (fields.notes !== undefined) patch.notes = fields.notes
       if (Object.keys(patch).length > 0) vault.updateTodo(todo.id, patch)
     })
   }
