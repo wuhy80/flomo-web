@@ -40,7 +40,7 @@ import {
   CHECK_PLAINTEXT,
 } from './crypto.ts'
 import type { GitHubDirEntry } from './github.ts'
-import { findTodo, indentTodoAt, insertTodoAt, moveTodoAt, outdentTodoAt, parseTodoDocument, parseTodoPlain, removeTodoAt, setTodoDone, stripCompleted, TODO_FILE, updateTodoAt } from './todos.ts'
+import { findTodo, indentTodoAt, insertTodoAt, moveTodoAt, outdentTodoAt, parseTodoDocument, parseTodoPlain, removeTodoAt, reorderTodoAt, reparentTodoAt, setTodoDone, stripCompleted, TODO_FILE, updateTodoAt } from './todos.ts'
 import type { TodoDocument } from './todos.ts'
 import { dayOf, monthOf } from './time.ts'
 import { parseTags } from './tags.ts'
@@ -699,6 +699,43 @@ export class FlomoVault {
     const existing = findTodo(this.todoItems, id)
     if (existing === null) throw new Error(`找不到 todo：${id}`)
     this.todoItems = moveTodoAt(this.todoItems, id, dir)
+    this.touchTodos()
+    return findTodo(this.todoItems, id) ?? existing
+  }
+
+  /**
+   * Move a task — subtree riding along — to become the last child of another
+   * task, the landing a drag-onto drop wants. Dropping onto itself or one of
+   * its own descendants is refused and the checklist stays as it was; a null
+   * parent lifts the task back to the top level.
+   * @param id - the todo to move.
+   * @param parentId - the parent task's id, or null for the top level.
+   * @returns the moved todo.
+   * @throws when the id is unknown.
+   */
+  moveTodoUnder(id: string, parentId: string | null): Todo {
+    const existing = findTodo(this.todoItems, id)
+    if (existing === null) throw new Error(`找不到 todo：${id}`)
+    this.todoItems = reparentTodoAt(this.todoItems, id, parentId)
+    this.touchTodos()
+    return findTodo(this.todoItems, id) ?? existing
+  }
+
+  /**
+   * Reorder a task to sit directly before or after another task, at that
+   * task's own level — the landing a drag-on-a-row-edge drop wants. The
+   * subtree rides along; a target inside the dragged subtree is refused and
+   * the checklist stays as it was.
+   * @param id - the todo to move.
+   * @param targetId - the reference task to land beside.
+   * @param side - land before or after the reference task.
+   * @returns the moved todo.
+   * @throws when the id is unknown.
+   */
+  moveTodoBeside(id: string, targetId: string, side: 'before' | 'after'): Todo {
+    const existing = findTodo(this.todoItems, id)
+    if (existing === null) throw new Error(`找不到 todo：${id}`)
+    this.todoItems = reorderTodoAt(this.todoItems, id, targetId, side)
     this.touchTodos()
     return findTodo(this.todoItems, id) ?? existing
   }

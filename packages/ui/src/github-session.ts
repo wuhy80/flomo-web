@@ -402,6 +402,16 @@ export class GitHubVaultSession implements FlomoSession {
     this.mutate((vault) => vault.moveTodo(id, dir))
   }
 
+  /** {@inheritDoc FlomoSession.moveTodoUnder} */
+  moveTodoUnder(id: string, parentId: string): void {
+    this.mutate((vault) => vault.moveTodoUnder(id, parentId))
+  }
+
+  /** {@inheritDoc FlomoSession.moveTodoBeside} */
+  moveTodoBeside(id: string, targetId: string, side: 'before' | 'after'): void {
+    this.mutate((vault) => vault.moveTodoBeside(id, targetId, side))
+  }
+
   /** {@inheritDoc FlomoSession.clearCompletedTodos} */
   clearCompletedTodos(): void {
     this.mutate((vault) => vault.clearCompletedTodos())

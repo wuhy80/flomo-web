@@ -635,6 +635,8 @@ export function FlomoApp({
               onIndent={session.indentTodo?.bind(session)}
               onOutdent={session.outdentTodo?.bind(session)}
               onMove={session.moveTodo?.bind(session)}
+              onMoveUnder={session.moveTodoUnder?.bind(session)}
+              onMoveBeside={session.moveTodoBeside?.bind(session)}
               onClearCompleted={session.clearCompletedTodos?.bind(session)}
             />
           ) : null}

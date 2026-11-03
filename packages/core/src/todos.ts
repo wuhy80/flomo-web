@@ -272,6 +272,43 @@ export function insertAfterTodoAt(todos: readonly Todo[], afterId: string, todo:
 }
 
 /**
+ * Insert a task as the previous sibling of another task — the mirror of
+ * {@linkcode insertAfterTodoAt}.
+ * @param todos - the forest.
+ * @param beforeId - the task to insert before.
+ * @param todo - the task to insert.
+ * @returns the new forest.
+ * @throws when `beforeId` is unknown.
+ */
+export function insertBeforeTodoAt(todos: readonly Todo[], beforeId: string, todo: Todo): Todo[] {
+  let changed = false
+  // Same identity discipline as insertAfterTodoAt: a level that did not
+  // change hands back its own array.
+  const walk = (list: readonly Todo[]): Todo[] => {
+    const index = list.findIndex((task) => task.id === beforeId)
+    if (index !== -1) {
+      changed = true
+      const next = [...list]
+      next.splice(index, 0, todo)
+      return next
+    }
+    let next: Todo[] | null = null
+    for (let at = 0; at < list.length; at += 1) {
+      const task = list[at]!
+      if (task.children === undefined) continue
+      const children = walk(task.children)
+      if (children === task.children) continue
+      next = next ?? [...list]
+      next[at] = { ...task, children }
+      break // one id matches, so at most one subtree changes
+    }
+    return next ?? (list as Todo[])
+  }
+  const next = walk(todos)
+  return changed ? next : (todos as Todo[])
+}
+
+/**
  * Demote a task: it becomes the last child of the sibling above it, its own
  * subtree riding along. A first child has nobody to nest under and stays put.
  * @param todos - the forest.
@@ -366,6 +403,79 @@ export function moveTodoAt(todos: readonly Todo[], id: string, dir: -1 | 1): Tod
   }
   const next = walk(todos)
   return changed ? next : (todos as Todo[])
+}
+
+/**
+ * Move a task — its whole subtree riding along — to become the last child of
+ * another task, the landing a drag-onto drop wants; `parentId === null` puts
+ * it at the top of the forest instead. A drop onto the task itself or one of
+ * its own descendants would curl the forest into a cycle, so that request is
+ * refused and the forest comes back unchanged, as does a move that would land
+ * the task under the parent it already sits under.
+ * @param todos - the forest.
+ * @param id - the task to move.
+ * @param parentId - the parent task's id, or null for the top level.
+ * @returns the new forest; the original when the move is refused or a no-op.
+ */
+export function reparentTodoAt(
+  todos: readonly Todo[],
+  id: string,
+  parentId: string | null,
+): Todo[] {
+  const task = findTodo(todos, id)
+  if (task === null) return todos as Todo[]
+  // Onto itself or into its own subtree: either request would strand the tree,
+  // because the drop target disappears together with the dragged subtree.
+  if (parentId !== null && (parentId === id || findTodo(task.children ?? [], parentId) !== null)) {
+    return todos as Todo[]
+  }
+  if (parentId !== null && findTodo(todos, parentId) === null) return todos as Todo[]
+  let currentParent: string | null = null
+  walkTodos(todos, (walking, _depth, parents) => {
+    if (walking.id === id && parents.length > 0) {
+      currentParent = parents[parents.length - 1]!.id
+    }
+  })
+  if (parentId === currentParent) return todos as Todo[] // already a child there
+  const [without, removed] = removeTodoAt(todos, id)
+  if (!removed) return todos as Todo[]
+  if (parentId === null) return [task, ...without]
+  return updateTodoAt(without, parentId, (parent) => ({
+    ...parent,
+    children: [...(parent.children ?? []), task],
+  }))
+}
+
+/**
+ * Reorder a task to sit directly before or after another task, at that
+ * task's own level — the landing a drag-on-a-row-edge drop wants. The moved
+ * task's whole subtree rides along, and the move crosses levels the way the
+ * eye expects: dropping beside a child of P makes the dragged task a child
+ * of P too. A target inside the dragged subtree would strand the target, so
+ * that request is refused and the forest comes back unchanged, as does any
+ * move with an unknown id or the target equal to the dragged task.
+ * @param todos - the forest.
+ * @param id - the task to move.
+ * @param targetId - the reference task to land beside.
+ * @param side - land before or after the reference task.
+ * @returns the new forest; the original when the move is refused or a no-op.
+ */
+export function reorderTodoAt(
+  todos: readonly Todo[],
+  id: string,
+  targetId: string,
+  side: 'before' | 'after',
+): Todo[] {
+  if (id === targetId) return todos as Todo[]
+  const task = findTodo(todos, id)
+  if (task === null) return todos as Todo[]
+  if (findTodo(todos, targetId) === null) return todos as Todo[]
+  if (findTodo(task.children ?? [], targetId) !== null) return todos as Todo[]
+  const [without, removed] = removeTodoAt(todos, id)
+  if (!removed) return todos as Todo[]
+  return side === 'after'
+    ? insertAfterTodoAt(without, targetId, task)
+    : insertBeforeTodoAt(without, targetId, task)
 }
 
 /**

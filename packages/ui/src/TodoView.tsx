@@ -19,7 +19,7 @@
 import type * as React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { QUADRANTS, findTodo, flattenTodos, groupCompletedByDay, splitTodos, todoDueState, todoQuadrant } from '@flomo/core'
+import { QUADRANTS, findTodo, flattenTodos, groupCompletedByDay, splitTodos, todoDueState, todoQuadrant, walkTodos } from '@flomo/core'
 import { isTypingTarget } from './shortcuts.ts'
 import type { CompletedDayGroup, Todo, TodoPatch, TodoPriority } from '@flomo/core'
 import type { TodoQuickFields } from './session.ts'
@@ -51,6 +51,10 @@ export interface TodoHandlers {
   onOutdent?: (id: string) => void
   /** Swap a task with the sibling above (−1) or below (+1). */
   onMove?: (id: string, dir: -1 | 1) => void
+  /** Land a dragged task under the row it was released on, as its last child. */
+  onMoveUnder?: (id: string, parentId: string) => void
+  /** Reorder a dragged task directly before or after the row it touched. */
+  onMoveBeside?: (id: string, targetId: string, side: 'before' | 'after') => void
   /** Drop every completed task. */
   onClearCompleted?: () => void
 }
@@ -321,6 +325,12 @@ function TodoRow({
   onToggleOpen,
   onExpand,
   onToggleDetail,
+  dragId,
+  dragSubtree,
+  onDragStart,
+  onDragEnd,
+  onDropUnder,
+  onDropBeside,
   handlers,
 }: {
   todo: Todo
@@ -340,6 +350,15 @@ function TodoRow({
   onToggleOpen: (id: string) => void
   onExpand: (id: string) => void
   onToggleDetail: (id: string) => void
+  /** The task under drag right now, or null between drags — every row reads
+   * it to decide whether a hover is a valid landing. */
+  dragId: string | null
+  /** The dragged task's own subtree; a drop onto it would make a cycle. */
+  dragSubtree: ReadonlySet<string>
+  onDragStart: (id: string) => void
+  onDragEnd: () => void
+  onDropUnder: (id: string, parentId: string) => void
+  onDropBeside: (id: string, targetId: string, side: 'before' | 'after') => void
   handlers: TodoHandlers
 }): React.ReactElement {
   const { onToggle, onRemove, onUpdate, onAdd } = handlers
@@ -351,12 +370,90 @@ function TodoRow({
   const open = openIds.has(todo.id)
   const detailOpen = detailId === todo.id
   const deleteArmedHere = deleteArmed === todo.id
+  // The row under the cursor answers every dragover, so the state lives here.
+  // The hover splits into three bands across the row line — top edge lands
+  // before it, bottom edge after it, the middle makes it a child — and `deny`
+  // paints the not-allowed tint for self, descendant and done targets.
+  const [dropState, setDropState] = useState<'idle' | 'child' | 'before' | 'after' | 'deny'>('idle')
+  const dragActive = dragId !== null
+  const dropAllowedHere = dragActive && dragId !== todo.id && !dragSubtree.has(todo.id) && !done
+  const clearDrop = (): void => setDropState('idle')
+  /** Which landing band the cursor is in, measured on the visible line —
+   * the `li`'s own rect would stretch over the whole expanded subtree. */
+  const hoverZone = (event: React.DragEvent<Element>): 'before' | 'after' | 'child' => {
+    const line = event.currentTarget.querySelector(':scope > .fl-todo-line')
+    if (!(line instanceof HTMLElement)) return 'child'
+    const rect = line.getBoundingClientRect()
+    const at = (event.clientY - rect.top) / rect.height
+    return at < 0.3 ? 'before' : at > 0.7 ? 'after' : 'child'
+  }
   return (
     <li
       className="fl-todo-item"
       data-done={done ? 'true' : undefined}
       data-todo-id={todo.id}
       data-selected={selected ? 'true' : undefined}
+      data-dragging={dragId === todo.id ? 'true' : undefined}
+      data-drop-child={dropState === 'child' ? 'true' : undefined}
+      data-drop-before={dropState === 'before' ? 'true' : undefined}
+      data-drop-after={dropState === 'after' ? 'true' : undefined}
+      data-drop-deny={dropState === 'deny' ? 'true' : undefined}
+      draggable={!editing && !done}
+      onDragStart={(event) => {
+        event.dataTransfer.setData('text/plain', todo.id)
+        event.dataTransfer.effectAllowed = 'move'
+        // The default ghost drags the whole expanded subtree along; a clone of
+        // just the visible line reads as "this task" instead of "this pile".
+        const line = event.currentTarget.querySelector('.fl-todo-line')
+        if (line instanceof HTMLElement) {
+          const ghost = line.cloneNode(true) as HTMLElement
+          ghost.style.cssText =
+            'position:absolute;top:-9999px;left:-9999px;width:420px;padding:7px 8px;' +
+            'background:#fff;border:1px solid var(--flomo-border-strong);' +
+            'border-radius:var(--flomo-radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.18);'
+          document.body.appendChild(ghost)
+          event.dataTransfer.setDragImage(ghost, 14, 16)
+          window.setTimeout(() => ghost.remove(), 0)
+        }
+        onDragStart(todo.id)
+      }}
+      onDragEnd={() => {
+        clearDrop()
+        onDragEnd()
+      }}
+      onDragOver={(event) => {
+        if (!dragActive) return
+        // Events bubble up from nested rows; only the innermost row may light
+        // up, and an outer row that was lit on the way in must switch off.
+        if (event.target instanceof Element && event.target.closest('[data-todo-id]') !== event.currentTarget) {
+          setDropState((current) => (current === 'idle' ? current : 'idle'))
+          return
+        }
+        if (!dropAllowedHere) {
+          event.dataTransfer.dropEffect = 'none'
+          setDropState((current) => (current === 'deny' ? current : 'deny'))
+          return
+        }
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+        const zone = hoverZone(event)
+        setDropState((current) => (current === zone ? current : zone))
+      }}
+      onDragLeave={(event) => {
+        // Crossing into a child element fires a leave for the row itself;
+        // only a departure past the row's border clears the highlight.
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) clearDrop()
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        const zone = dropAllowedHere && dragId !== null ? hoverZone(event) : null
+        clearDrop()
+        if (zone !== null && dragId !== null) {
+          if (zone === 'child') onDropUnder(dragId, todo.id)
+          else onDropBeside(dragId, todo.id, zone)
+        }
+        onDragEnd()
+      }}
     >
       <div className="fl-todo-line">
         {hasChildren ? (
@@ -465,8 +562,14 @@ function TodoRow({
               onCommitEdit={onCommitEdit}
               onCancelEdit={onCancelEdit}
               onToggleOpen={onToggleOpen}
-onExpand={onExpand}
+              onExpand={onExpand}
               onToggleDetail={onToggleDetail}
+              dragId={dragId}
+              dragSubtree={dragSubtree}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              onDropUnder={onDropUnder}
+              onDropBeside={onDropBeside}
               handlers={handlers}
             />
           ))}
@@ -531,6 +634,8 @@ export function TodoView({
   onIndent,
   onOutdent,
   onMove,
+  onMoveUnder,
+  onMoveBeside,
   onClearCompleted,
 }: TodoViewProps): React.ReactElement {
   const [draft, setDraft] = useState('')
@@ -547,11 +652,22 @@ export function TodoView({
   const [detailId, setDetailId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [deleteArmed, setDeleteArmed] = useState<string | null>(null)
+  /** The task currently being dragged, or null between drags. */
+  const [dragId, setDragId] = useState<string | null>(null)
   const draftInput = useRef<HTMLInputElement>(null)
 
-  const handlers: TodoHandlers = { onAdd, onAddFields, onEdit, onUpdate, onToggle, onRemove, onIndent, onOutdent, onMove, onClearCompleted }
+  const handlers: TodoHandlers = { onAdd, onAddFields, onEdit, onUpdate, onToggle, onRemove, onIndent, onOutdent, onMove, onMoveUnder, onMoveBeside, onClearCompleted }
 
   const { active, completed } = splitTodos(todos)
+
+  /** The dragged task's whole subtree — a drop onto any of it would curl the
+   * forest into a cycle, so those rows refuse the drop instead. */
+  const dragSubtree = useMemo(() => {
+    const ids = new Set<string>()
+    const root = dragId === null ? null : findTodo(todos, dragId)
+    if (root !== null) walkTodos([root], (todo) => ids.add(todo.id))
+    return ids
+  }, [todos, dragId])
 
   // Completed work grouped by the day it was ticked off. Anything older than
   // the three-day window moves to the archive page, which buckets those days
@@ -626,6 +742,22 @@ export function TodoView({
   /** Open a subtree without the toggle — a newly added subtask must be seen. */
   const expandTask = (id: string): void => {
     setOpenIds((current) => new Set(current).add(id))
+  }
+
+  const startDrag = (id: string): void => setDragId(id)
+  const endDrag = (): void => setDragId(null)
+
+  /** Land a dragged task under the row it was released on, then open the
+   * parent so the new nesting is seen the instant it happens. */
+  const dropUnder = (id: string, parentId: string): void => {
+    onMoveUnder?.(id, parentId)
+    expandTask(parentId)
+  }
+
+  /** Land a dragged task as the sibling right before or after the row it was
+   * released on — the row-edge reorder landing. */
+  const dropBeside = (id: string, targetId: string, side: 'before' | 'after'): void => {
+    onMoveBeside?.(id, targetId, side)
   }
 
   const toggleDetail = (id: string): void => {
@@ -856,6 +988,12 @@ export function TodoView({
           deleteArmed={deleteArmed}
           onArmRemove={armRemove}
           onConfirmRemove={confirmRemove}
+          dragId={dragId}
+          dragSubtree={dragSubtree}
+          onDragStart={startDrag}
+          onDragEnd={endDrag}
+          onDropUnder={dropUnder}
+          onDropBeside={dropBeside}
           handlers={handlers}
         />
       ))}
@@ -1135,6 +1273,12 @@ export function TodoView({
                       deleteArmed={deleteArmed}
                       onArmRemove={armRemove}
                       onConfirmRemove={confirmRemove}
+                      dragId={dragId}
+                      dragSubtree={dragSubtree}
+                      onDragStart={startDrag}
+                      onDragEnd={endDrag}
+                      onDropUnder={dropUnder}
+                      onDropBeside={dropBeside}
                       handlers={handlers}
                     />
                   ))}
@@ -1180,7 +1324,7 @@ export function TodoView({
           ) : null}
 
           <div className="fl-todo-hints" aria-hidden="true">
-            ↑↓ 选中 · Enter 编辑 · x 完成 · s 子任务 · d 详情 · 1/2/3 优先级 · Tab 缩进 · Del 删除
+            ↑↓ 选中 · Enter 编辑 · x 完成 · s 子任务 · d 详情 · 1/2/3 优先级 · Tab 缩进 · Del 删除 · 拖拽:中间设为子任务,上下边缘排序
           </div>
         </>
       ) : (

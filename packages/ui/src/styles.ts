@@ -1712,6 +1712,64 @@ a.fl-button {
   background: var(--flomo-green-soft);
 }
 
+/* 拖拽落点:悬停行分上缘/中段/下缘三带 — 上缘落它前面、下缘落它后面(排序,
+   绿色插入线),中段变它的子任务(绿环 + 徽标);会成环或落到已完成行上的
+   落点红晕拒绝。徽标与插入线都要定位锚点,行挂 relative。 */
+.fl-todo-item { position: relative; }
+
+.fl-todo-item[data-dragging="true"] > .fl-todo-line {
+  opacity: 0.4;
+  outline: 1px dashed var(--flomo-border-strong);
+  outline-offset: -1px;
+}
+
+.fl-todo-item[data-drop-child="true"] > .fl-todo-line {
+  background: var(--flomo-green-soft);
+  outline: 2px solid var(--flomo-green);
+  outline-offset: -2px;
+  box-shadow: 0 4px 14px rgba(24, 160, 88, 0.18);
+}
+
+.fl-todo-item[data-drop-child="true"] > .fl-todo-line::after {
+  content: '松开设为子任务';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--flomo-green);
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 排序落点:行上/下缘的一条绿线,落在列表缝隙的视觉位置。 */
+.fl-todo-item[data-drop-before="true"]::before,
+.fl-todo-item[data-drop-after="true"]::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--flomo-green);
+  box-shadow: 0 0 0 3px rgba(24, 160, 88, 0.15);
+  pointer-events: none;
+}
+
+.fl-todo-item[data-drop-before="true"]::before { top: -1px; }
+.fl-todo-item[data-drop-after="true"]::after { bottom: -1px; }
+
+.fl-todo-item[data-drop-deny="true"] > .fl-todo-line {
+  background: rgba(239, 68, 68, 0.07);
+  outline: 2px dashed rgba(239, 68, 68, 0.45);
+  outline-offset: -2px;
+  cursor: not-allowed;
+}
+
 .fl-todo-hints {
   margin-top: 12px;
   font-size: 11.5px;

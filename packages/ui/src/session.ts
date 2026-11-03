@@ -196,6 +196,10 @@ export interface FlomoSession {
   outdentTodo?(id: string): void
   /** Swap a task with the sibling above (−1) or below (+1). */
   moveTodo?(id: string, dir: -1 | 1): void
+  /** Move a task under another as its last child — the drag-onto landing. */
+  moveTodoUnder?(id: string, parentId: string): void
+  /** Reorder a task to sit directly before or after another task. */
+  moveTodoBeside?(id: string, targetId: string, side: 'before' | 'after'): void
   /** Drop every completed task. */
   clearCompletedTodos?(): void
 

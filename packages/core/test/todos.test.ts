@@ -22,6 +22,8 @@ import {
   parseDateOnly,
   parseTodoPlain,
   removeTodoAt,
+  reorderTodoAt,
+  reparentTodoAt,
   setTodoDone,
   splitTodos,
   stripCompleted,
@@ -510,6 +512,83 @@ describe('indent, outdent and move', () => {
     assert.equal(insertAfterTodoAt(tree, 'nope', task('x')), tree)
   })
 
+  it('reparents a task under another as the last child, subtree riding along', () => {
+    const tree: Todo[] = [
+      task('a'),
+      task('b', { children: [task('b1'), task('b2')] }),
+      task('c', { children: [task('c1')] }),
+    ]
+    const next = reparentTodoAt(tree, 'a', 'b')
+    assert.deepEqual(findTodo(next, 'b')?.children?.map((child) => child.id), ['b1', 'b2', 'a'], 'a lands last')
+    assert.deepEqual(next.map((top) => top.id), ['b', 'c'], 'a left its old spot')
+    assert.equal(findTodo(next, 'a')?.children, undefined, 'a drags in empty-handed')
+  })
+
+  it('moves a whole subtree with the drag, and refuses a drop into itself', () => {
+    const tree: Todo[] = [
+      task('a', { children: [task('a1', { children: [task('a1a')] })] }),
+      task('b'),
+    ]
+    const moved = reparentTodoAt(tree, 'a', 'b')
+    assert.deepEqual(findTodo(moved, 'b')?.children?.map((child) => child.id), ['a'], 'a rides under b')
+    assert.equal(findTodo(moved, 'a1a')?.id, 'a1a', 'the deep grandchild survives')
+    assert.equal(reparentTodoAt(tree, 'a', 'a1a'), tree, 'dropping a tree into itself is refused')
+    assert.equal(reparentTodoAt(tree, 'a', 'a'), tree, 'dropping onto itself is refused')
+    assert.equal(reparentTodoAt(tree, 'nope', 'b'), tree, 'an unknown drag source changes nothing')
+    assert.equal(reparentTodoAt(tree, 'a', 'ghost'), tree, 'an unknown parent changes nothing')
+  })
+
+  it('is a no-op when the task already sits under that parent', () => {
+    const tree: Todo[] = [task('a', { children: [task('a1'), task('a2')] })]
+    assert.equal(reparentTodoAt(tree, 'a2', 'a'), tree, 'the same array comes back')
+  })
+
+  it('reorders a task directly before or after another, at the top level', () => {
+    const tree: Todo[] = [task('a'), task('b'), task('c')]
+    assert.deepEqual(
+      reorderTodoAt(tree, 'c', 'a', 'before').map((top) => top.id),
+      ['c', 'a', 'b'],
+      'c lands right before a',
+    )
+    assert.deepEqual(
+      reorderTodoAt(tree, 'a', 'b', 'after').map((top) => top.id),
+      ['b', 'a', 'c'],
+      'a lands right after b',
+    )
+  })
+
+  it('lands beside a nested row at that row’s own level', () => {
+    const tree: Todo[] = [task('a', { children: [task('a1'), task('a2')] }), task('b')]
+    const next = reorderTodoAt(tree, 'b', 'a2', 'after')
+    assert.deepEqual(next.map((top) => top.id), ['a'], 'b left the top level')
+    assert.deepEqual(
+      findTodo(next, 'a')?.children?.map((child) => child.id),
+      ['a1', 'a2', 'b'],
+      'dropping beside a child of P joins P',
+    )
+    const back = reorderTodoAt(next, 'b', 'a2', 'before')
+    assert.deepEqual(
+      findTodo(back, 'a')?.children?.map((child) => child.id),
+      ['a1', 'b', 'a2'],
+      'b can land before a2 too',
+    )
+  })
+
+  it('refuses reorder targets inside the dragged subtree or unknown ids', () => {
+    const tree: Todo[] = [task('a', { children: [task('a1', { children: [task('a1a')] })] }), task('b')]
+    assert.equal(reorderTodoAt(tree, 'a', 'a1a', 'after'), tree, 'a target inside the drag is refused')
+    assert.equal(reorderTodoAt(tree, 'a', 'a', 'before'), tree, 'dropping beside itself changes nothing')
+    assert.equal(reorderTodoAt(tree, 'ghost', 'b', 'after'), tree, 'an unknown drag source changes nothing')
+    assert.equal(reorderTodoAt(tree, 'a', 'ghost', 'before'), tree, 'an unknown target changes nothing')
+  })
+
+  it('lifts a task back to the top level on a null parent', () => {
+    const tree: Todo[] = [task('a', { children: [task('a1')] }), task('b')]
+    const next = reparentTodoAt(tree, 'a1', null)
+    assert.deepEqual(next.map((top) => top.id), ['a1', 'a', 'b'], 'a1 lands at the top')
+    assert.equal(findTodo(next, 'a')?.children?.length, 0)
+  })
+
   it('inserts after a task at any depth', () => {
     const tree: Todo[] = [task('a', { children: [task('a1')] }), task('b')]
     const next = insertAfterTodoAt(tree, 'a1', task('a2'))
@@ -569,6 +648,52 @@ describe('vault tree operations', () => {
     const reloaded = findTodo(reopened.todos(), child.id)
     assert.ok(reloaded?.completedAt !== undefined, 'the child stamp rode along')
     assert.ok(reloaded !== null && reloaded.children === undefined)
+  })
+
+  it('moves a task under another with moveTodoUnder, refusing cycles', async () => {
+    const store = new MemoryStore()
+    const { vault } = await openVault(store)
+    const a = vault.addTodo('迁移 Node 版本')
+    const b = vault.addTodo('时序分析')
+    const c = vault.addTodo('检查 influx')
+
+    vault.moveTodoUnder(c.id, a.id)
+    assert.deepEqual(findTodo(vault.todos(), a.id)?.children?.map((child) => child.content), ['检查 influx'], 'c lands as the last child')
+    assert.deepEqual(vault.todos().map((todo) => todo.content), ['时序分析', '迁移 Node 版本'], 'c left the top level')
+
+    // The drag landing must never curl the forest: onto itself or a descendant.
+    vault.moveTodoUnder(a.id, a.id)
+    vault.moveTodoUnder(a.id, c.id)
+    assert.deepEqual(vault.todos().map((todo) => todo.content), ['时序分析', '迁移 Node 版本'], 'refused drops leave the tree as it was')
+  })
+
+  it('reorders with moveTodoBeside across levels', async () => {
+    const store = new MemoryStore()
+    const { vault } = await openVault(store)
+    const a = vault.addTodo('迁移 Node 版本')
+    const b = vault.addTodo('时序分析')
+    const c = vault.addTodo('检查 influx')
+
+    // Top level starts as [时序分析, 迁移 Node 版本, 检查 influx] — addTodo prepends.
+    vault.moveTodoUnder(c.id, a.id)
+    assert.deepEqual(findTodo(vault.todos(), a.id)?.children?.map((todo) => todo.content), ['检查 influx'])
+
+    // Dropping beside a child joins that child's parent.
+    vault.moveTodoBeside(b.id, c.id, 'before')
+    assert.deepEqual(vault.todos().map((todo) => todo.content), ['迁移 Node 版本'], 'b left the top level')
+    assert.deepEqual(
+      findTodo(vault.todos(), a.id)?.children?.map((todo) => todo.content),
+      ['时序分析', '检查 influx'],
+      'b became a child of a, ahead of c',
+    )
+
+    // A target inside the dragged subtree is refused.
+    vault.moveTodoBeside(a.id, c.id, 'after')
+    assert.deepEqual(
+      findTodo(vault.todos(), a.id)?.children?.map((todo) => todo.content),
+      ['时序分析', '检查 influx'],
+      'the refused drop leaves the tree as it was',
+    )
   })
 
   it('removes a task with its subtree and clears completed trees', async () => {
