@@ -227,6 +227,18 @@ describe('splitTodos', () => {
     assert.deepEqual(active.map((item) => item.id), ['root'])
     assert.deepEqual(completed.map((item) => item.id), ['root2'])
   })
+
+  it('keeps a root open until it is ticked itself, even with every subtask done', () => {
+    // The regression this pins: ticking the last subtask must not sweep the
+    // unticked parent into the done group — only the main task's own click does.
+    const tree: Todo = {
+      ...todo('root'),
+      children: [todo('child', '2026-10-02T08:00:00.000Z')],
+    }
+    const { active, completed } = splitTodos([tree])
+    assert.deepEqual(active.map((item) => item.id), ['root'], 'the root stays open on its own tick')
+    assert.deepEqual(completed, [])
+  })
 })
 
 describe('groupCompletedByDay', () => {

@@ -545,10 +545,12 @@ export interface TodoGroups {
 /**
  * Split the forest into open and done roots.
  *
+ * The split reads only each root's own tick — a task belongs to the done
+ * group when it itself was checked, never because its subtasks all were. A
+ * parent with every subtask ticked but its own box open stays in the open
+ * list, showing its 子任务 progress bar until the top-level click happens.
  * The stored order is the display order for open tasks; done ones sink into
- * their own group ordered by when they were ticked, newest first. A completed
- * timestamp anywhere in a root's subtree ties the root to that moment, so a
- * parent ticked through its last open child sinks with it.
+ * their own group ordered by when they were ticked, newest first.
  * @param todos - the forest, in stored order.
  * @returns the two groups.
  */
@@ -556,13 +558,12 @@ export function splitTodos(todos: readonly Todo[]): TodoGroups {
   const active: Todo[] = []
   const completed: Todo[] = []
   for (const todo of todos) {
-    const stamp = latestCompletion(todo)
-    if (stamp === null) active.push(todo)
+    if (todo.completedAt === undefined) active.push(todo)
     else completed.push(todo)
   }
   completed.sort((a, b) => {
-    const aa = latestCompletion(a) ?? ''
-    const bb = latestCompletion(b) ?? ''
+    const aa = a.completedAt ?? ''
+    const bb = b.completedAt ?? ''
     return aa < bb ? 1 : -1
   })
   return { active, completed }
