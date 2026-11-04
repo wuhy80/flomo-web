@@ -46,7 +46,7 @@ import { GITHUB_TOKEN_URL, describeTokenExpiry } from './token-status.ts'
 import { useFlomoSession } from './useFlomoSession.ts'
 import { useShortcuts } from './shortcuts.ts'
 import type { ShortcutAction } from './shortcuts.ts'
-import { showsComposer, sameView, viewTitle, diaryTagOf } from './views.ts'
+import { decodeViewParam, encodeViewParam, showsComposer, sameView, viewTitle, diaryTagOf } from './views.ts'
 import type { FlomoView } from './views.ts'
 import type { FlomoSession, UnlockOptions } from './session.ts'
 
@@ -84,6 +84,12 @@ export interface FlomoAppProps {
   onEditConnection?: () => void
   /** Inject the stylesheet on mount. */
   injectStyles?: boolean
+  /**
+   * How navigation is remembered. `'hash'` mirrors the main column into the
+   * URL hash (`#view=todo`), so TODO/全部/标签 can be bookmarked and reentered
+   * directly; `'memory'` (the default) keeps the host page's URL untouched.
+   */
+  routing?: 'hash' | 'memory'
 }
 
 /**
@@ -121,15 +127,69 @@ export function FlomoApp({
   renderUnconfigured,
   onResetConnection,
   tokenExpiresAt = null,
+  /**
+   * How navigation is remembered. `'hash'` mirrors the main column into the
+   * URL hash (`#view=todo`), so TODO/全部/标签 can be bookmarked and reentered
+   * directly; `'memory'` (the default) keeps the host page's URL untouched.
+   */
+  routing = 'memory',
   onEditConnection,
   injectStyles = true,
 }: FlomoAppProps): React.ReactElement {
   const snapshot = useFlomoSession(session)
-  const [view, setView] = useState<FlomoView>(() => {
+  const [view, setViewState] = useState<FlomoView>(() => {
     const memoId = typeof location === 'undefined' ? null : readMemoDeepLink(location.hash)
-    return memoId ? { kind: 'focus', id: memoId } : { kind: 'all' }
+    if (memoId) return { kind: 'focus', id: memoId }
+    if (routing === 'hash' && typeof location !== 'undefined') {
+      const params = new URLSearchParams(location.hash.slice(1))
+      const fromHash = decodeViewParam(params.get('view'))
+      if (fromHash !== null) return fromHash
+    }
+    return { kind: 'all' }
   })
   const [query, setQuery] = useState('')
+
+  // Hash-mirroring navigation: every view change is written into the `view`
+  // parameter alongside any deep-link params already in the hash, so
+  // TODO/全部/标签/日记 are addressable and bookmarkable. Browser
+  // back/forward and hand-edited URLs flow back through `hashchange`.
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const setView = (next: FlomoView): void => {
+    setViewState(next)
+    if (routing !== 'hash' || typeof location === 'undefined') return
+    const params = new URLSearchParams(location.hash.slice(1))
+    const value = encodeViewParam(next)
+    if (value === null) params.delete('view')
+    else params.set('view', value)
+    const nextHash = `#${params.toString()}`
+    if (window.location.hash !== nextHash) window.location.hash = nextHash
+  }
+
+  useEffect(() => {
+    if (routing !== 'hash') return
+    const onHashChange = (): void => {
+      const params = new URLSearchParams(window.location.hash.slice(1))
+      const raw = params.get('view')
+      const parsed = raw !== null ? decodeViewParam(raw) : { kind: 'all' as const }
+      if (parsed === null) return
+      setViewState((prev) => (sameView(prev, parsed) ? prev : parsed))
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [routing])
+
+  // First paint mirrors the initial view into the URL without adding a
+  // history entry, keeping other deep-link params (memo/compose) intact.
+  useEffect(() => {
+    if (routing !== 'hash' || typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    const value = encodeViewParam(viewRef.current)
+    if (value === null) params.delete('view')
+    else params.set('view', value)
+    history.replaceState(null, '', `#${params.toString()}`)
+  }, [routing])
+
   const [randomTick, setRandomTick] = useState(0)
   const [composeToken, setComposeToken] = useState(0)
   const [importMessage, setImportMessage] = useState<string | null>(null)

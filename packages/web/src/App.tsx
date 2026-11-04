@@ -238,6 +238,7 @@ export function App(): React.ReactElement {
   return (
     <FlomoApp
       session={session}
+      routing="hash"
       onResetConnection={handleResetConnection}
       tokenExpiresAt={config?.tokenExpiresAt ?? null}
       onEditConnection={() => setEditing(true)}

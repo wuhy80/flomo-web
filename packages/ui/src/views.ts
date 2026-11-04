@@ -107,3 +107,80 @@ export function showsComposer(view: FlomoView): boolean {
     view.kind === 'link'
   )
 }
+
+/**
+ * Encode one view as the value of the `view` hash parameter — the address bar
+ * form of the navigation model, so `#view=todo` is a bookmarkable address.
+ *
+ * Payloads (tag paths, memo ids) ride after a colon and are percent-encoded,
+ * matching the `#memo=` deep link that already shares this hash.
+ * @param view - the view to encode.
+ * @returns the parameter value, or null when the view kind has no address.
+ */
+export function encodeViewParam(view: FlomoView): string | null {
+  switch (view.kind) {
+    case 'todo':
+    case 'all':
+    case 'review':
+    case 'insight':
+    case 'heatmap':
+    case 'random':
+    case 'settings':
+      return view.kind
+    case 'tag':
+      return `tag:${encodeURIComponent(view.tag)}`
+    case 'day':
+      return `day:${view.day}`
+    case 'link':
+      return `link:${encodeURIComponent(view.target)}`
+    case 'focus':
+      return `focus:${encodeURIComponent(view.id)}`
+  }
+}
+
+/**
+ * Decode a `view` hash parameter back into a view — the inverse of
+ * {@linkcode encodeViewParam}.
+ *
+ * `URLSearchParams` undoes only its own transport encoding, and the hash can
+ * come from two places: this app (payload percent-encoded by
+ * {@linkcode encodeViewParam}) or a hand-typed address (payload raw). A
+ * decode that tolerates both reads '开发环境' and '%E5%BC%80...' alike, and
+ * a malformed escape refuses the value instead of throwing.
+ * @param value - the raw parameter value, or null when the hash lacked one.
+ * @returns the view, or null when the value addresses nothing recognizable.
+ */
+export function decodeViewParam(value: string | null): FlomoView | null {
+  if (value === null) return null
+  const colon = value.indexOf(':')
+  const kind = colon === -1 ? value : value.slice(0, colon)
+  const payload = colon === -1 ? '' : value.slice(colon + 1)
+  let decoded = payload
+  if (payload !== '') {
+    try {
+      decoded = decodeURIComponent(payload)
+    } catch {
+      return null // a malformed escape addresses nothing recognizable
+    }
+  }
+  switch (kind) {
+    case 'todo':
+    case 'all':
+    case 'review':
+    case 'insight':
+    case 'heatmap':
+    case 'random':
+    case 'settings':
+      return { kind } as FlomoView
+    case 'tag':
+      return decoded === '' ? null : { kind: 'tag', tag: decoded }
+    case 'day':
+      return /^\d{4}-\d{2}-\d{2}$/.test(payload) ? { kind: 'day', day: payload } : null
+    case 'link':
+      return decoded === '' ? null : { kind: 'link', target: decoded }
+    case 'focus':
+      return decoded === '' ? null : { kind: 'focus', id: decoded }
+    default:
+      return null
+  }
+}
