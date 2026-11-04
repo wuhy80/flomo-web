@@ -17,7 +17,7 @@
  */
 
 import type * as React from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { QUADRANTS, findTodo, flattenTodos, groupCompletedByDay, splitTodos, todoDueState, todoQuadrant, walkTodos } from '@flomo/core'
 import { isTypingTarget } from './shortcuts.ts'
@@ -64,14 +64,6 @@ export interface TodoViewProps extends TodoHandlers {
   todos: readonly Todo[]
 }
 
-/** Display labels for the priorities, in select order. */
-const PRIORITY_OPTIONS: ReadonlyArray<{ value: TodoPriority | ''; label: string }> = [
-  { value: '', label: '无优先级' },
-  { value: 'P1', label: 'P1 高' },
-  { value: 'P2', label: 'P2 中' },
-  { value: 'P3', label: 'P3 低' },
-]
-
 /**
  * Local `YYYY-MM-DD`, the exact shape the due field stores. Due dates carry no
  * timezone, so "today" for grouping and chips must be cut from the same cloth.
@@ -93,6 +85,30 @@ function dateKeyOf(date: Date): string {
 function dueLabel(due: string): string {
   const [, m, d] = due.split('-')
   return `${Number(m)}月${Number(d)}日`
+}
+
+/**
+ * The first meaningful line of a description, for the row's inline preview —
+ * the list should show there is something to read without opening the card.
+ * Markdown furniture (headings, quotes, list markers, emphasis marks) is
+ * stripped so the preview reads as prose.
+ * @param notes - the stored markdown description.
+ * @returns the preview line, or null when there is nothing to show.
+ */
+function notesSnippet(notes: string | undefined): string | null {
+  if (notes === undefined) return null
+  for (const raw of notes.split('\n')) {
+    const line = raw
+      .trim()
+      .replace(/^#{1,6}\s+/, '')
+      .replace(/^>\s?/, '')
+      .replace(/^[-*+]\s+(?:\[[ xX]\]\s?)?/, '')
+      .replace(/^\d+\.\s+/, '')
+      .replace(/\*\*|__|`/g, '')
+      .trim()
+    if (line !== '') return line
+  }
+  return null
 }
 
 /**
@@ -147,6 +163,52 @@ function DueBadge({ due, done }: { due: string; done: boolean }): React.ReactEle
 }
 
 /**
+ * A textarea that grows with its content — the description starts at a
+ * comfortable few lines and stretches as it is written, instead of parking
+ * three visible rows behind a scrollbar.
+ * @param props - controlled value, sizing floor and the usual handlers.
+ * @returns the textarea element.
+ */
+function AutoTextarea({
+  value,
+  placeholder,
+  ariaLabel,
+  minHeight,
+  onChange,
+  onBlur,
+  onKeyDown,
+}: {
+  value: string
+  placeholder: string
+  ariaLabel: string
+  minHeight: number
+  onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void
+  onBlur?: () => void
+  onKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
+}): React.ReactElement {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el === null) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+  return (
+    <textarea
+      ref={ref}
+      className="fl-todo-notes-input"
+      style={{ minHeight }}
+      value={value}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      onChange={onChange}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+    />
+  )
+}
+
+/**
  * The detail card under a row: description with markdown, priority, due date
  * and the subtask add row.
  *
@@ -194,24 +256,31 @@ function TodoDetail({
   return (
     <div className="fl-todo-detail">
       <div className="fl-todo-detail-fields">
-        <label className="fl-todo-field">
+        <div className="fl-todo-field">
           <span className="fl-todo-field-label">优先级</span>
-          <select
-            value={todo.priority ?? ''}
-            aria-label="优先级"
-            onChange={(event) =>
-              onUpdate?.(todo.id, {
-                priority: event.target.value === '' ? null : (event.target.value as TodoPriority),
-              })
-            }
-          >
-            {PRIORITY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
+          <div className="fl-todo-pri-set" role="group" aria-label="优先级">
+            <button
+              type="button"
+              className="fl-todo-pri-opt"
+              data-active={todo.priority === undefined ? 'true' : undefined}
+              onClick={() => onUpdate?.(todo.id, { priority: null })}
+            >
+              无
+            </button>
+            {(['P1', 'P2', 'P3'] as const).map((priority) => (
+              <button
+                key={priority}
+                type="button"
+                className="fl-todo-pri-opt"
+                data-p={priority}
+                data-active={todo.priority === priority ? 'true' : undefined}
+                onClick={() => onUpdate?.(todo.id, { priority })}
+              >
+                {priority}
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
         <label className="fl-todo-field">
           <span className="fl-todo-field-label">期望结束</span>
           <input
@@ -246,12 +315,11 @@ function TodoDetail({
             )}
           </div>
         ) : (
-          <textarea
-            className="fl-todo-notes-input"
+          <AutoTextarea
             value={notes}
-            rows={3}
+            minHeight={96}
             placeholder="描述这个任务，支持与笔记相同的格式"
-            aria-label="任务描述"
+            ariaLabel="任务描述"
             onChange={(event) => setNotes(event.target.value)}
             onBlur={commitNotes}
             onKeyDown={(event) => {
@@ -370,6 +438,7 @@ function TodoRow({
   const open = openIds.has(todo.id)
   const detailOpen = detailId === todo.id
   const deleteArmedHere = deleteArmed === todo.id
+  const snippet = notesSnippet(todo.notes)
   // The row under the cursor answers every dragover, so the state lives here.
   // The hover splits into three bands across the row line — top edge lands
   // before it, bottom edge after it, the middle makes it a child — and `deny`
@@ -529,6 +598,12 @@ function TodoRow({
           <span className="fl-todo-subprogress-track">
             <i style={{ width: `${Math.round((subDone / children.length) * 100)}%` }} />
           </span>
+        </div>
+      ) : null}
+
+      {!done && !detailOpen && snippet !== null ? (
+        <div className="fl-todo-notes-snippet" title={snippet}>
+          {snippet}
         </div>
       ) : null}
 
@@ -1186,11 +1261,11 @@ export function TodoView({
 
               {composeDetailOpen ? (
                 <div className="fl-todo-compose-detail" id="fl-todo-compose-detail">
-                  <textarea
+                  <AutoTextarea
                     value={quick.notes ?? ''}
-                    rows={3}
+                    minHeight={96}
                     placeholder="任务描述，支持与笔记相同的格式"
-                    aria-label="新任务的描述"
+                    ariaLabel="新任务的描述"
                     onChange={(event) =>
                       setQuick((current) => ({ ...current, notes: event.target.value }))
                     }
@@ -1200,28 +1275,6 @@ export function TodoView({
                     }}
                   />
                   <div className="fl-todo-compose-fields">
-                    <label className="fl-todo-compose-field">
-                      优先级
-                      <select
-                        value={quick.priority ?? ''}
-                        aria-label="新任务的优先级"
-                        onChange={(event) =>
-                          setQuick((current) => ({
-                            ...current,
-                            priority:
-                              event.target.value === ''
-                                ? undefined
-                                : (event.target.value as TodoPriority),
-                          }))
-                        }
-                      >
-                        {PRIORITY_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
                     <label className="fl-todo-compose-field">
                       期望结束
                       <input

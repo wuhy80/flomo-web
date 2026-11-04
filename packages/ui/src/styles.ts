@@ -1509,34 +1509,19 @@ a.fl-button {
    fields a task's own detail card edits, bound to the task about to be born. */
 .fl-todo-compose-detail {
   margin: 8px 2px 0 54px;
-  border: 1px dashed var(--flomo-border-strong);
+  border: 1px solid var(--flomo-border);
   border-radius: var(--flomo-radius);
-  background: var(--flomo-bg-sunken);
-  padding: 10px 12px;
+  background: var(--flomo-bg);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
 }
-
-.fl-todo-compose-detail textarea {
-  width: 100%;
-  min-height: 56px;
-  resize: vertical;
-  border: 1px solid var(--flomo-border-strong);
-  border-radius: var(--flomo-radius-sm);
-  background: var(--flomo-bg);
-  color: var(--flomo-text);
-  font: inherit;
-  font-size: 13px;
-  padding: 7px 9px;
-  outline: 0;
-}
-
-.fl-todo-compose-detail textarea:focus { border-color: var(--flomo-green); }
 
 .fl-todo-compose-fields {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -1544,25 +1529,10 @@ a.fl-button {
 .fl-todo-compose-field {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
   color: var(--flomo-text-soft);
 }
-
-.fl-todo-compose-fields select,
-.fl-todo-compose-fields input[type="date"] {
-  font: inherit;
-  font-size: 13px;
-  color: var(--flomo-text);
-  border: 1px solid var(--flomo-border-strong);
-  border-radius: var(--flomo-radius-sm);
-  background: var(--flomo-bg);
-  padding: 4px 6px;
-  outline: 0;
-}
-
-.fl-todo-compose-fields select:focus,
-.fl-todo-compose-fields input[type="date"]:focus { border-color: var(--flomo-green); }
 
 .fl-todo-list {
   list-style: none;
@@ -2039,48 +2009,102 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
 .fl-todo-act[aria-pressed="true"] { color: var(--flomo-green); }
 
 /* The detail card sits inside the row, indented to the title's left edge. */
+/* 详情卡片:白底浮在白面板上,靠轻阴影和更大圆角分层;内边距放宽给描述
+   区足够的呼吸感。 */
 .fl-todo-detail {
   margin: 6px 0 6px 26px;
-  padding: 10px 12px;
-  border: 1px solid var(--flomo-border-strong);
+  padding: 12px 14px;
+  border: 1px solid var(--flomo-border);
   border-radius: var(--flomo-radius);
   background: var(--flomo-bg);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .fl-todo-detail-fields {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .fl-todo-field {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .fl-todo-field-label {
   font-size: 12px;
   color: var(--flomo-text-soft);
+  letter-spacing: 0.2px;
 }
 
-.fl-todo-detail-fields select,
-.fl-todo-detail-fields input[type="date"] {
+/* 优先级分段胶囊:无/P1/P2/P3 一排点选即存,替代旧的裸下拉;选中色沿用
+   快捷胶囊的热度 — P1 红、P2 琥珀、P3 蓝。 */
+.fl-todo-pri-set {
+  display: inline-flex;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 999px;
+  background: var(--flomo-bg);
+  overflow: hidden;
+}
+
+.fl-todo-pri-opt {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--flomo-text-soft);
+  padding: 4px 13px;
+  cursor: pointer;
+}
+
+.fl-todo-pri-opt + .fl-todo-pri-opt { border-left: 1px solid var(--flomo-border); }
+
+.fl-todo-pri-opt:hover { background: var(--flomo-hover); color: var(--flomo-text); }
+
+.fl-todo-pri-opt[data-active="true"] {
+  background: var(--flomo-green-soft);
+  color: var(--flomo-green);
+  font-weight: 600;
+}
+
+.fl-todo-pri-opt[data-p="P1"][data-active="true"] {
+  background: rgba(208, 48, 80, 0.1);
+  color: var(--flomo-danger);
+}
+
+.fl-todo-pri-opt[data-p="P2"][data-active="true"] {
+  background: #fdf1dd;
+  color: #b06a00;
+}
+
+.fl-todo-pri-opt[data-p="P3"][data-active="true"] {
+  background: var(--flomo-blue-soft);
+  color: var(--flomo-blue-strong);
+}
+
+/* 期望结束:填充式圆角输入,聚焦时转白底绿边。 */
+.fl-todo-detail-fields input[type="date"],
+.fl-todo-compose-fields input[type="date"] {
   font: inherit;
   font-size: 13px;
   color: var(--flomo-text);
-  border: 1px solid var(--flomo-border-strong);
-  border-radius: var(--flomo-radius-sm);
-  background: var(--flomo-bg);
-  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--flomo-input-bg);
+  padding: 5px 12px;
   outline: 0;
 }
 
-.fl-todo-detail-fields select:focus,
-.fl-todo-detail-fields input[type="date"]:focus { border-color: var(--flomo-green); }
+.fl-todo-detail-fields input[type="date"]:focus,
+.fl-todo-compose-fields input[type="date"]:focus {
+  background: var(--flomo-bg);
+  border-color: var(--flomo-green);
+}
 
 .fl-todo-notes { display: flex; flex-direction: column; gap: 4px; }
 
@@ -2103,28 +2127,39 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
 
 .fl-todo-notes-toggle:hover { background: var(--flomo-hover); }
 
+/* 描述输入区:高度跟随内容自动增长(AutoTextarea 负责),起点就有约四行,
+   行高放宽让 markdown 草稿读得下去;聚焦时绿边加柔和外圈。 */
 .fl-todo-notes-input {
   width: 100%;
-  resize: vertical;
-  min-height: 58px;
+  resize: none;
+  overflow: hidden;
+  min-height: 96px;
   border: 1px solid var(--flomo-border-strong);
   border-radius: var(--flomo-radius-sm);
   font: inherit;
   font-size: 13.5px;
+  line-height: 1.65;
   color: var(--flomo-text);
   background: var(--flomo-bg);
-  padding: 7px 9px;
+  padding: 9px 11px;
   outline: 0;
 }
 
-.fl-todo-notes-input:focus { border-color: var(--flomo-green); }
+.fl-todo-notes-input::placeholder { color: var(--flomo-text-faint); }
+
+.fl-todo-notes-input:focus {
+  border-color: var(--flomo-green);
+  background: var(--flomo-bg);
+  box-shadow: 0 0 0 3px var(--flomo-green-soft);
+}
 
 /* The rendered description reuses the memo body's classes at a smaller size. */
 .fl-todo-notes-body {
   font-size: 13.5px;
+  line-height: 1.7;
   border: 1px solid var(--flomo-border);
   border-radius: var(--flomo-radius-sm);
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: var(--flomo-bg-sunken);
 }
 
@@ -2134,10 +2169,14 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
-  border: 1px dashed var(--flomo-border-strong);
-  border-radius: var(--flomo-radius-sm);
+  padding: 6px 12px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 999px;
+  background: var(--flomo-bg);
+  transition: border-color 0.12s ease;
 }
+
+.fl-todo-subadd:focus-within { border-color: var(--flomo-green); }
 
 .fl-todo-subadd input {
   flex: 1;
@@ -2151,6 +2190,16 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
 }
 
 .fl-todo-subadd input::placeholder { color: var(--flomo-text-faint); }
+
+/* 行内描述摘要:描述写好后,标题下透出第一行,列表不必点开也能读到。 */
+.fl-todo-notes-snippet {
+  font-size: 12.5px;
+  color: var(--flomo-text-soft);
+  padding: 2px 8px 2px 32px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .fl-todo-detail-close {
   align-self: flex-end;
