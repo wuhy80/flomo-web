@@ -317,7 +317,7 @@ function TodoDetail({
         ) : (
           <AutoTextarea
             value={notes}
-            minHeight={96}
+            minHeight={140}
             placeholder="描述这个任务，支持与笔记相同的格式"
             ariaLabel="任务描述"
             onChange={(event) => setNotes(event.target.value)}
@@ -399,6 +399,12 @@ function TodoRow({
   onDragEnd,
   onDropUnder,
   onDropBeside,
+  subQuickId,
+  subDraft,
+  onSubDraftChange,
+  onOpenSubQuick,
+  onCommitSubQuick,
+  onCancelSubQuick,
   handlers,
 }: {
   todo: Todo
@@ -427,6 +433,15 @@ function TodoRow({
   onDragEnd: () => void
   onDropUnder: (id: string, parentId: string) => void
   onDropBeside: (id: string, targetId: string, side: 'before' | 'after') => void
+  /** The row whose inline subtask input is open, or null between uses. */
+  subQuickId: string | null
+  /** The live draft of that inline input. */
+  subDraft: string
+  onSubDraftChange: (text: string) => void
+  onOpenSubQuick: (id: string) => void
+  /** Enter lands here: add the draft, keep the input open for the next one. */
+  onCommitSubQuick: (id: string) => void
+  onCancelSubQuick: () => void
   handlers: TodoHandlers
 }): React.ReactElement {
   const { onToggle, onRemove, onUpdate, onAdd } = handlers
@@ -439,6 +454,7 @@ function TodoRow({
   const detailOpen = detailId === todo.id
   const deleteArmedHere = deleteArmed === todo.id
   const snippet = notesSnippet(todo.notes)
+  const subQuickOpen = subQuickId === todo.id
   // The row under the cursor answers every dragover, so the state lives here.
   // The hover splits into three bands across the row line — top edge lands
   // before it, bottom edge after it, the middle makes it a child — and `deny`
@@ -539,57 +555,86 @@ function TodoRow({
           <span className="fl-todo-caret" aria-hidden="true" />
         )}
         <TodoCheck todo={todo} onToggle={onToggle} />
-        {editing ? (
-          <input
-            className="fl-todo-edit"
-            type="text"
-            value={editText}
-            aria-label="编辑任务"
-            onChange={(event) => onEditText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') onCommitEdit()
-              if (event.key === 'Escape') onCancelEdit()
-            }}
-            onBlur={onCommitEdit}
-            autoFocus
-          />
-        ) : (
-          <>
-            <button
-              type="button"
-              className="fl-todo-text"
-              title="点击编辑标题"
-              onClick={() => onStartEdit(todo)}
-            >
-              {todo.content}
-            </button>
-            {todo.priority !== undefined ? <PriorityChip priority={todo.priority} /> : null}
-            {todo.due !== undefined ? <DueBadge due={todo.due} done={done} /> : null}
-            <span className="fl-todo-actions">
+        <div className="fl-todo-main">
+          {editing ? (
+            <input
+              className="fl-todo-edit"
+              type="text"
+              value={editText}
+              aria-label="编辑任务"
+              onChange={(event) => onEditText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onCommitEdit()
+                if (event.key === 'Escape') onCancelEdit()
+              }}
+              onBlur={onCommitEdit}
+              autoFocus
+            />
+          ) : (
+            <>
+              <button
+                type="button"
+                className="fl-todo-text"
+                title="点击编辑标题"
+                onClick={() => onStartEdit(todo)}
+              >
+                {todo.content}
+              </button>
+              {!done && (todo.priority !== undefined || snippet !== null) ? (
+                <div className="fl-todo-sub">
+                  {todo.priority !== undefined ? (
+                    <span
+                      className="fl-todo-pri-dot"
+                      data-p={todo.priority}
+                      title={`优先级 ${todo.priority}`}
+                    />
+                  ) : null}
+                  {snippet !== null ? (
+                    <span className="fl-todo-sub-note" title={snippet}>
+                      {snippet}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+        {!editing && todo.due !== undefined ? <DueBadge due={todo.due} done={done} /> : null}
+        {!editing ? (
+          <span className="fl-todo-actions">
+            {!done && onAdd !== undefined ? (
               <button
                 type="button"
                 className="fl-todo-act"
-                aria-pressed={detailOpen}
-                title="详情"
-                onClick={() => onToggleDetail(todo.id)}
+                title="添加子任务"
+                onClick={() => onOpenSubQuick(todo.id)}
               >
-                详情
+                子任务
               </button>
-              <button
-                type="button"
-                className={deleteArmedHere ? 'fl-todo-remove fl-todo-remove-confirm' : 'fl-todo-remove'}
-                aria-label={deleteArmedHere ? `确认删除「${todo.content}」及其子任务` : `删除「${todo.content}」`}
-                title={deleteArmedHere ? '再次点击确认删除' : '删除'}
-                data-confirm={deleteArmedHere ? 'true' : undefined}
-                onClick={() =>
-                  deleteArmedHere ? onConfirmRemove(todo.id) : onArmRemove(todo.id)
-                }
-              >
-                {deleteArmedHere ? '确认删除？' : '×'}
-              </button>
-            </span>
-          </>
-        )}
+            ) : null}
+            <button
+              type="button"
+              className="fl-todo-act"
+              aria-pressed={detailOpen}
+              title="详情"
+              onClick={() => onToggleDetail(todo.id)}
+            >
+              详情
+            </button>
+            <button
+              type="button"
+              className={deleteArmedHere ? 'fl-todo-remove fl-todo-remove-confirm' : 'fl-todo-remove'}
+              aria-label={deleteArmedHere ? `确认删除「${todo.content}」及其子任务` : `删除「${todo.content}」`}
+              title={deleteArmedHere ? '再次点击确认删除' : '删除'}
+              data-confirm={deleteArmedHere ? 'true' : undefined}
+              onClick={() =>
+                deleteArmedHere ? onConfirmRemove(todo.id) : onArmRemove(todo.id)
+              }
+            >
+              {deleteArmedHere ? '确认删除？' : '×'}
+            </button>
+          </span>
+        ) : null}
       </div>
 
       {hasChildren && !done ? (
@@ -601,9 +646,24 @@ function TodoRow({
         </div>
       ) : null}
 
-      {!done && !detailOpen && snippet !== null ? (
-        <div className="fl-todo-notes-snippet" title={snippet}>
-          {snippet}
+      {subQuickOpen ? (
+        <div className="fl-todo-subquick">
+          <span className="fl-todo-add-icon" aria-hidden="true">
+            ＋
+          </span>
+          <input
+            type="text"
+            value={subDraft}
+            placeholder="添加子任务，回车确认，可连续添加"
+            aria-label={`为「${todo.content}」添加子任务`}
+            onChange={(event) => onSubDraftChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') onCommitSubQuick(todo.id)
+              if (event.key === 'Escape') onCancelSubQuick()
+            }}
+            onBlur={() => onCommitSubQuick(todo.id)}
+            autoFocus
+          />
         </div>
       ) : null}
 
@@ -645,6 +705,12 @@ function TodoRow({
               onDragEnd={onDragEnd}
               onDropUnder={onDropUnder}
               onDropBeside={onDropBeside}
+              subQuickId={subQuickId}
+              subDraft={subDraft}
+              onSubDraftChange={onSubDraftChange}
+              onOpenSubQuick={onOpenSubQuick}
+              onCommitSubQuick={onCommitSubQuick}
+              onCancelSubQuick={onCancelSubQuick}
               handlers={handlers}
             />
           ))}
@@ -655,23 +721,32 @@ function TodoRow({
 }
 
 /**
- * The hero band: today's date, a greeting, and a progress ring for the whole
- * checklist. Pure display — everything it shows is derived from the counts the
- * panel already holds, so it can never disagree with the sections below.
- * @param props - completed and total task counts.
- * @returns the hero element.
+ * The Things-style head: a big 「今天 ★」 title, a quiet greeting line, and a
+ * round add button that drops the caret into the composer. Pure display —
+ * everything it shows is derived from the counts the panel already holds.
+ * @param props - completed and total task counts, plus the add click.
+ * @returns the head element.
  */
-function TodoHero({ done, total }: { done: number; total: number }): React.ReactElement {
+function TodoHero({
+  done,
+  total,
+  onAdd,
+}: {
+  done: number
+  total: number
+  onAdd?: () => void
+}): React.ReactElement {
   const now = new Date()
   const hour = now.getHours()
   const greet = hour < 6 ? '夜深了' : hour < 12 ? '上午好' : hour < 18 ? '下午好' : '晚上好'
   const week = '日一二三四五六'[now.getDay()]
-  const pct = total === 0 ? 0 : Math.round((done / total) * 100)
   const left = total - done
   return (
-    <div className="fl-todo-hero">
-      <div className="fl-todo-hero-text">
-        <h2>今天</h2>
+    <div className="fl-todo-head">
+      <div>
+        <h2>
+          今天 <span className="fl-todo-head-star" aria-hidden="true">★</span>
+        </h2>
         <p>
           {now.getMonth() + 1}月{now.getDate()}日 星期{week} · {greet}
           {total === 0
@@ -681,14 +756,9 @@ function TodoHero({ done, total }: { done: number; total: number }): React.React
               : '，全部完成 🎉'}
         </p>
       </div>
-      <div
-        className="fl-todo-ring"
-        role="img"
-        aria-label={`已完成 ${done} / ${total}，${pct}%`}
-        style={{ '--pct': `${pct}%` } as React.CSSProperties}
-      >
-        <span>{pct}%</span>
-      </div>
+      <button type="button" className="fl-todo-head-add" aria-label="新建任务" onClick={onAdd}>
+        ＋
+      </button>
     </div>
   )
 }
@@ -729,6 +799,10 @@ export function TodoView({
   const [deleteArmed, setDeleteArmed] = useState<string | null>(null)
   /** The task currently being dragged, or null between drags. */
   const [dragId, setDragId] = useState<string | null>(null)
+  /** The row whose inline subtask input is open, plus its live draft — Enter
+   * keeps the input open so several subtasks land in one sitting. */
+  const [subQuickId, setSubQuickId] = useState<string | null>(null)
+  const [subDraft, setSubDraft] = useState('')
   const draftInput = useRef<HTMLInputElement>(null)
 
   const handlers: TodoHandlers = { onAdd, onAddFields, onEdit, onUpdate, onToggle, onRemove, onIndent, onOutdent, onMove, onMoveUnder, onMoveBeside, onClearCompleted }
@@ -833,6 +907,28 @@ export function TodoView({
    * released on — the row-edge reorder landing. */
   const dropBeside = (id: string, targetId: string, side: 'before' | 'after'): void => {
     onMoveBeside?.(id, targetId, side)
+  }
+
+  /** Open the inline subtask input under a row — no detail card needed. */
+  const openSubQuick = (id: string): void => {
+    setSubQuickId(id)
+    setSubDraft('')
+  }
+  /** Commit the inline draft: add it under the row and keep the input open
+   * for the next subtask; an empty draft just closes the input. */
+  const commitSubQuick = (id: string): void => {
+    const content = subDraft.trim()
+    if (content === '') {
+      setSubQuickId(null)
+      return
+    }
+    onAdd?.(content, id)
+    expandTask(id)
+    setSubDraft('')
+  }
+  const cancelSubQuick = (): void => {
+    setSubQuickId(null)
+    setSubDraft('')
   }
 
   const toggleDetail = (id: string): void => {
@@ -975,11 +1071,7 @@ export function TodoView({
         case 's':
         case 'S':
           event.preventDefault()
-          expandTask(selectedId)
-          setDetailId(selectedId)
-          requestAnimationFrame(() => {
-            document.querySelector<HTMLInputElement>('.fl-todo-detail .fl-todo-subadd input')?.focus()
-          })
+          openSubQuick(selectedId)
           return
         case 'd':
         case 'D':
@@ -1069,6 +1161,12 @@ export function TodoView({
           onDragEnd={endDrag}
           onDropUnder={dropUnder}
           onDropBeside={dropBeside}
+          subQuickId={subQuickId}
+          subDraft={subDraft}
+          onSubDraftChange={setSubDraft}
+          onOpenSubQuick={openSubQuick}
+          onCommitSubQuick={commitSubQuick}
+          onCancelSubQuick={cancelSubQuick}
           handlers={handlers}
         />
       ))}
@@ -1166,7 +1264,11 @@ export function TodoView({
 
   return (
     <div className="fl-todo">
-      <TodoHero done={completed.length} total={active.length + completed.length} />
+      <TodoHero
+        done={completed.length}
+        total={active.length + completed.length}
+        onAdd={() => draftInput.current?.focus()}
+      />
 
       <div className="fl-todo-modes" role="tablist" aria-label="视图">
         <button
@@ -1263,7 +1365,7 @@ export function TodoView({
                 <div className="fl-todo-compose-detail" id="fl-todo-compose-detail">
                   <AutoTextarea
                     value={quick.notes ?? ''}
-                    minHeight={96}
+                    minHeight={140}
                     placeholder="任务描述，支持与笔记相同的格式"
                     ariaLabel="新任务的描述"
                     onChange={(event) =>
@@ -1332,6 +1434,12 @@ export function TodoView({
                       onDragEnd={endDrag}
                       onDropUnder={dropUnder}
                       onDropBeside={dropBeside}
+                      subQuickId={subQuickId}
+                      subDraft={subDraft}
+                      onSubDraftChange={setSubDraft}
+                      onOpenSubQuick={openSubQuick}
+                      onCommitSubQuick={commitSubQuick}
+                      onCancelSubQuick={cancelSubQuick}
                       handlers={handlers}
                     />
                   ))}

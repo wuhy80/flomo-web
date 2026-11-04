@@ -1234,85 +1234,59 @@ a.fl-button {
 
 .fl-todo { display: flex; flex-direction: column; }
 
-/* The hero band: today at a glance. The ring reads its sweep from --pct, set
-   inline by the component from the done/total counts. */
-.fl-todo-hero {
-  position: relative;
-  overflow: hidden;
+/* The Things-style head: a big 「今天 ★」 title, a quiet greeting line, and a
+   round add button that drops the caret into the composer below. */
+.fl-todo-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 12px;
-  padding: 20px 22px 18px;
-  border-radius: 14px;
-  color: #fff;
-  background: linear-gradient(120deg, var(--flomo-green) 0%, #4cbb80 100%);
+  padding: 2px 6px 14px;
 }
 
-.fl-todo-hero::after {
-  content: "";
-  position: absolute;
-  right: -40px;
-  top: -55px;
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.fl-todo-hero::before {
-  content: "";
-  position: absolute;
-  right: 60px;
-  bottom: -75px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.fl-todo-hero-text { position: relative; z-index: 1; }
-
-.fl-todo-hero-text h2 {
+.fl-todo-head h2 {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
   line-height: 1.25;
+  letter-spacing: 0.2px;
 }
 
-.fl-todo-hero-text p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  opacity: 0.92;
+.fl-todo-head-star {
+  color: #f5a623;
+  font-size: 17px;
+  margin-left: 4px;
+  vertical-align: 2px;
 }
 
-.fl-todo-ring {
-  position: relative;
-  z-index: 1;
+.fl-todo-head p {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  color: var(--flomo-text-soft);
+}
+
+.fl-todo-head-add {
   flex: none;
-  width: 52px;
-  height: 52px;
+  width: 38px;
+  height: 38px;
+  border: 0;
   border-radius: 50%;
-  background: conic-gradient(#fff var(--pct), rgba(255, 255, 255, 0.28) 0);
-  display: grid;
-  place-items: center;
+  background: var(--flomo-input-bg);
+  color: var(--flomo-text-soft);
+  font: inherit;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.fl-todo-ring span {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  display: grid;
-  place-items: center;
-  font-size: 11.5px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+.fl-todo-head-add:hover {
+  background: var(--flomo-green);
+  color: #fff;
+  transform: scale(1.05);
 }
 
 @media (max-width: 560px) {
-  .fl-todo-hero { flex-direction: column; align-items: flex-start; }
   .fl-todo-quick { padding-left: 2px; }
   .fl-todo-compose-detail { margin-left: 2px; }
 }
@@ -1331,15 +1305,15 @@ a.fl-button {
 }
 
 .fl-todo-section-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
 }
 
 .fl-todo-section-dot[data-tone="overdue"] { background: var(--flomo-danger); }
 .fl-todo-section-dot[data-tone="today"] { background: var(--flomo-green); }
 .fl-todo-section-dot[data-tone="upcoming"] { background: #b06a00; }
-.fl-todo-section-dot[data-tone="someday"] { background: var(--flomo-text-faint); }
+.fl-todo-section-dot[data-tone="someday"] { background: #c9c9ce; }
 
 .fl-todo-section-count {
   color: var(--flomo-text-faint);
@@ -1355,16 +1329,22 @@ a.fl-button {
 
 /* The composer sits at the top, before the sections — write first, file
    second. The gradient plus is the one loud element on purpose. */
+/* composer:Things 式一行新建——无边框的安静一行,聚焦/输入时才见边界。 */
 .fl-todo-add {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-top: 2px;
-  padding: 9px 12px;
-  border: 1px solid var(--flomo-border-strong);
+  padding: 10px 12px;
+  border: 1px solid transparent;
   border-radius: var(--flomo-radius);
+  background: transparent;
+}
+
+.fl-todo-add:focus-within {
+  border-color: var(--flomo-border);
   background: var(--flomo-bg);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
 }
 
 .fl-todo-add-icon {
@@ -1547,31 +1527,70 @@ a.fl-button {
 }
 
 /* A task row now carries optional detail and subtasks, so the <li> is a
-   column and the visible line is a row of its own. */
+   column and the visible line is a row of its own. Rows separate by air, not
+   by hairlines — the Things way — with hover giving the only grouping cue. */
 .fl-todo-item {
   display: block;
   padding: 3px;
   border-radius: var(--flomo-radius-sm);
 }
 
-.fl-todo-item + .fl-todo-item { border-top: 1px solid var(--flomo-border); }
+.fl-todo-item + .fl-todo-item { margin-top: 2px; }
 
 .fl-todo-line {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 7px 8px;
+  padding: 8px 10px;
   border-radius: var(--flomo-radius-sm);
 }
 
 .fl-todo-line:hover { background: var(--flomo-hover); }
 
+/* The title column: everything that hangs under the title — the description
+   preview and the priority dot — lives in this quiet second row. */
+.fl-todo-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fl-todo-sub {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--flomo-text-soft);
+}
+
+.fl-todo-pri-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.fl-todo-pri-dot[data-p="P1"] { background: var(--flomo-danger); }
+.fl-todo-pri-dot[data-p="P2"] { background: #e8a23d; }
+.fl-todo-pri-dot[data-p="P3"] { background: var(--flomo-blue); }
+
+.fl-todo-sub-note {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* The round tick box: an outlined circle while open, the vault green filled
    with a white check once done — the one bit of colour on the panel. */
 .fl-todo-check {
   flex: none;
-  width: 19px;
-  height: 19px;
+  width: 21px;
+  height: 21px;
+  margin-top: 1px;
   border: 1.5px solid var(--flomo-border-strong);
   border-radius: 50%;
   background: transparent;
@@ -1582,10 +1601,11 @@ a.fl-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
 
 .fl-todo-check:hover { border-color: var(--flomo-green); }
+.fl-todo-check:active { transform: scale(0.88); }
 
 .fl-todo-check[data-done="true"] {
   background: var(--flomo-green);
@@ -1599,6 +1619,7 @@ a.fl-button {
   background: transparent;
   font: inherit;
   font-size: 14.5px;
+  line-height: 1.45;
   color: var(--flomo-text);
   text-align: left;
   cursor: text;
@@ -1649,12 +1670,12 @@ a.fl-button {
 .fl-todo-remove-confirm:hover { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.18); }
 
 /* Subtask progress under a parent's line: a count and a hairline track, quiet
-   unless the number moves. */
+   unless the number moves. Indented to the title's left edge. */
 .fl-todo-subprogress {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 3px 0 4px 40px;
+  margin: 2px 0 4px 66px;
   font-size: 12px;
   color: var(--flomo-text-soft);
   font-variant-numeric: tabular-nums;
@@ -1751,8 +1772,9 @@ a.fl-button {
 /* Done rows keep their place in the completed group: dimmed, struck through,
    and with the delete affordance one hover away like the open rows. */
 .fl-todo-item[data-done="true"] .fl-todo-text {
-  color: var(--flomo-text-soft);
+  color: var(--flomo-text-faint);
   text-decoration: line-through;
+  transition: color 0.2s ease;
 }
 
 .fl-todo-done { margin-top: 14px; }
@@ -1920,6 +1942,7 @@ a.fl-button {
 .fl-todo-caret {
   flex: none;
   width: 16px;
+  margin-top: 3px;
   border: 0;
   background: transparent;
   font-size: 11px;
@@ -1964,21 +1987,21 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
 .fl-todo-priority[data-priority="P2"] { color: #b06a00; background: #fdf1dd; }
 .fl-todo-priority[data-priority="P3"] { color: var(--flomo-blue-strong); background: var(--flomo-blue-soft); }
 
+/* The due badge, Things way: plain text, not a pill — urgent days speak in
+   colour, future days stay quiet grey. */
 .fl-todo-due {
   flex: none;
-  font-size: 11.5px;
+  margin-top: 2px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1;
   color: var(--flomo-text-soft);
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--flomo-input-bg);
   font-variant-numeric: tabular-nums;
 }
 
-.fl-todo-due[data-state="near"] { color: #b06a00; background: #fdf1dd; font-weight: 600; }
-.fl-todo-due[data-state="overdue"] { color: var(--flomo-danger); background: rgba(208, 48, 80, 0.1); font-weight: 600; }
-.fl-todo-due[data-state="today"] { color: var(--flomo-green); background: var(--flomo-green-soft); font-weight: 600; }
+.fl-todo-due[data-state="today"] { color: var(--flomo-danger); font-weight: 600; }
+.fl-todo-due[data-state="overdue"] { color: var(--flomo-danger); font-weight: 600; }
+.fl-todo-due[data-state="near"] { color: #b06a00; font-weight: 600; }
 
 .fl-todo-item[data-done="true"] .fl-todo-due { display: none; }
 
@@ -1986,6 +2009,7 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
   flex: none;
   display: flex;
   gap: 2px;
+  margin-top: 1px;
   opacity: 0;
   transition: opacity 0.1s ease;
 }
@@ -2009,15 +2033,14 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
 .fl-todo-act[aria-pressed="true"] { color: var(--flomo-green); }
 
 /* The detail card sits inside the row, indented to the title's left edge. */
-/* 详情卡片:白底浮在白面板上,靠轻阴影和更大圆角分层;内边距放宽给描述
-   区足够的呼吸感。 */
+/* 详情区:Things 化——不再是一张浮卡,而是行下方无边框的内联浅灰区域,
+   缩进与标题对齐;描述区因此可以放得更高更宽。 */
 .fl-todo-detail {
-  margin: 6px 0 6px 26px;
+  margin: 2px 10px 8px 66px;
   padding: 12px 14px;
-  border: 1px solid var(--flomo-border);
+  border: 0;
   border-radius: var(--flomo-radius);
-  background: var(--flomo-bg);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  background: var(--flomo-bg-sunken);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -2127,13 +2150,13 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
 
 .fl-todo-notes-toggle:hover { background: var(--flomo-hover); }
 
-/* 描述输入区:高度跟随内容自动增长(AutoTextarea 负责),起点就有约四行,
+/* 描述输入区:高度跟随内容自动增长(AutoTextarea 负责),起点就有约六行,
    行高放宽让 markdown 草稿读得下去;聚焦时绿边加柔和外圈。 */
 .fl-todo-notes-input {
   width: 100%;
   resize: none;
   overflow: hidden;
-  min-height: 96px;
+  min-height: 140px;
   border: 1px solid var(--flomo-border-strong);
   border-radius: var(--flomo-radius-sm);
   font: inherit;
@@ -2153,14 +2176,15 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
   box-shadow: 0 0 0 3px var(--flomo-green-soft);
 }
 
-/* The rendered description reuses the memo body's classes at a smaller size. */
+/* The rendered description reuses the memo body's classes at a smaller size.
+   White on the sunken detail area, so it reads as the "paper" being written. */
 .fl-todo-notes-body {
   font-size: 13.5px;
   line-height: 1.7;
   border: 1px solid var(--flomo-border);
   border-radius: var(--flomo-radius-sm);
   padding: 10px 12px;
-  background: var(--flomo-bg-sunken);
+  background: var(--flomo-bg);
 }
 
 .fl-todo-notes-empty { color: var(--flomo-text-faint); font-size: 13px; }
@@ -2191,15 +2215,43 @@ button.fl-todo-caret:hover { color: var(--flomo-text); }
 
 .fl-todo-subadd input::placeholder { color: var(--flomo-text-faint); }
 
-/* 行内描述摘要:描述写好后,标题下透出第一行,列表不必点开也能读到。 */
-.fl-todo-notes-snippet {
-  font-size: 12.5px;
-  color: var(--flomo-text-soft);
-  padding: 2px 8px 2px 32px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* 行级快捷子任务输入:悬停行的「子任务」入口展开的胶囊输入,回车连续
+   添加,Esc 或空白失焦关闭——不必先打开详情卡。 */
+.fl-todo-subquick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 10px 8px 66px;
+  padding: 7px 12px;
+  border: 1px solid var(--flomo-border-strong);
+  border-radius: 999px;
+  background: var(--flomo-bg);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
+
+.fl-todo-subquick:focus-within {
+  border-color: var(--flomo-green);
+  box-shadow: 0 0 0 3px var(--flomo-green-soft);
+}
+
+.fl-todo-subquick .fl-todo-add-icon { width: 22px; height: 22px; font-size: 12px; }
+
+.fl-todo-subquick input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--flomo-text);
+  outline: 0;
+  padding: 0;
+}
+
+.fl-todo-subquick input::placeholder { color: var(--flomo-text-faint); }
+
+/* 行内描述摘要:描述写好后,标题下透出第一行,列表不必点开也能读到。 */
+/* 行内描述摘要已并入行的第二行(.fl-todo-sub),此处不再单独渲染。 */
 
 .fl-todo-detail-close {
   align-self: flex-end;
