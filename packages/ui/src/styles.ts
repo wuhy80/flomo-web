@@ -261,6 +261,12 @@ export const FLOMO_CSS = `
   overflow-x: hidden;
 }
 
+/* The TODO checklist reads better wide: long task titles and markdown
+   descriptions get the room the memo feed doesn't need. */
+.fl-main-wide {
+  width: min(86vw, 1240px);
+}
+
 .fl-column {
   padding: 24px 0 120px;
 }

@@ -233,7 +233,9 @@ function TodoDetail({
   onClose: () => void
 }): React.ReactElement {
   const [notes, setNotes] = useState(todo.notes ?? '')
-  const [preview, setPreview] = useState(false)
+  // A description that already exists opens as formatted markdown — the card
+  // is a reader first; 「编辑」 flips into the textarea to change it.
+  const [preview, setPreview] = useState((todo.notes ?? '').trim() !== '')
   const [subDraft, setSubDraft] = useState('')
   const subInput = useRef<HTMLInputElement>(null)
 

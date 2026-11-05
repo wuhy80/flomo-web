@@ -525,7 +525,7 @@ export function FlomoApp({
         showSettings={showSettings}
       />
 
-      <main className="fl-main">
+      <main className={view.kind === 'todo' ? 'fl-main fl-main-wide' : 'fl-main'}>
         <div className="fl-column">
           <div className="fl-column-head">
             <div className="fl-title-wrap" ref={titleMenu}>
