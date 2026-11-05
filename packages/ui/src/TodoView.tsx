@@ -309,7 +309,11 @@ function TodoDetail({
           </button>
         </div>
         {preview ? (
-          <div className="fl-todo-notes-body">
+          <div
+            className="fl-todo-notes-body"
+            title="双击进入编辑"
+            onDoubleClick={() => setPreview(false)}
+          >
             {notes.trim() === '' ? (
               <span className="fl-todo-notes-empty">还没有描述</span>
             ) : (
